@@ -7,11 +7,11 @@ class Config(object):
     # pyro client config
     API_ID    = os.environ.get("API_ID", "22299340")
     API_HASH  = os.environ.get("API_HASH", "09b09f3e2ff1306da4a19888f614d937")
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "7906213903:AAHe9TSuy9aRwnNvasku2K09DfcqblC71kw") 
+    BOT_TOKEN = os.environ.get("BOT_TOKEN", "") 
 
     # database config
     DB_NAME = os.environ.get("DB_NAME","codeflix")     
-    DB_URL  = os.environ.get("DB_URL","mongodb+srv://n4animeedit:u80hdwhlka5NBFfY@cluster0.jowvb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    DB_URL  = os.environ.get("DB_URL","")
     PORT = os.environ.get("PORT", "9090")
  
     # other configs
@@ -19,8 +19,8 @@ class Config(object):
     START_PIC   = os.environ.get("START_PIC", "https://graph.org/file/29a3acbbab9de5f45a5fe.jpg")
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]
     FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'animelibraryn4').split(',')
-    LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1001896877147"))
-    DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1002263636517"))
+    LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002263636517"))
+    DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "--1001896877147"))
     
     # web response configuration     
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
