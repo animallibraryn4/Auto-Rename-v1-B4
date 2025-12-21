@@ -12,10 +12,16 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
 
-pyrogram.utils.MIN_CHANNEL_ID = -1002263636517
+# --- DNS PATCH FOR TERMUX (FIX: resolv.conf error) ---
+import dns.resolver
+dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+dns.resolver.default_resolver.nameservers = ['8.8.8.8']
+# ----------------------------------------------------
+
+pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 # Setting SUPPORT_CHAT directly here
-SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1002263636517"))
+SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
 
 class Bot(Client):
 
@@ -25,7 +31,7 @@ class Bot(Client):
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
             bot_token=Config.BOT_TOKEN,
-            workers=200,
+            workers=50,  
             plugins={"root": "plugins"},
             sleep_threshold=15,
         )
@@ -59,7 +65,7 @@ class Bot(Client):
                     chat_id=chat_id,
                     photo=Config.START_PIC,
                     caption=(
-                        "**ɪᴛᴀᴄʜɪ ɪs ʀᴇsᴛᴀʀᴛᴇᴅ ᴀɢᴀɪɴ  !**\n\n"
+                        "**ᴀɴʏᴀ ɪs ʀᴇsᴛᴀʀᴛᴇᴅ ᴀɢᴀɪɴ  !**\n\n"
                         f"ɪ ᴅɪᴅɴ'ᴛ sʟᴇᴘᴛ sɪɴᴄᴇ: `{uptime_string}`"
                     ),
                     reply_markup=InlineKeyboardMarkup(
@@ -73,3 +79,4 @@ class Bot(Client):
                 print(f"Failed to send message in chat {chat_id}: {e}")
 
 Bot().run()
+
