@@ -42,7 +42,8 @@ class Database:
             audio='By @Animelibraryn4',
             subtitle='By @Animelibraryn4',
             video='Encoded By @Animelibraryn4',
-            media_type=None
+            media_type=None,
+            rename_mode="file"
         )
 
     async def add_user(self, b, m):
@@ -325,6 +326,26 @@ class Database:
         except Exception as e:
             logging.error(f"Error deleting verify status for user {id}: {e}")
             return False
+
+     async def set_rename_mode(self, id, mode):
+         try:
+             await self.col.update_one(
+                 {"_id": int(id)},
+                 {"$set": {"rename_mode": mode}},
+                 upsert=True
+             )
+             return True
+         except Exception as e:
+             logging.error(f"Error setting rename mode for user {id}: {e}")
+             return False
+   
+     async def get_rename_mode(self, id):
+         try:
+             user = await self.col.find_one({"_id": int(id)})
+             return user.get("rename_mode", "file") if user else "file"  # Default to file mode
+         except Exception as e:
+             logging.error(f"Error getting rename mode for user {id}: {e}")
+             return "file"
 
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
