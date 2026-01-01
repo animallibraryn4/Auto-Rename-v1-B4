@@ -304,8 +304,9 @@ async def process_rename(client: Client, message: Message):
     _, file_extension = os.path.splitext(file_name)
     renamed_file_name = f"{format_template}{file_extension}"
     
+    
     # Create paths
-    download_path = f"downloads/{message.id}_{renamed_file_name}"
+    download_path = f"downloads/{message.id}{file_extension}"
     metadata_path = f"Metadata/{message.id}_{renamed_file_name}"
     os.makedirs("downloads", exist_ok=True)
     os.makedirs("Metadata", exist_ok=True)
