@@ -30,6 +30,11 @@ user_queues = {}
 renaming_operations = {}
 recent_verification_checks = {}
 
+# Enhanced patterns for Caption Mode (more flexible formats)
+pattern_caption_season = re.compile(r'(?:season|saison|sezon|сезон|temporada)\s*[:=-]?\s*(\d+)', re.IGNORECASE)
+pattern_caption_episode = re.compile(r'(?:episode|ep|eps|эпизод|cap[íi]tulo)\s*[:=-]?\s*(\d+)', re.IGNORECASE)
+pattern_caption_season_episode = re.compile(r'(?:season|s)\s*(\d+)\s*(?:episode|ep)\s*(\d+)', re.IGNORECASE)
+
 # Patterns for extracting file information
 pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
 pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
@@ -148,6 +153,36 @@ async def convert_to_mkv(input_path, output_path):
         error_message = stderr.decode()
         raise Exception(f"MKV conversion failed: {error_message}")
 
+def extract_quality(text):
+    """Extract quality from text with enhanced caption support"""
+    # Enhanced patterns for caption mode
+    caption_quality_patterns = [
+        (re.compile(r'(?:quality|resolution|res|qualit[ée])\s*[:=-]?\s*(\d{3,4}[^\dp]*p)', re.IGNORECASE), 
+         lambda m: m.group(1)),
+        (re.compile(r'(?:quality|resolution|res|qualit[ée])\s*[:=-]?\s*(\d{3,4}p)', re.IGNORECASE), 
+         lambda m: m.group(1)),
+        (re.compile(r'\b(?:HD|Full HD|FHD|UHD|4K|2K|HDR|HDRip)\b', re.IGNORECASE),
+         lambda m: m.group(0)),
+    ]
+    
+    # Try caption-specific patterns first
+    for pattern, quality in caption_quality_patterns:
+        match = re.search(pattern, text)
+        if match:
+            return quality(match) if callable(quality) else quality
+    
+    # Then try standard patterns
+    for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
+                            (pattern6, "4k"), 
+                            (pattern7, "2k"), 
+                            (pattern8, "HdRip"), 
+                            (pattern9, "4kX264"), 
+                            (pattern10, "4kx265")]:
+        match = re.search(pattern, text)
+        if match: 
+            return quality(match) if callable(quality) else quality
+    return "Unknown"
+
 def extract_quality(filename):
     for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
                             (pattern6, "4k"), 
@@ -160,9 +195,21 @@ def extract_quality(filename):
             return quality(match) if callable(quality) else quality
     return "Unknown"
 
-def extract_episode_number(filename):
+def extract_episode_number(text, is_caption_mode=False):
+    """Extract episode number from text, with enhanced support for caption mode"""
+    if is_caption_mode:
+        # First try caption-specific patterns
+        match = pattern_caption_episode.search(text)
+        if match:
+            return match.group(1)
+        
+        match = pattern_caption_season_episode.search(text)
+        if match:
+            return match.group(2)
+    
+    # Then try standard patterns (for backward compatibility)
     for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
-        match = re.search(pattern, filename)
+        match = pattern.search(text)
         if match: 
             if pattern in [pattern1, pattern2, pattern4]:
                 return match.group(2) 
@@ -170,9 +217,21 @@ def extract_episode_number(filename):
                 return match.group(1)
     return None
 
-def extract_season_number(filename):
+def extract_season_number(text, is_caption_mode=False):
+    """Extract season number from text, with enhanced support for caption mode"""
+    if is_caption_mode:
+        # First try caption-specific patterns
+        match = pattern_caption_season.search(text)
+        if match:
+            return match.group(1)
+        
+        match = pattern_caption_season_episode.search(text)
+        if match:
+            return match.group(1)
+    
+    # Then try standard patterns (for backward compatibility)
     for pattern in [pattern1, pattern4]:
-        match = re.search(pattern, filename)
+        match = pattern.search(text)
         if match: 
             return match.group(1)
     return None
@@ -212,10 +271,10 @@ async def forward_to_dump_channel(client, path, media_type, ph_path, file_name, 
     except Exception as e:
         logger.error(f"[DUMP ERROR] {e}")
 
-# Modify the extract_info_from_source function to handle both modes:
 async def extract_info_from_source(message, user_mode):
     """Extract season, episode, quality from source based on mode"""
     user_id = message.from_user.id
+    is_caption_mode = user_mode == "caption_mode"
     
     if user_mode == "file_mode":
         # Extract from file name (existing logic)
@@ -226,18 +285,18 @@ async def extract_info_from_source(message, user_mode):
         elif message.audio:
             source_text = message.audio.file_name or ""
         else:
-            return None, None, None, None
+            return None, None, None, None, None
     else:  # caption_mode
         # Extract from caption
         source_text = message.caption or ""
     
-    # Extract season number
-    season_number = extract_season_number(source_text)
+    # Extract season number with mode awareness
+    season_number = extract_season_number(source_text, is_caption_mode)
     
-    # Extract episode number
-    episode_number = extract_episode_number(source_text)
+    # Extract episode number with mode awareness
+    episode_number = extract_episode_number(source_text, is_caption_mode)
     
-    # Extract quality
+    # Extract quality (enhanced for caption mode)
     extracted_quality = extract_quality(source_text)
     standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
     
@@ -246,7 +305,6 @@ async def extract_info_from_source(message, user_mode):
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
 
-# Modify the process_rename function to use the mode:
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
