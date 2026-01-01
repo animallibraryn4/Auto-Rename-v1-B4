@@ -374,14 +374,14 @@ async def extract_info_from_source(message, user_mode):
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
 
-# Extract information based on mode
-season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
+    # Extract information based on mode
+    season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
 
-# DEBUG: Log what was extracted
-source_text = message.caption if user_mode == "caption_mode" else file_name
-logger.info(f"User Mode: {user_mode}")
-logger.info(f"Source Text: {source_text}")
-logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
+    # DEBUG: Log what was extracted
+    source_text = message.caption if user_mode == "caption_mode" else file_name
+    logger.info(f"User Mode: {user_mode}")
+    logger.info(f"Source Text: {source_text}")
+    logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
 
 async def process_rename(client: Client, message: Message):
     ph_path = None
