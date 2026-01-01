@@ -30,12 +30,31 @@ user_queues = {}
 renaming_operations = {}
 recent_verification_checks = {}
 
-# Enhanced patterns for Caption Mode (more flexible formats)
-pattern_caption_season = re.compile(r'(?:season|saison|sezon|сезон|temporada)\s*[:=-]?\s*(\d+)', re.IGNORECASE)
-pattern_caption_episode = re.compile(r'(?:episode|ep|eps|эпизод|cap[íi]tulo)\s*[:=-]?\s*(\d+)', re.IGNORECASE)
-pattern_caption_season_episode = re.compile(r'(?:season|s)\s*(\d+)\s*(?:episode|ep)\s*(\d+)', re.IGNORECASE)
+# ===== Enhanced Patterns for Caption Mode =====
+# These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
+pattern_caption_season_verbose = re.compile(
+    r'(?:season|saison|sezon|сезон|temporada|сезона|temporada)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
+pattern_caption_episode_verbose = re.compile(
+    r'(?:episode|ep|eps|эпизод|cap[íi]tulo|серия|episodio)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
+pattern_caption_season_episode_combined = re.compile(
+    r'(?:season|s)\s*[:=-]?\s*(\d+)\s*(?:episode|ep)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
 
-# Patterns for extracting file information
+# Special pattern for formats like "Season 10 Episode 01" without punctuation
+pattern_caption_simple = re.compile(
+    r'(?:season|s)\s*(\d+)\s*(?:episode|ep)\s*(\d+)', 
+    re.IGNORECASE
+)
+
+# Enhanced pattern for any number pairs that might be season/episode
+pattern_caption_number_pair = re.compile(r'(\d+)\s*(?:[-~]|and|&|,)\s*(\d+)', re.IGNORECASE)
+
+# Original patterns for backward compatibility
 pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
 pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
 pattern3 = re.compile(r'(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)')
@@ -183,19 +202,78 @@ def extract_quality(text):
             return quality(match) if callable(quality) else quality
     return "Unknown"
 
-def extract_episode_number(text, is_caption_mode=False):
-    """Extract episode number from text, with enhanced support for caption mode"""
+def extract_season_number(text, is_caption_mode=False):
+    """Extract season number from text with enhanced caption support"""
+    if not text:
+        return None
+    
     if is_caption_mode:
-        # First try caption-specific patterns
-        match = pattern_caption_episode.search(text)
+        # Clean the text first
+        clean_text = re.sub(r'\s+', ' ', text.strip())
+        
+        # Try verbose caption patterns first
+        match = pattern_caption_season_verbose.search(clean_text)
         if match:
             return match.group(1)
         
-        match = pattern_caption_season_episode.search(text)
+        # Try combined pattern
+        match = pattern_caption_season_episode_combined.search(clean_text)
+        if match:
+            return match.group(1)
+        
+        # Try simple pattern
+        match = pattern_caption_simple.search(clean_text)
+        if match:
+            return match.group(1)
+        
+        # Try number pair pattern (first number as season)
+        match = pattern_caption_number_pair.search(clean_text)
+        if match:
+            # If we have two numbers and context suggests season/episode
+            # Check if the text contains season/episode keywords
+            if any(keyword in clean_text.lower() for keyword in ['season', 'episode', 'ep', 's', 'e']):
+                return match.group(1)
+    
+    # Fall back to original patterns for file mode or as backup
+    for pattern in [pattern1, pattern4]:
+        match = pattern.search(text)
+        if match: 
+            return match.group(1)
+    
+    return None
+
+def extract_episode_number(text, is_caption_mode=False):
+    """Extract episode number from text with enhanced caption support"""
+    if not text:
+        return None
+    
+    if is_caption_mode:
+        # Clean the text first
+        clean_text = re.sub(r'\s+', ' ', text.strip())
+        
+        # Try verbose caption patterns first
+        match = pattern_caption_episode_verbose.search(clean_text)
+        if match:
+            return match.group(1)
+        
+        # Try combined pattern
+        match = pattern_caption_season_episode_combined.search(clean_text)
         if match:
             return match.group(2)
+        
+        # Try simple pattern
+        match = pattern_caption_simple.search(clean_text)
+        if match:
+            return match.group(2)
+        
+        # Try number pair pattern (second number as episode)
+        match = pattern_caption_number_pair.search(clean_text)
+        if match:
+            # If we have two numbers and context suggests season/episode
+            if any(keyword in clean_text.lower() for keyword in ['season', 'episode', 'ep', 's', 'e']):
+                return match.group(2)
     
-    # Then try standard patterns (for backward compatibility)
+    # Fall back to original patterns for file mode or as backup
     for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
         match = pattern.search(text)
         if match: 
@@ -203,25 +281,7 @@ def extract_episode_number(text, is_caption_mode=False):
                 return match.group(2) 
             else:
                 return match.group(1)
-    return None
-
-def extract_season_number(text, is_caption_mode=False):
-    """Extract season number from text, with enhanced support for caption mode"""
-    if is_caption_mode:
-        # First try caption-specific patterns
-        match = pattern_caption_season.search(text)
-        if match:
-            return match.group(1)
-        
-        match = pattern_caption_season_episode.search(text)
-        if match:
-            return match.group(1)
     
-    # Then try standard patterns (for backward compatibility)
-    for pattern in [pattern1, pattern4]:
-        match = pattern.search(text)
-        if match: 
-            return match.group(1)
     return None
 
 def extract_volume_chapter(filename):
@@ -278,11 +338,32 @@ async def extract_info_from_source(message, user_mode):
         # Extract from caption
         source_text = message.caption or ""
     
+    # Clean and normalize the text for better extraction
+    if source_text:
+        source_text = re.sub(r'\s+', ' ', source_text.strip())
+    
     # Extract season number with mode awareness
     season_number = extract_season_number(source_text, is_caption_mode)
     
     # Extract episode number with mode awareness
     episode_number = extract_episode_number(source_text, is_caption_mode)
+    
+    # Special handling for common caption patterns
+    if is_caption_mode and not episode_number and season_number:
+        # If we have season but no episode, check if season was mis-extracted as episode
+        # Look for episode pattern again with different approach
+        episode_patterns = [
+            r'episode\s*[:=-]?\s*(\d+)',
+            r'ep\s*[:=-]?\s*(\d+)',
+            r'eps?\s*(\d+)',
+            r'e\s*(\d+)',
+        ]
+        
+        for ep_pattern in episode_patterns:
+            match = re.search(ep_pattern, source_text, re.IGNORECASE)
+            if match:
+                episode_number = match.group(1)
+                break
     
     # Extract quality (enhanced for caption mode)
     extracted_quality = extract_quality(source_text)
@@ -292,6 +373,15 @@ async def extract_info_from_source(message, user_mode):
     volume_number, chapter_number = extract_volume_chapter(source_text)
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
+
+# Extract information based on mode
+season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
+
+# DEBUG: Log what was extracted
+source_text = message.caption if user_mode == "caption_mode" else file_name
+logger.info(f"User Mode: {user_mode}")
+logger.info(f"Source Text: {source_text}")
+logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
 
 async def process_rename(client: Client, message: Message):
     ph_path = None
@@ -350,7 +440,14 @@ async def process_rename(client: Client, message: Message):
 
     # Extract information based on mode
     season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
+    
+    # DEBUG: Log what was extracted
+    source_text = message.caption if user_mode == "caption_mode" else file_name
+    logger.info(f"User Mode: {user_mode}")
+    logger.info(f"Source Text: {source_text}")
+    logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
 
+    
     # Apply extracted information to format template
     if episode_number:
         format_template = format_template.replace("[EP.NUM]", str(episode_number)).replace("{episode}", str(episode_number))
