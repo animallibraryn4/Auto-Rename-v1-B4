@@ -510,6 +510,7 @@ async def process_rename(client: Client, message: Message):
                 await client.send_document(
                     message.chat.id,
                     document=path,
+                    file_name=renamed_file_name,
                     thumb=ph_path,
                     caption=caption,
                     progress=progress_for_pyrogram,
@@ -519,6 +520,7 @@ async def process_rename(client: Client, message: Message):
                 await client.send_video(
                     message.chat.id,
                     video=path,
+                    file_name=renamed_file_name,
                     caption=caption,
                     thumb=ph_path,
                     duration=0,
@@ -529,6 +531,7 @@ async def process_rename(client: Client, message: Message):
                 await client.send_audio(
                     message.chat.id,
                     audio=path,
+                    file_name=renamed_file_name,
                     caption=caption,
                     thumb=ph_path,
                     duration=0,
