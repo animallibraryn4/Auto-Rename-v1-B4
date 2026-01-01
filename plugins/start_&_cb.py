@@ -65,9 +65,8 @@ async def start(client, message: Message):
             disable_web_page_preview=True
         )
 
-
-# Callback Query Handler - FIXED: Only handles specific callbacks, not all
-@Client.on_callback_query(filters.regex(r'^(home|caption|help|meta|donate|file_names|thumbnail|metadatax|source|premiumx|plans|about|close|setmedia_|on_metadata|off_metadata|metainfo|back_to_welcome|premium_page|close_message)$'))
+# Update the callback regex pattern to include mode-related callbacks:
+@Client.on_callback_query(filters.regex(r'^(home|caption|help|meta|donate|file_names|thumbnail|metadatax|source|premiumx|plans|about|close|setmedia_|on_metadata|off_metadata|metainfo|back_to_welcome|premium_page|close_message|set_mode_|close_mode)$'))
 async def cb_handler(client, query: CallbackQuery):
     data = query.data
     user_id = query.from_user.id
