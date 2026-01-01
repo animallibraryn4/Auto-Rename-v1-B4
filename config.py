@@ -141,7 +141,8 @@ Pʀɪᴄɪɴɢ:
 ➲ /Autorename: ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇs.
 ➲ /Metadata: ᴄᴏɱᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ.
 ➲ /smart_thumb: ᴏᴘᴇɴ ᴀ ᴍᴇɴᴜ ᴛᴏ ꜱᴇᴛ, ᴠɪᴇᴡ, ᴏʀ ᴅᴇʟᴇᴛᴇ ᴛʜᴜᴍʙɴᴀɪʟꜱ ꜰᴏʀ ᴇᴀᴄʜ ᴠɪᴅᴇᴏ ǫᴜᴀʟɪᴛʏ (360p, 480p, 720p, 1080p, 2K, 4K, etc).
-➲ /get_token: ɢᴇᴛ ᴀ ᴛᴏᴋᴇɴ ᴛᴏ ᴠᴇʀɪғʏ ʏᴏᴜʀsᴇʟғ ᴀɴᴅ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ ᴡɪᴛʜᴏᴜᴛ ʀᴇsᴛʀɪᴄᴛɪᴏɴs."""
+➲ /get_token: ɢᴇᴛ ᴀ ᴛᴏᴋᴇɴ ᴛᴏ ᴠᴇʀɪғʏ ʏᴏᴜʀsᴇʟғ ᴀɴᴅ ᴜsᴇ ᴛʜᴇ ʙᴏᴛ ᴡɪᴛʜᴏᴜᴛ ʀᴇsᴛʀɪᴄᴛɪᴏɴs.
+➲ /mode: sᴡɪᴛᴄʜ ʙᴇᴛᴡᴇᴇɴ ꜰɪʟᴇ ᴍᴏᴅᴇ ᴀɴᴅ ᴄᴀᴘᴛɪᴏɴ ᴍᴏᴅᴇ."""
 
     SEND_METADATA = """
 <b><pre>Metadata Settings:</pre></b>
@@ -204,5 +205,6 @@ Pʀɪᴄɪɴɢ:
     UPI_TXT = "👋 Hey {},\n\nPay the amount according to your selected plan and enjoy plan membership!\n\n💵 <b>UPI ID:</b> <code>dm @PYato</code>\n\n‼️ You must send a screenshot after payment."
     
     QR_TXT = "👋 Hey {},\n\nPay the amount according to your membership price!\n\n📸 <b>QR Code:</b> <a href='https://t.me/Animelibraryn4'>Click here to scan</a>\n\n‼️ You must send a screenshot after payment."
-    
+
+
 
