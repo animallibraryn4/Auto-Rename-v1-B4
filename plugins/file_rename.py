@@ -478,29 +478,27 @@ async def process_rename(client: Client, message: Message):
 
         # ===== RESTORED FROM OLD FILE: Quality-Based Thumbnail Selection =====
         c_caption = await codeflixbots.get_caption(message.chat.id)
-        
-        # Get quality from filename for thumbnail selection
-        extracted_quality = extract_quality(file_name)
-        standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
-        
+
         # Try to get quality-specific thumbnail first
         c_thumb = None
         is_global_enabled = await codeflixbots.is_global_thumb_enabled(user_id)
-
+ 
         if is_global_enabled:
             c_thumb = await codeflixbots.get_global_thumb(user_id)
         else:
-            if standard_quality:
-                c_thumb = await codeflixbots.get_quality_thumbnail(user_id, standard_quality)
-            
-            # Fall back to default thumbnail if no quality-specific one exists
-            if not c_thumb:
-                c_thumb = await codeflixbots.get_thumbnail(user_id)
-        
+             # Use the already-extracted quality (based on user's mode)
+             # standard_quality was already extracted in extract_info_from_source()
+             if standard_quality:
+                 c_thumb = await codeflixbots.get_quality_thumbnail(user_id, standard_quality)
+    
+             # Fall back to default thumbnail if no quality-specific one exists
+             if not c_thumb:
+                 c_thumb = await codeflixbots.get_thumbnail(user_id)
+
         # If still no thumbnail, check for video thumbnails
         if not c_thumb and media_type == "video" and message.video.thumbs:
             c_thumb = message.video.thumbs[0].file_id
-
+ 
         caption = (
             c_caption.format(
                 filename=renamed_file_name,
