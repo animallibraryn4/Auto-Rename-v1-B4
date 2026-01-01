@@ -2,15 +2,24 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import codeflixbots
 
+# You might want to update the autorename command response to mention the mode feature:
+
 @Client.on_message(filters.private & filters.command("autorename"))
 async def auto_rename_command(client, message):
     user_id = message.from_user.id
-
+    
+    # Get current mode
+    current_mode = await codeflixbots.get_mode(user_id)
+    
     # Extract and validate the format from the command
     command_parts = message.text.split(maxsplit=1)
     if len(command_parts) < 2 or not command_parts[1].strip():
         await message.reply_text(
             "**Please provide a new name after the command /autorename**\n\n"
+            f"**Current Mode:** `{current_mode.replace('_', ' ').title()}`\n"
+            "**File Mode:** Extracts from file name\n"
+            "**Caption Mode:** Extracts from file caption\n"
+            "Use /mode to switch modes\n\n"
             "Here's how to use it:\n"
             "**Example format:** ` /autorename S[SE.NUM]EP[EP.NUM] your video title [QUALITY]`"
         )
@@ -24,10 +33,12 @@ async def auto_rename_command(client, message):
     # Send confirmation message with the template in monospaced font
     await message.reply_text(
         f"**🌟 Fantastic! You're ready to auto-rename your files.**\n\n"
-        "📩 Simply send the file(s) you want to rename.\n\n"
+        f"**Current Mode:** `{current_mode.replace('_', ' ').title()}`\n\n"
+        f"📩 Simply send the file(s) you want to rename.\n\n"
         f"**Your saved template:** `{format_template}`\n\n"
         "Remember, it might take some time, but I'll ensure your files are renamed perfectly!✨"
     )
+
 
 @Client.on_message(filters.private & filters.command("setmedia"))
 async def set_media_command(client, message):
