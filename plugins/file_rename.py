@@ -30,20 +30,61 @@ user_queues = {}
 renaming_operations = {}
 recent_verification_checks = {}
 
-# Patterns for extracting file information
-pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
-pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
-pattern3 = re.compile(r'(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)')
-pattern3_2 = re.compile(r'(?:\s*-\s*(\d+)\s*)')
-pattern4 = re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE)
-patternX = re.compile(r'(\d+)')
-pattern5 = re.compile(r'\b(?:.*?(\d{3,4}[^\dp]*p).*?|.*?(\d{3,4}p))\b', re.IGNORECASE)
-pattern6 = re.compile(r'[([<{]?\s*4k\s*[)\]>}]?', re.IGNORECASE)
-pattern7 = re.compile(r'[([<{]?\s*2k\s*[)\]>}]?', re.IGNORECASE)
-pattern8 = re.compile(r'[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b', re.IGNORECASE)
-pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
-pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
-pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
+# ===== COMPREHENSIVE PATTERNS FOR BOTH FILE AND CAPTION MODES =====
+
+# Season patterns (various formats)
+season_patterns = [
+    re.compile(r'S(\d+)(?:E|EP)(\d+)'),  # S01E01, S1EP1
+    re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)'),  # S1 E1, S1-EP1
+    re.compile(r'Season\s*(\d+)\s*[Ee]pisode\s*(\d+)', re.IGNORECASE),  # Season 1 Episode 1
+    re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE),  # S1-01, S1.01
+    re.compile(r'(\d+)\s*x\s*(\d+)', re.IGNORECASE),  # 1x01, 01x01
+    re.compile(r'\[S(\d+)\]', re.IGNORECASE),  # [S01]
+    re.compile(r'\(S(\d+)\)', re.IGNORECASE),  # (S01)
+    re.compile(r'Season\s*(\d+)', re.IGNORECASE),  # Season 1
+    re.compile(r'S(\d+)\b', re.IGNORECASE),  # S01 standalone
+    re.compile(r'^\s*(\d+)\s*$'),  # Just a number (if it's the only number)
+]
+
+# Episode patterns (various formats)
+episode_patterns = [
+    re.compile(r'S(\d+)(?:E|EP)(\d+)'),  # S01E01
+    re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)'),  # S1 E1
+    re.compile(r'Season\s*(\d+)\s*[Ee]pisode\s*(\d+)', re.IGNORECASE),  # Season 1 Episode 1
+    re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE),  # S1-01
+    re.compile(r'(\d+)\s*x\s*(\d+)', re.IGNORECASE),  # 1x01
+    re.compile(r'[Ee]pisode\s*(\d+)', re.IGNORECASE),  # Episode 1
+    re.compile(r'\[EP?\s*(\d+)\]', re.IGNORECASE),  # [E01], [EP01]
+    re.compile(r'\(EP?\s*(\d+)\)', re.IGNORECASE),  # (E01)
+    re.compile(r'EP?\s*(\d+)', re.IGNORECASE),  # EP01, E01
+    re.compile(r'-\s*(\d+)\s*-'),  # - 01 -
+    re.compile(r'^\s*(\d+)\s*$'),  # Just a number
+    re.compile(r'#\s*(\d+)'),  # #01
+]
+
+# Quality patterns (various formats)
+quality_patterns = [
+    re.compile(r'\b(4[kK]|2160[pP]|UHD)\b'),  # 4K, 2160p, UHD
+    re.compile(r'\b(2[kK]|1440[pP]|QHD)\b'),  # 2K, 1440p, QHD
+    re.compile(r'\b(1080[pP]|FullHD|FHD)\b'),  # 1080p, FullHD
+    re.compile(r'\b(720[pP]|HD|HDReady)\b'),  # 720p, HD
+    re.compile(r'\b(480[pP]|SD)\b'),  # 480p, SD
+    re.compile(r'\b(360[pP])\b'),  # 360p
+    re.compile(r'\b(HDRip|HDR|WEB-DL|WEBRip|BluRay|BRRip|DVDRip)\b', re.IGNORECASE),  # Various formats
+    re.compile(r'\b(4kX264|4kx265|HEVC|x265|x264)\b', re.IGNORECASE),  # Codecs
+    re.compile(r'\[(\d{3,4}[pP])\]'),  # [1080p], [720p]
+    re.compile(r'\((\d{3,4}[pP])\)'),  # (1080p), (720p)
+    re.compile(r'(\d{3,4}[pP])\b'),  # 1080p standalone
+]
+
+# Volume/Chapter patterns
+volume_chapter_patterns = [
+    re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE),
+    re.compile(r'Volume\s*(\d+)\s*Chapter\s*(\d+)', re.IGNORECASE),
+    re.compile(r'Vol\.?\s*(\d+)\s*Ch\.?\s*(\d+)', re.IGNORECASE),
+]
+
+# ===== HELPER FUNCTIONS =====
 
 async def user_worker(user_id, client):
     """Worker to process files for a specific user"""
@@ -65,23 +106,58 @@ async def user_worker(user_id, client):
                 except: pass
 
 def standardize_quality_name(quality):
-    """Restored and Improved: Standardize quality names for consistent storage"""
+    """Standardize quality names for consistent storage"""
     if not quality or quality == "Unknown":
         return "Unknown"
-        
-    q = quality.lower().strip()
-    if any(x in q for x in ['4k', '2160', 'uhd']): return '2160p'
-    if any(x in q for x in ['2k', '1440', 'qhd']): return '1440p'
-    if '1080' in q: return '1080p'
-    if '720' in q: return '720p'
-    if '480' in q: return '480p'
-    if '360' in q: return '360p'
-    if any(x in q for x in ['hdrip', 'hd', 'web-dl']): return 'HDrip'
-    if '4kx264' in q: return '4kX264'
-    if '4kx265' in q: return '4kx265'
     
-    match = re.search(r'(\d{3,4}p)', q)
-    if match: return match.group(1)
+    q = quality.lower().strip()
+    
+    # 4K/UHD variations
+    if any(x in q for x in ['4k', '2160', 'uhd']):
+        return '2160p'
+    
+    # 2K/QHD variations
+    if any(x in q for x in ['2k', '1440', 'qhd']):
+        return '1440p'
+    
+    # 1080p variations
+    if any(x in q for x in ['1080', 'fullhd', 'fhd']):
+        return '1080p'
+    
+    # 720p variations
+    if any(x in q for x in ['720', 'hd', 'hdready']):
+        return '720p'
+    
+    # 480p variations
+    if any(x in q for x in ['480', 'sd']):
+        return '480p'
+    
+    # 360p
+    if '360' in q:
+        return '360p'
+    
+    # HDRip variations
+    if any(x in q for x in ['hdrip', 'web-dl', 'webrip', 'bluray', 'brrip', 'dvdrip']):
+        return 'HDrip'
+    
+    # Codec variations
+    if '4kx264' in q:
+        return '4kX264'
+    if '4kx265' in q:
+        return '4kx265'
+    if any(x in q for x in ['hevc', 'x265']):
+        return 'HEVC'
+    if 'x264' in q:
+        return 'x264'
+    
+    # HDR
+    if 'hdr' in q:
+        return 'HDR'
+    
+    # Try to match any remaining quality pattern
+    match = re.search(r'(\d{3,4}p)', q, re.IGNORECASE)
+    if match:
+        return match.group(1).lower()
     
     return quality.capitalize()
 
@@ -89,7 +165,6 @@ def standardize_quality_name(quality):
 async def convert_ass_subtitles(input_path, output_path):
     """
     Convert ASS subtitles to mov_text format for MP4 compatibility
-    (Restored from old file)
     """
     ffmpeg_cmd = shutil.which('ffmpeg')
     if ffmpeg_cmd is None:
@@ -100,10 +175,10 @@ async def convert_ass_subtitles(input_path, output_path):
         '-i', input_path,
         '-c:v', 'copy',
         '-c:a', 'copy',
-        '-c:s', 'mov_text',  # Convert subtitles to mov_text format
+        '-c:s', 'mov_text',
         '-map', '0',
         '-loglevel', 'error',
-        '-y',  # Overwrite output file
+        '-y',
         output_path
     ]
     
@@ -120,8 +195,7 @@ async def convert_ass_subtitles(input_path, output_path):
 
 async def convert_to_mkv(input_path, output_path):
     """
-    Convert any video file to MKV format without re-encoding, preserving all streams
-    (Restored from old file)
+    Convert any video file to MKV format without re-encoding
     """
     ffmpeg_cmd = shutil.which('ffmpeg')
     if ffmpeg_cmd is None:
@@ -130,10 +204,10 @@ async def convert_to_mkv(input_path, output_path):
     command = [
         ffmpeg_cmd,
         '-i', input_path,
-        '-map', '0',          # Map all streams from input
-        '-c', 'copy',         # Copy all streams without re-encoding
+        '-map', '0',
+        '-c', 'copy',
         '-loglevel', 'error',
-        '-y',  # Overwrite output file
+        '-y',
         output_path
     ]
     
@@ -148,40 +222,112 @@ async def convert_to_mkv(input_path, output_path):
         error_message = stderr.decode()
         raise Exception(f"MKV conversion failed: {error_message}")
 
-def extract_quality(filename):
-    for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
-                            (pattern6, "4k"), 
-                            (pattern7, "2k"), 
-                            (pattern8, "HdRip"), 
-                            (pattern9, "4kX264"), 
-                            (pattern10, "4kx265")]:
-        match = re.search(pattern, filename)
-        if match: 
-            return quality(match) if callable(quality) else quality
+# ===== IMPROVED EXTRACTION FUNCTIONS FOR BOTH MODES =====
+
+def extract_quality_from_text(text):
+    """Extract quality from text (filename or caption)"""
+    if not text:
+        return "Unknown"
+    
+    # Try all quality patterns
+    for pattern in quality_patterns:
+        match = re.search(pattern, text)
+        if match:
+            # Extract the quality group
+            for group_num in range(1, len(match.groups()) + 1):
+                if match.group(group_num):
+                    return match.group(group_num)
+            # If no groups, return the whole match
+            return match.group(0)
+    
     return "Unknown"
 
-def extract_episode_number(filename):
-    for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
-        match = re.search(pattern, filename)
-        if match: 
-            if pattern in [pattern1, pattern2, pattern4]:
-                return match.group(2) 
+def extract_episode_number_from_text(text):
+    """Extract episode number from text (filename or caption)"""
+    if not text:
+        return None
+    
+    # Try all episode patterns
+    for pattern in episode_patterns:
+        match = re.search(pattern, text)
+        if match:
+            # Different patterns have different group structures
+            if pattern in [episode_patterns[0], episode_patterns[1], episode_patterns[2], 
+                          episode_patterns[3], episode_patterns[4]]:
+                # Patterns with both season and episode: episode is group 2
+                return match.group(2)
             else:
+                # Episode-only patterns: episode is group 1
                 return match.group(1)
+    
     return None
 
-def extract_season_number(filename):
-    for pattern in [pattern1, pattern4]:
-        match = re.search(pattern, filename)
-        if match: 
+def extract_season_number_from_text(text):
+    """Extract season number from text (filename or caption)"""
+    if not text:
+        return None
+    
+    # Try all season patterns that include season number
+    for pattern in season_patterns[:8]:  # First 8 patterns include season numbers
+        match = re.search(pattern, text)
+        if match:
+            # For patterns with both season and episode, season is group 1
+            # For season-only patterns, season is also group 1
             return match.group(1)
+    
+    # Special case: try to extract from patterns like "01x01" where season might be first number
+    x_pattern = re.search(r'(\d+)\s*x\s*\d+', text, re.IGNORECASE)
+    if x_pattern:
+        return x_pattern.group(1)
+    
     return None
 
-def extract_volume_chapter(filename):
-    match = re.search(pattern11, filename)
-    if match:
-        return match.group(1), match.group(2)
+def extract_volume_chapter_from_text(text):
+    """Extract volume and chapter from text"""
+    if not text:
+        return None, None
+    
+    for pattern in volume_chapter_patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1), match.group(2)
+    
     return None, None
+
+# ===== MODE-BASED EXTRACTION FUNCTION =====
+
+async def extract_info_from_source(message, user_mode):
+    """Extract season, episode, quality from source based on mode"""
+    user_id = message.from_user.id
+    
+    if user_mode == "file_mode":
+        # Extract from file name
+        if message.document:
+            source_text = message.document.file_name or ""
+        elif message.video:
+            source_text = message.video.file_name or ""
+        elif message.audio:
+            source_text = message.audio.file_name or ""
+        else:
+            return None, None, None, None, None
+    else:  # caption_mode
+        # Extract from caption
+        source_text = message.caption or ""
+    
+    # Debug logging
+    logger.info(f"[MODE: {user_mode}] Extracting from: {source_text[:100]}...")
+    
+    # Extract all information
+    season_number = extract_season_number_from_text(source_text)
+    episode_number = extract_episode_number_from_text(source_text)
+    extracted_quality = extract_quality_from_text(source_text)
+    standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
+    volume_number, chapter_number = extract_volume_chapter_from_text(source_text)
+    
+    # Debug logging for extracted info
+    logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}, Volume: {volume_number}, Chapter: {chapter_number}")
+    
+    return season_number, episode_number, standard_quality, volume_number, chapter_number
 
 async def forward_to_dump_channel(client, path, media_type, ph_path, file_name, renamed_file_name, user_info):
     if not Config.DUMP_CHANNEL: 
@@ -212,41 +358,8 @@ async def forward_to_dump_channel(client, path, media_type, ph_path, file_name, 
     except Exception as e:
         logger.error(f"[DUMP ERROR] {e}")
 
-# Modify the extract_info_from_source function to handle both modes:
-async def extract_info_from_source(message, user_mode):
-    """Extract season, episode, quality from source based on mode"""
-    user_id = message.from_user.id
-    
-    if user_mode == "file_mode":
-        # Extract from file name (existing logic)
-        if message.document:
-            source_text = message.document.file_name
-        elif message.video:
-            source_text = message.video.file_name or ""
-        elif message.audio:
-            source_text = message.audio.file_name or ""
-        else:
-            return None, None, None, None
-    else:  # caption_mode
-        # Extract from caption
-        source_text = message.caption or ""
-    
-    # Extract season number
-    season_number = extract_season_number(source_text)
-    
-    # Extract episode number
-    episode_number = extract_episode_number(source_text)
-    
-    # Extract quality
-    extracted_quality = extract_quality(source_text)
-    standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
-    
-    # Extract volume and chapter
-    volume_number, chapter_number = extract_volume_chapter(source_text)
-    
-    return season_number, episode_number, standard_quality, volume_number, chapter_number
+# ===== MAIN RENAME FUNCTION =====
 
-# Modify the process_rename function to use the mode:
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
@@ -305,7 +418,21 @@ async def process_rename(client: Client, message: Message):
     # Extract information based on mode
     season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
 
+    # Debug: Show what was extracted
+    debug_info = f"""
+    🛠️ **Extraction Debug Info:**
+    • **Mode:** {user_mode.replace('_', ' ').title()}
+    • **Season:** {season_number or 'Not found'}
+    • **Episode:** {episode_number or 'Not found'}
+    • **Quality:** {standard_quality or 'Not found'}
+    • **Volume:** {volume_number or 'Not found'}
+    • **Chapter:** {chapter_number or 'Not found'}
+    """
+    logger.info(debug_info)
+
     # Apply extracted information to format template
+    original_template = format_template
+    
     if episode_number:
         format_template = format_template.replace("[EP.NUM]", str(episode_number)).replace("{episode}", str(episode_number))
     else:
@@ -330,11 +457,22 @@ async def process_rename(client: Client, message: Message):
     # Clean up the format template
     format_template = re.sub(r'\s+', ' ', format_template).strip()
     format_template = format_template.replace("_", " ")
-    format_template = re.sub(r'\[\s*\]', '', format_template)
+    
+    # Remove empty brackets and parentheses
+    format_template = re.sub(r'\[[^\]]*\]', '', format_template)  # Remove empty []
+    format_template = re.sub(r'\([^)]*\)', '', format_template)   # Remove empty ()
+    format_template = re.sub(r'\s+', ' ', format_template).strip()  # Clean extra spaces
+    
+    # If template became empty after removing placeholders, use original filename
+    if not format_template.strip():
+        format_template = file_name.rsplit('.', 1)[0]  # Remove extension
 
     # Create renamed file name
     _, file_extension = os.path.splitext(file_name)
     renamed_file_name = f"{format_template}{file_extension}"
+    
+    # Log the renaming process
+    logger.info(f"Renaming: {file_name} -> {renamed_file_name}")
     
     # Create paths
     download_path = f"downloads/{message.id}_{renamed_file_name}"
@@ -406,13 +544,13 @@ async def process_rename(client: Client, message: Message):
                 logger.warning(f"Error checking subtitle codec: {e}")
 
         # ===== RESTORED FROM OLD FILE: Get Audio and Subtitle Metadata =====
-        # Get all metadata from database (RESTORED CRITICAL PART)
+        # Get all metadata from database
         file_title = await codeflixbots.get_title(user_id)
         artist = await codeflixbots.get_artist(user_id)
         author = await codeflixbots.get_author(user_id)
         video_title = await codeflixbots.get_video(user_id)
-        audio_title = await codeflixbots.get_audio(user_id)  # RESTORED
-        subtitle_title = await codeflixbots.get_subtitle(user_id)  # RESTORED
+        audio_title = await codeflixbots.get_audio(user_id)
+        subtitle_title = await codeflixbots.get_subtitle(user_id)
 
         # Apply metadata based on subtitle type
         if is_mp4_with_ass:
@@ -432,16 +570,16 @@ async def process_rename(client: Client, message: Message):
                 '-metadata', f'artist={artist}',
                 '-metadata', f'author={author}',
                 '-metadata:s:v', f'title={video_title}',
-                '-metadata:s:a', f'title={audio_title}',  # RESTORED: Audio stream title
-                '-metadata:s:s', f'title={subtitle_title}',  # RESTORED: Subtitle stream title
+                '-metadata:s:a', f'title={audio_title}',
+                '-metadata:s:s', f'title={subtitle_title}',
                 '-map', '0',
                 '-c', 'copy',
                 '-loglevel', 'error',
-                '-y',  # Overwrite
+                '-y',
                 final_output
             ]
         else:
-            # Original metadata command with RESTORED audio and subtitle metadata
+            # Original metadata command
             metadata_command = [
                 'ffmpeg',
                 '-i', path,
@@ -449,12 +587,12 @@ async def process_rename(client: Client, message: Message):
                 '-metadata', f'artist={artist}',
                 '-metadata', f'author={author}',
                 '-metadata:s:v', f'title={video_title}',
-                '-metadata:s:a', f'title={audio_title}',  # RESTORED: Audio stream title
-                '-metadata:s:s', f'title={subtitle_title}',  # RESTORED: Subtitle stream title
+                '-metadata:s:a', f'title={audio_title}',
+                '-metadata:s:s', f'title={subtitle_title}',
                 '-map', '0',
                 '-c', 'copy',
                 '-loglevel', 'error',
-                '-y',  # Overwrite
+                '-y',
                 metadata_path
             ]
 
@@ -479,8 +617,8 @@ async def process_rename(client: Client, message: Message):
         # ===== RESTORED FROM OLD FILE: Quality-Based Thumbnail Selection =====
         c_caption = await codeflixbots.get_caption(message.chat.id)
         
-        # Get quality from filename for thumbnail selection
-        extracted_quality = extract_quality(file_name)
+        # Get quality for thumbnail selection
+        extracted_quality = extract_quality_from_text(file_name if user_mode == "file_mode" else (message.caption or ""))
         standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
         
         # Try to get quality-specific thumbnail first
@@ -520,14 +658,14 @@ async def process_rename(client: Client, message: Message):
                     
                     # Only crop to square if media preference is "document"
                     if media_type == "document":
-                        # Square crop for documents (center crop)
+                        # Square crop for documents
                         width, height = img.size
                         min_dim = min(width, height)
                         left, top = (width - min_dim) // 2, (height - min_dim) // 2
                         right, bottom = (width + min_dim) // 2, (height + min_dim) // 2
                         img = img.crop((left, top, right, bottom)).resize((320, 320), Image.LANCZOS)
                     else:
-                        # For videos/audio, just resize while maintaining aspect ratio
+                        # For videos/audio, maintain aspect ratio
                         img.thumbnail((320, 320), Image.LANCZOS)
                     
                     img.save(ph_path, "JPEG", quality=95)
@@ -597,7 +735,7 @@ async def process_rename(client: Client, message: Message):
                 except Exception as e:
                     logger.warning(f"Error removing file {file_path}: {e}")
         
-        # Clean up temporary files from subtitle conversion
+        # Clean up temporary files
         temp_files = [f"{download_path}.temp.mkv", 
                      f"{metadata_path}.temp.mp4", 
                      f"{metadata_path}.final.mp4"]
