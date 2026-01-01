@@ -161,13 +161,20 @@ def extract_quality(filename):
     return "Unknown"
 
 def extract_episode_number(filename):
-    for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
+    # First, look for high-accuracy patterns like S01E01 or E01
+    for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4]:
         match = re.search(pattern, filename)
         if match: 
             if pattern in [pattern1, pattern2, pattern4]:
                 return match.group(2) 
             else:
                 return match.group(1)
+    
+    # Only if nothing else is found, look for a standalone number
+    match = re.search(patternX, filename)
+    if match:
+        return match.group(1)
+        
     return None
 
 def extract_season_number(filename):
