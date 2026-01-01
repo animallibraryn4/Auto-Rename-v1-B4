@@ -510,11 +510,9 @@ async def process_rename(client: Client, message: Message):
                 await client.send_document(
                     message.chat.id,
                     document=path,
-                    file_name=renamed_file_name,
-                    thumb=ph_path,
+                    file_name=renamed_file_name,   # ✅ ADD THIS
                     caption=caption,
-                    progress=progress_for_pyrogram,
-                    progress_args=("Upload Started...", upload_msg, time.time()),
+                    thumb=ph_path,
                 )
             elif media_type == "video":
                 await client.send_video(
