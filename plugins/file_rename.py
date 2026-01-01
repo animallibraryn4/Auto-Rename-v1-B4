@@ -183,18 +183,6 @@ def extract_quality(text):
             return quality(match) if callable(quality) else quality
     return "Unknown"
 
-def extract_quality(filename):
-    for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
-                            (pattern6, "4k"), 
-                            (pattern7, "2k"), 
-                            (pattern8, "HdRip"), 
-                            (pattern9, "4kX264"), 
-                            (pattern10, "4kx265")]:
-        match = re.search(pattern, filename)
-        if match: 
-            return quality(match) if callable(quality) else quality
-    return "Unknown"
-
 def extract_episode_number(text, is_caption_mode=False):
     """Extract episode number from text, with enhanced support for caption mode"""
     if is_caption_mode:
