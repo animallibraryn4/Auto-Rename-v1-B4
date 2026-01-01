@@ -326,6 +326,28 @@ class Database:
             logging.error(f"Error deleting verify status for user {id}: {e}")
             return False
 
+    async def get_mode(self, user_id):
+        """Get user's mode preference (file_mode or caption_mode)"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("mode", "file_mode")  # Default to file_mode
+        except Exception as e:
+            logging.error(f"Error getting mode for user {user_id}: {e}")
+            return "file_mode"
+
+    async def set_mode(self, user_id, mode):
+        """Set user's mode preference"""
+        try:
+            await self.col.update_one(
+            {"_id": int(user_id)},
+            {"$set": {"mode": mode}},
+            upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting mode for user {user_id}: {e}")
+            return False
+        
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
 
