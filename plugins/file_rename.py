@@ -212,6 +212,41 @@ async def forward_to_dump_channel(client, path, media_type, ph_path, file_name, 
     except Exception as e:
         logger.error(f"[DUMP ERROR] {e}")
 
+# Modify the extract_info_from_source function to handle both modes:
+async def extract_info_from_source(message, user_mode):
+    """Extract season, episode, quality from source based on mode"""
+    user_id = message.from_user.id
+    
+    if user_mode == "file_mode":
+        # Extract from file name (existing logic)
+        if message.document:
+            source_text = message.document.file_name
+        elif message.video:
+            source_text = message.video.file_name or ""
+        elif message.audio:
+            source_text = message.audio.file_name or ""
+        else:
+            return None, None, None, None
+    else:  # caption_mode
+        # Extract from caption
+        source_text = message.caption or ""
+    
+    # Extract season number
+    season_number = extract_season_number(source_text)
+    
+    # Extract episode number
+    episode_number = extract_episode_number(source_text)
+    
+    # Extract quality
+    extracted_quality = extract_quality(source_text)
+    standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
+    
+    # Extract volume and chapter
+    volume_number, chapter_number = extract_volume_chapter(source_text)
+    
+    return season_number, episode_number, standard_quality, volume_number, chapter_number
+
+# Modify the process_rename function to use the mode:
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
@@ -219,6 +254,9 @@ async def process_rename(client: Client, message: Message):
     if not await is_user_verified(user_id): 
         return
 
+    # Get user's mode preference
+    user_mode = await codeflixbots.get_mode(user_id)
+    
     format_template = await codeflixbots.get_format_template(user_id)
     media_preference = await codeflixbots.get_media_preference(user_id)
     
@@ -247,7 +285,13 @@ async def process_rename(client: Client, message: Message):
     else:
         return await message.reply_text("Unsupported File Type")
 
-    if await check_anti_nsfw(file_name, message):
+    # Check for NSFW based on mode
+    if user_mode == "file_mode":
+        check_text = file_name
+    else:
+        check_text = message.caption or ""
+    
+    if await check_anti_nsfw(check_text, message):
         return await message.reply_text("NSFW content detected. File upload rejected.")
 
     # Check for duplicate operations
@@ -258,35 +302,30 @@ async def process_rename(client: Client, message: Message):
 
     renaming_operations[file_id] = datetime.now()
 
-    # ===== RESTORED FROM OLD FILE: Extract and process filename components =====
-    # Extract episode number
-    episode_number = extract_episode_number(file_name)
+    # Extract information based on mode
+    season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
+
+    # Apply extracted information to format template
     if episode_number:
         format_template = format_template.replace("[EP.NUM]", str(episode_number)).replace("{episode}", str(episode_number))
     else:
         format_template = format_template.replace("[EP.NUM]", "").replace("{episode}", "")
 
-    # Extract season number
-    season_number = extract_season_number(file_name)
     if season_number:
         format_template = format_template.replace("[SE.NUM]", str(season_number)).replace("{season}", str(season_number))
     else:
         format_template = format_template.replace("[SE.NUM]", "").replace("{season}", "")
 
-    # Extract volume and chapter
-    volume_number, chapter_number = extract_volume_chapter(file_name)
     if volume_number and chapter_number:
         format_template = format_template.replace("[Vol{volume}]", f"Vol{volume_number}").replace("[Ch{chapter}]", f"Ch{chapter_number}")
     else:
         format_template = format_template.replace("[Vol{volume}]", "").replace("[Ch{chapter}]", "")
 
     # Extract quality (not for PDFs)
-    if not is_pdf:
-        extracted_quality = extract_quality(file_name)
-        if extracted_quality != "Unknown":
-            format_template = format_template.replace("[QUALITY]", extracted_quality).replace("{quality}", extracted_quality)
-        else:
-            format_template = format_template.replace("[QUALITY]", "").replace("{quality}", "")
+    if not is_pdf and standard_quality:
+        format_template = format_template.replace("[QUALITY]", standard_quality).replace("{quality}", standard_quality)
+    else:
+        format_template = format_template.replace("[QUALITY]", "").replace("{quality}", "")
 
     # Clean up the format template
     format_template = re.sub(r'\s+', ' ', format_template).strip()
