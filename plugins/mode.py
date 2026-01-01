@@ -1,49 +1,45 @@
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
 from helper.database import codeflixbots
+from config import Txt
 
 @Client.on_message(filters.private & filters.command("mode"))
-async def mode_command(client, message):
-    """Switch between File Mode and Caption Mode"""
+async def mode_command(client, message: Message):
+    """Handle /mode command to switch between File Mode and Caption Mode"""
     user_id = message.from_user.id
-    current_mode = await codeflixbots.get_rename_mode(user_id)
+    current_mode = await codeflixbots.get_mode(user_id)
     
     text = f"""
-**🔧 Rename Mode Settings**
+📊 **Current Mode:** `{current_mode.replace('_', ' ').title()}`
 
-**Current Mode:** `{current_mode.upper()} MODE`
+**🔹 File Mode:**
+• Extracts season, episode, and quality from **file name**
+• Ignores file caption
+• Best for files with proper naming patterns
 
-**📁 File Mode:**
-- Extracts season/episode/quality from **file name**
-- Ignores the caption completely
-- Best for files with metadata in filename
+**🔸 Caption Mode:**
+• Extracts season, episode, and quality from **file caption**
+• Ignores file name
+• Best for files where caption contains the information
 
-**📝 Caption Mode:**
-- Extracts season/episode/quality from **file caption**
-- Ignores the file name completely
-- Best when caption contains metadata
-
-**How to use:**
-1. Click buttons below to switch mode
-2. Send files with appropriate metadata source
-3. The bot will auto-rename based on selected mode
+**Choose your preferred mode:**
 """
     
     buttons = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                f"📁 File Mode {'✅' if current_mode == 'file' else ''}",
-                callback_data="mode_file"
+                f"📁 File Mode {'✅' if current_mode == 'file_mode' else ''}",
+                callback_data="set_mode_file"
             )
         ],
         [
             InlineKeyboardButton(
-                f"📝 Caption Mode {'✅' if current_mode == 'caption' else ''}",
-                callback_data="mode_caption"
+                f"📝 Caption Mode {'✅' if current_mode == 'caption_mode' else ''}",
+                callback_data="set_mode_caption"
             )
         ],
         [
-            InlineKeyboardButton("❌ Close", callback_data="close")
+            InlineKeyboardButton("❌ Close", callback_data="close_mode")
         ]
     ])
     
@@ -53,57 +49,47 @@ async def mode_command(client, message):
         disable_web_page_preview=True
     )
 
-@Client.on_callback_query(filters.regex(r'^mode_(file|caption)$'))
-async def mode_callback(client, callback_query):
-    user_id = callback_query.from_user.id
-    mode = callback_query.data.split("_")[1]  # "file" or "caption"
+@Client.on_callback_query(filters.regex(r"^set_mode_"))
+async def set_mode_callback(client, query: CallbackQuery):
+    """Handle mode selection callback"""
+    user_id = query.from_user.id
+    mode = query.data.split("_")[2]  # file or caption
     
-    await codeflixbots.set_rename_mode(user_id, mode)
-    
-    # Update the message with new mode
-    text = f"""
-**🔧 Rename Mode Settings**
+    if mode in ["file", "caption"]:
+        mode_value = f"{mode}_mode"
+        await codeflixbots.set_mode(user_id, mode_value)
+        
+        # Update the message with new mode
+        text = f"""
+✅ **Mode Updated Successfully!**
 
-**Current Mode:** `{mode.upper()} MODE` ✅
+📊 **New Mode:** `{mode_value.replace('_', ' ').title()}`
 
-**📁 File Mode:**
-- Extracts season/episode/quality from **file name**
-- Ignores the caption completely
-- Best for files with metadata in filename
+**{'• Extracts information from file names' if mode == 'file' else '• Extracts information from file captions'}**
+**{'• Ignores file captions' if mode == 'file' else '• Ignores file names'}**
 
-**📝 Caption Mode:**
-- Extracts season/episode/quality from **file caption**
-- Ignores the file name completely
-- Best when caption contains metadata
-
-**How to use:**
-1. Click buttons below to switch mode
-2. Send files with appropriate metadata source
-3. The bot will auto-rename based on selected mode
+You can now send files for renaming in **{mode_value.replace('_', ' ').title()}**.
 """
-    
-    buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                f"📁 File Mode {'✅' if mode == 'file' else ''}",
-                callback_data="mode_file"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                f"📝 Caption Mode {'✅' if mode == 'caption' else ''}",
-                callback_data="mode_caption"
-            )
-        ],
-        [
-            InlineKeyboardButton("❌ Close", callback_data="close")
-        ]
-    ])
-    
-    await callback_query.message.edit_text(
-        text=text,
-        reply_markup=buttons,
-        disable_web_page_preview=True
-    )
-    
-    await callback_query.answer(f"Switched to {mode.upper()} Mode!")
+        
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📁 File Mode", callback_data="set_mode_file"),
+                InlineKeyboardButton("📝 Caption Mode", callback_data="set_mode_caption")
+            ],
+            [
+                InlineKeyboardButton("❌ Close", callback_data="close_mode")
+            ]
+        ])
+        
+        await query.message.edit_text(
+            text=text,
+            reply_markup=buttons,
+            disable_web_page_preview=True
+        )
+        
+        await query.answer(f"Switched to {mode_value.replace('_', ' ').title()}")
+
+@Client.on_callback_query(filters.regex("^close_mode$"))
+async def close_mode_callback(client, query: CallbackQuery):
+    """Close mode selection message"""
+    await query.message.delete()
