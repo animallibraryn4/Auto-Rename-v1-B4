@@ -148,21 +148,30 @@ async def convert_to_mkv(input_path, output_path):
         error_message = stderr.decode()
         raise Exception(f"MKV conversion failed: {error_message}")
 
-def extract_quality(filename):
+# ===== MODIFIED: Functions to extract from any text (filename or caption) =====
+def extract_quality_from_text(text):
+    """Extract quality from any text (filename or caption)"""
+    if not text:
+        return "Unknown"
+    
     for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
                             (pattern6, "4k"), 
                             (pattern7, "2k"), 
                             (pattern8, "HdRip"), 
                             (pattern9, "4kX264"), 
                             (pattern10, "4kx265")]:
-        match = re.search(pattern, filename)
+        match = re.search(pattern, text)
         if match: 
             return quality(match) if callable(quality) else quality
     return "Unknown"
 
-def extract_episode_number(filename):
+def extract_episode_number_from_text(text):
+    """Extract episode number from any text (filename or caption)"""
+    if not text:
+        return None
+    
     for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
-        match = re.search(pattern, filename)
+        match = re.search(pattern, text)
         if match: 
             if pattern in [pattern1, pattern2, pattern4]:
                 return match.group(2) 
@@ -170,18 +179,39 @@ def extract_episode_number(filename):
                 return match.group(1)
     return None
 
-def extract_season_number(filename):
+def extract_season_number_from_text(text):
+    """Extract season number from any text (filename or caption)"""
+    if not text:
+        return None
+    
     for pattern in [pattern1, pattern4]:
-        match = re.search(pattern, filename)
+        match = re.search(pattern, text)
         if match: 
             return match.group(1)
     return None
 
-def extract_volume_chapter(filename):
-    match = re.search(pattern11, filename)
+def extract_volume_chapter_from_text(text):
+    """Extract volume and chapter from any text (filename or caption)"""
+    if not text:
+        return None, None
+    
+    match = re.search(pattern11, text)
     if match:
         return match.group(1), match.group(2)
     return None, None
+
+# Original functions kept for backward compatibility
+def extract_quality(filename):
+    return extract_quality_from_text(filename)
+
+def extract_episode_number(filename):
+    return extract_episode_number_from_text(filename)
+
+def extract_season_number(filename):
+    return extract_season_number_from_text(filename)
+
+def extract_volume_chapter(filename):
+    return extract_volume_chapter_from_text(filename)
 
 async def forward_to_dump_channel(client, path, media_type, ph_path, file_name, renamed_file_name, user_info):
     if not Config.DUMP_CHANNEL: 
@@ -222,6 +252,9 @@ async def process_rename(client: Client, message: Message):
     format_template = await codeflixbots.get_format_template(user_id)
     media_preference = await codeflixbots.get_media_preference(user_id)
     
+    # ===== MODIFIED: Get rename mode =====
+    rename_mode = await codeflixbots.get_rename_mode(user_id)  # Get current mode
+    
     if not format_template:
         return await message.reply_text("Please Set An Auto Rename Format First Using /autorename")
 
@@ -247,6 +280,28 @@ async def process_rename(client: Client, message: Message):
     else:
         return await message.reply_text("Unsupported File Type")
 
+    # ===== MODIFIED: Get caption text if available =====
+    caption_text = message.caption if message.caption else ""
+    
+    # ===== MODIFIED: Choose source text based on mode =====
+    if rename_mode == "file":
+        source_text = file_name
+        await message.reply_text(f"🔧 **Mode:** File Mode\n📁 **Source:** Filename\n\nExtracting metadata from: `{file_name}`", quote=True)
+    else:  # caption mode
+        source_text = caption_text
+        if not source_text:
+            await message.reply_text(
+                "❌ **Caption Mode Active**\n\n"
+                "You're using **Caption Mode** but this file has no caption!\n\n"
+                "Please either:\n"
+                "1. Add a caption with season/episode/quality info\n"
+                "2. Switch to File Mode using `/mode`\n\n"
+                "Example caption: `S01E02 Naruto Shippuden [1080p]`",
+                quote=True
+            )
+            return
+        await message.reply_text(f"🔧 **Mode:** Caption Mode\n📝 **Source:** Caption\n\nExtracting metadata from: `{caption_text}`", quote=True)
+
     if await check_anti_nsfw(file_name, message):
         return await message.reply_text("NSFW content detected. File upload rejected.")
 
@@ -258,23 +313,23 @@ async def process_rename(client: Client, message: Message):
 
     renaming_operations[file_id] = datetime.now()
 
-    # ===== RESTORED FROM OLD FILE: Extract and process filename components =====
+    # ===== MODIFIED: Extract from appropriate source =====
     # Extract episode number
-    episode_number = extract_episode_number(file_name)
+    episode_number = extract_episode_number_from_text(source_text)
     if episode_number:
         format_template = format_template.replace("[EP.NUM]", str(episode_number)).replace("{episode}", str(episode_number))
     else:
         format_template = format_template.replace("[EP.NUM]", "").replace("{episode}", "")
 
     # Extract season number
-    season_number = extract_season_number(file_name)
+    season_number = extract_season_number_from_text(source_text)
     if season_number:
         format_template = format_template.replace("[SE.NUM]", str(season_number)).replace("{season}", str(season_number))
     else:
         format_template = format_template.replace("[SE.NUM]", "").replace("{season}", "")
 
     # Extract volume and chapter
-    volume_number, chapter_number = extract_volume_chapter(file_name)
+    volume_number, chapter_number = extract_volume_chapter_from_text(source_text)
     if volume_number and chapter_number:
         format_template = format_template.replace("[Vol{volume}]", f"Vol{volume_number}").replace("[Ch{chapter}]", f"Ch{chapter_number}")
     else:
@@ -282,7 +337,7 @@ async def process_rename(client: Client, message: Message):
 
     # Extract quality (not for PDFs)
     if not is_pdf:
-        extracted_quality = extract_quality(file_name)
+        extracted_quality = extract_quality_from_text(source_text)
         if extracted_quality != "Unknown":
             format_template = format_template.replace("[QUALITY]", extracted_quality).replace("{quality}", extracted_quality)
         else:
@@ -441,7 +496,7 @@ async def process_rename(client: Client, message: Message):
         c_caption = await codeflixbots.get_caption(message.chat.id)
         
         # Get quality from filename for thumbnail selection
-        extracted_quality = extract_quality(file_name)
+        extracted_quality = extract_quality_from_text(source_text)
         standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
         
         # Try to get quality-specific thumbnail first
