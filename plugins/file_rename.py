@@ -31,17 +31,13 @@ user_sequence_counter = {}  # Track sequence numbers per user
 renaming_operations = {}
 recent_verification_checks = {}
 
-# ADD: Cleanup function for user state
+# Cleanup function for user state
 def cleanup_user_state(user_id):
     """Clean up user state if queue is empty"""
     if (user_id in user_queues and 
         user_queues[user_id]["queue"].empty() and 
         user_id in user_sequence_counter):
         del user_sequence_counter[user_id]
-
-# Global dictionary to prevent duplicate operations
-renaming_operations = {}
-recent_verification_checks = {}
 
 # ===== Enhanced Patterns for Caption Mode =====
 # These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
@@ -145,7 +141,7 @@ def standardize_quality_name(quality):
     
     return quality.capitalize()
 
-# ===== RESTORED FROM OLD FILE: ASS Subtlitle Conversion =====
+# ===== RESTORED FROM OLD FILE: ASS Subtitle Conversion =====
 async def convert_ass_subtitles(input_path, output_path):
     """
     Convert ASS subtitles to mov_text format for MP4 compatibility
@@ -266,7 +262,6 @@ def extract_season_number(text, is_caption_mode=False):
         match = pattern_caption_number_pair.search(clean_text)
         if match:
             # If we have two numbers and context suggests season/episode
-            # Check if the text contains season/episode keywords
             if any(keyword in clean_text.lower() for keyword in ['season', 'episode', 'ep', 's', 'e']):
                 return match.group(1)
     
@@ -409,15 +404,6 @@ async def extract_info_from_source(message, user_mode):
     volume_number, chapter_number = extract_volume_chapter(source_text)
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
-
-    # Extract information based on mode
-    season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
-
-    # DEBUG: Log what was extracted
-    source_text = message.caption if user_mode == "caption_mode" else file_name
-    logger.info(f"User Mode: {user_mode}")
-    logger.info(f"Source Text: {source_text}")
-    logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
 
 async def process_rename(client: Client, message: Message):
     ph_path = None
@@ -773,25 +759,24 @@ async def process_rename(client: Client, message: Message):
                     os.remove(file_path)
                 except Exception as e:
                     logger.warning(f"Error removing file {file_path}: {e}")
-    
-         # Clean up temporary files from subtitle conversion
-         temp_files = [f"{download_path}.temp.mkv", 
-                       f"{metadata_path}.temp.mp4", 
-                       f"{metadata_path}.final.mp4"]
-         for temp_file in temp_files:
-             if os.path.exists(temp_file):
-                 try:
-                     os.remove(temp_file)
-                 except:
-                     pass
         
-         # Remove from operations tracking
-         if file_id in renaming_operations:
-             del renaming_operations[file_id]
-    
-         # ADD: Clean up user state if queue is empty
-         cleanup_user_state(user_id)  # Now user_id is defined (it's a parameter of process_rename)
-
+        # Clean up temporary files from subtitle conversion
+        temp_files = [f"{download_path}.temp.mkv", 
+                     f"{metadata_path}.temp.mp4", 
+                     f"{metadata_path}.final.mp4"]
+        for temp_file in temp_files:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
+        
+        # Remove from operations tracking
+        if file_id in renaming_operations:
+            del renaming_operations[file_id]
+        
+        # Clean up user state if queue is empty
+        cleanup_user_state(user_id)
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message):
@@ -821,5 +806,3 @@ async def auto_rename_files(client, message):
     
     # Put message in queue with sequence number
     await user_queues[user_id]["queue"].put((sequence_num, message))
-    
-
