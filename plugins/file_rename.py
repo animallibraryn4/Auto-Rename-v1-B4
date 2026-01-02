@@ -822,13 +822,4 @@ async def auto_rename_files(client, message):
     # Put message in queue with sequence number
     await user_queues[user_id]["queue"].put((sequence_num, message))
     
-def cleanup_user_state(user_id):
-    """Clean up user state if queue is empty"""
-    if (user_id in user_queues and 
-        user_queues[user_id]["queue"].empty() and 
-        user_id in user_sequence_counter):
-        del user_sequence_counter[user_id]
-
-# Call it at the end of process_rename
-cleanup_user_state(user_id)
 
