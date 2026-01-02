@@ -21,10 +21,11 @@ from plugins import is_user_verified, send_verification
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ===== Global + Per-User Queue System =====
-MAX_CONCURRENT_TASKS = 3  
+# ===== FIXED: Global + Per-User Queue System =====
+MAX_CONCURRENT_TASKS = 1  # CHANGE: Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 user_queues = {}
+user_sequence_counter = {}  # ADD: Track sequence numbers per user
 
 # Global dictionary to prevent duplicate operations
 renaming_operations = {}
@@ -804,4 +805,14 @@ async def auto_rename_files(client, message):
     
     # Put message in queue with sequence number
     await user_queues[user_id]["queue"].put((sequence_num, message))
+
+def cleanup_user_state(user_id):
+    """Clean up user state if queue is empty"""
+    if (user_id in user_queues and 
+        user_queues[user_id]["queue"].empty() and 
+        user_id in user_sequence_counter):
+        del user_sequence_counter[user_id]
+
+# Call it at the end of process_rename
+cleanup_user_state(user_id)
 
