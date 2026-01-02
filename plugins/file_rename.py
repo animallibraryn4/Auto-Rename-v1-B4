@@ -72,21 +72,44 @@ pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 async def user_worker(user_id, client):
     """Worker to process files for a specific user"""
     queue = user_queues[user_id]["queue"]
+    
+    # CHANGE: Create a dictionary to store pending messages in order
+    pending_messages = {}
+    next_expected_sequence = 1
+    
     while True:
         try:
-            message = await asyncio.wait_for(queue.get(), timeout=300)
-            async with global_semaphore:
-                await process_rename(client, message)
-            queue.task_done()
+            # Wait for next message
+            data = await asyncio.wait_for(queue.get(), timeout=300)
+            sequence_num, message = data
+            
+            # Store message with its sequence number
+            pending_messages[sequence_num] = message
+            
+            # Process messages in order
+            while next_expected_sequence in pending_messages:
+                message_to_process = pending_messages.pop(next_expected_sequence)
+                
+                # Process the message with global semaphore
+                async with global_semaphore:
+                    await process_rename(client, message_to_process)
+                
+                queue.task_done()
+                next_expected_sequence += 1
+                
         except asyncio.TimeoutError:
+            # Clean up if inactive
             if user_id in user_queues:
                 del user_queues[user_id]
+            if user_id in user_sequence_counter:
+                del user_sequence_counter[user_id]
             break
         except Exception as e:
             logger.error(f"Error in user_worker for user {user_id}: {e}")
-            if user_id in user_queues:
-                try: queue.task_done()
-                except: pass
+            try: 
+                queue.task_done()
+            except: 
+                pass
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -772,4 +795,13 @@ async def auto_rename_files(client, message):
             "task": asyncio.create_task(user_worker(user_id, client))
         }
     
-    await user_queues[user_id]["queue"].put(message)
+    # ADD: Track sequence number for this file
+    if user_id not in user_sequence_counter:
+        user_sequence_counter[user_id] = 0
+    
+    sequence_num = user_sequence_counter[user_id] + 1
+    user_sequence_counter[user_id] = sequence_num
+    
+    # Put message in queue with sequence number
+    await user_queues[user_id]["queue"].put((sequence_num, message))
+
