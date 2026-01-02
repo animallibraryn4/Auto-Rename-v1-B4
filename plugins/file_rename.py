@@ -21,11 +21,23 @@ from plugins import is_user_verified, send_verification
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ===== FIXED: Global + Per-User Queue System =====
-MAX_CONCURRENT_TASKS = 1  # CHANGE: Process only one file at a time per user
+# ===== Global + Per-User Queue System =====
+MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 user_queues = {}
-user_sequence_counter = {}  # ADD: Track sequence numbers per user
+user_sequence_counter = {}  # Track sequence numbers per user
+
+# Global dictionary to prevent duplicate operations
+renaming_operations = {}
+recent_verification_checks = {}
+
+# ADD: Cleanup function for user state
+def cleanup_user_state(user_id):
+    """Clean up user state if queue is empty"""
+    if (user_id in user_queues and 
+        user_queues[user_id]["queue"].empty() and 
+        user_id in user_sequence_counter):
+        del user_sequence_counter[user_id]
 
 # Global dictionary to prevent duplicate operations
 renaming_operations = {}
@@ -74,7 +86,7 @@ async def user_worker(user_id, client):
     """Worker to process files for a specific user"""
     queue = user_queues[user_id]["queue"]
     
-    # CHANGE: Create a dictionary to store pending messages in order
+    # Create a dictionary to store pending messages in order
     pending_messages = {}
     next_expected_sequence = 1
     
@@ -133,7 +145,7 @@ def standardize_quality_name(quality):
     
     return quality.capitalize()
 
-# ===== RESTORED FROM OLD FILE: ASS Subtitle Conversion =====
+# ===== RESTORED FROM OLD FILE: ASS Subtlitle Conversion =====
 async def convert_ass_subtitles(input_path, output_path):
     """
     Convert ASS subtitles to mov_text format for MP4 compatibility
@@ -761,21 +773,25 @@ async def process_rename(client: Client, message: Message):
                     os.remove(file_path)
                 except Exception as e:
                     logger.warning(f"Error removing file {file_path}: {e}")
+    
+         # Clean up temporary files from subtitle conversion
+         temp_files = [f"{download_path}.temp.mkv", 
+                       f"{metadata_path}.temp.mp4", 
+                       f"{metadata_path}.final.mp4"]
+         for temp_file in temp_files:
+             if os.path.exists(temp_file):
+                 try:
+                     os.remove(temp_file)
+                 except:
+                     pass
         
-        # Clean up temporary files from subtitle conversion
-        temp_files = [f"{download_path}.temp.mkv", 
-                     f"{metadata_path}.temp.mp4", 
-                     f"{metadata_path}.final.mp4"]
-        for temp_file in temp_files:
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
-        
-        # Remove from operations tracking
-        if file_id in renaming_operations:
-            del renaming_operations[file_id]
+         # Remove from operations tracking
+         if file_id in renaming_operations:
+             del renaming_operations[file_id]
+    
+         # ADD: Clean up user state if queue is empty
+         cleanup_user_state(user_id)  # Now user_id is defined (it's a parameter of process_rename)
+
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message):
@@ -796,7 +812,7 @@ async def auto_rename_files(client, message):
             "task": asyncio.create_task(user_worker(user_id, client))
         }
     
-    # ADD: Track sequence number for this file
+    # Track sequence number for this file
     if user_id not in user_sequence_counter:
         user_sequence_counter[user_id] = 0
     
@@ -805,7 +821,7 @@ async def auto_rename_files(client, message):
     
     # Put message in queue with sequence number
     await user_queues[user_id]["queue"].put((sequence_num, message))
-
+    
 def cleanup_user_state(user_id):
     """Clean up user state if queue is empty"""
     if (user_id in user_queues and 
