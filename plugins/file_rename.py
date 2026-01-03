@@ -775,12 +775,12 @@ async def process_rename(client: Client, message: Message):
                     # Remove old file and use watermarked one
                     if os.path.exists(metadata_path):
                         os.remove(metadata_path)
-                os.rename(watermarked_path, metadata_path)
-                logger.info(f"Watermark applied successfully, using: {metadata_path}")
-            else:
-                logger.warning("Watermark processing skipped or failed, using original file")
-        except Exception as e:
-            logger.error(f"Watermark application failed: {e}")
+                    os.rename(watermarked_path, metadata_path)
+                    logger.info(f"Watermark applied successfully, using: {metadata_path}")
+                else:
+                    logger.warning("Watermark processing skipped or failed, using original file")
+            except Exception as e:
+                logger.error(f"Watermark application failed: {e}")
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
