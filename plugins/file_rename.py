@@ -405,6 +405,85 @@ async def extract_info_from_source(message, user_mode):
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
 
+async def add_video_watermark(input_path, output_path, watermark_settings):
+    """
+    Add watermark to video using FFmpeg
+    """
+    if not watermark_settings.get("enabled", False):
+        return input_path  # No watermark, return original
+    
+    watermark_type = watermark_settings.get("type", "text")
+    position = watermark_settings.get("position", "bottom-right")
+    opacity = watermark_settings.get("opacity", 0.7)
+    
+    # Map position to FFmpeg coordinates
+    position_map = {
+        "top-left": "10:10",  # 10 pixels from top and left
+        "top-right": "main_w-overlay_w-10:10",
+        "bottom-left": "10:main_h-overlay_h-10",
+        "bottom-right": "main_w-overlay_w-10:main_h-overlay_h-10",
+        "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2"
+    }
+    
+    ffmpeg_position = position_map.get(position, "main_w-overlay_w-10:main_h-overlay_h-10")
+    
+    ffmpeg_cmd = shutil.which('ffmpeg')
+    if ffmpeg_cmd is None:
+        raise Exception("FFmpeg not found")
+    
+    if watermark_type == "text":
+        # Text watermark
+        text = watermark_settings.get("text", "")
+        font_size = watermark_settings.get("font_size", 24)
+        font_color = watermark_settings.get("font_color", "white")
+        
+        # Escape special characters for FFmpeg
+        text = text.replace(":", "\\:").replace("'", "'\\\\\\''")
+        
+        command = [
+            ffmpeg_cmd,
+            '-i', input_path,
+            '-vf', f"drawtext=text='{text}':fontcolor={font_color}@0.7:"
+                   f"fontsize={font_size}:x={ffmpeg_position.split(':')[0]}:"
+                   f"y={ffmpeg_position.split(':')[1]}:"
+                   f"shadowcolor=black@0.5:shadowx=2:shadowy=2",
+            '-codec:a', 'copy',
+            '-loglevel', 'error',
+            '-y',
+            output_path
+        ]
+    elif watermark_type == "image":
+        # Image watermark
+        image_path = watermark_settings.get("image_path", "")
+        if not os.path.exists(image_path):
+            return input_path  # Image not found, skip watermark
+        
+        command = [
+            ffmpeg_cmd,
+            '-i', input_path,
+            '-i', image_path,
+            '-filter_complex', f"[1]format=rgba,colorchannelmixer=aa={opacity}[logo];"
+                             f"[0][logo]overlay={ffmpeg_position}",
+            '-codec:a', 'copy',
+            '-loglevel', 'error',
+            '-y',
+            output_path
+        ]
+    
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+    
+    if process.returncode != 0:
+        error_message = stderr.decode()
+        logger.error(f"Watermark error: {error_message}")
+        return input_path  # Return original if watermark fails
+    
+    return output_path
+
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
@@ -638,6 +717,22 @@ async def process_rename(client: Client, message: Message):
         if is_mp4_with_ass:
             os.replace(final_output, metadata_path)
         path = metadata_path
+
+        # Apply watermark if enabled
+        watermark_settings = await codeflixbots.get_video_watermark(user_id)
+        if watermark_settings.get("enabled", False) and media_type in ["video", "document"]:
+            try:
+                watermarked_path = f"{metadata_path}.watermarked.mkv"
+                watermarked_path = await add_video_watermark(metadata_path, watermarked_path, watermark_settings)
+          
+                if watermarked_path != metadata_path and os.path.exists(watermarked_path):
+                    # Remove old file and use watermarked one
+                    if os.path.exists(metadata_path):
+                        os.remove(metadata_path)
+                    os.rename(watermarked_path, metadata_path)
+            except Exception as e:
+                logger.error(f"Watermark application failed: {e}")
+
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
