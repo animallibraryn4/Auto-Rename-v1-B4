@@ -497,9 +497,16 @@ async def process_rename(client: Client, message: Message):
     format_template = format_template.replace("_", " ")
     format_template = re.sub(r'\[\s*\]', '', format_template)
 
-    # Create renamed file name
+    # Get watermark if set
+    watermark = await codeflixbots.get_watermark(user_id)
+
+    # Create renamed file name with watermark
     _, file_extension = os.path.splitext(file_name)
-    renamed_file_name = f"{format_template}{file_extension}"
+    if watermark and watermark.strip():
+        # Add watermark at the end before extension
+        renamed_file_name = f"{format_template} {watermark.strip()}{file_extension}"
+    else:
+        renamed_file_name = f"{format_template}{file_extension}"
     
     # Create paths
     download_path = f"downloads/{message.id}_{renamed_file_name}"
