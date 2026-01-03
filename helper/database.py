@@ -43,6 +43,16 @@ class Database:
             subtitle='By @Animelibraryn4',
             video='Encoded By @Animelibraryn4',
             media_type=None
+            # Add watermark settings with default values
+            video_watermark={
+                "enabled": False,
+                "text": "",
+                "image_path": "",
+                "position": "bottom-right",
+                "opacity": 0.7,
+                "font_size": 24,
+                "font_color": "white"
+            }
         )
 
     async def add_user(self, b, m):
@@ -365,9 +375,23 @@ class Database:
                     "font_color": "white"
                 }
         
-        # Get watermark settings or return default
-        watermark_settings = user.get("video_watermark")
-        if not watermark_settings:
+            # Get watermark settings or return default
+            watermark_settings = user.get("video_watermark")
+            if not watermark_settings:
+                return {
+                    "enabled": False,
+                    "text": "",
+                    "image_path": "",
+                    "position": "bottom-right",
+                    "opacity": 0.7,
+                    "font_size": 24,
+                    "font_color": "white"
+                }
+        
+            return watermark_settings
+               except Exception as e:
+            logging.error(f"Error getting video watermark for user {user_id}: {e}")
+            # Return default settings on error
             return {
                 "enabled": False,
                 "text": "",
@@ -377,37 +401,6 @@ class Database:
                 "font_size": 24,
                 "font_color": "white"
             }
-        
-        return watermark_settings
-    except Exception as e:
-        logging.error(f"Error getting video watermark for user {user_id}: {e}")
-        # Return default settings on error
-        return {
-            "enabled": False,
-            "text": "",
-            "image_path": "",
-            "position": "bottom-right",
-            "opacity": 0.7,
-            "font_size": 24,
-            "font_color": "white"
-        }
-            
-    async def get_video_watermark(self, user_id):
-        """Get user's video watermark settings"""
-        try:
-            user = await self.col.find_one({"_id": int(user_id)})
-            return user.get("video_watermark", {
-                "enabled": False,
-                "text": "",
-                "image_path": "",  # For image watermarks
-                "position": "bottom-right",  # top-left, top-right, bottom-left, bottom-right
-                "opacity": 0.7,
-                "font_size": 24,
-                "font_color": "white"
-            })
-        except Exception as e:
-            logging.error(f"Error getting video watermark for user {user_id}: {e}")
-            return {"enabled": False}
 
     async def set_video_watermark(self, user_id, watermark_settings):
         """Set user's video watermark settings"""
