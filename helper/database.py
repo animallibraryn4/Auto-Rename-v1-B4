@@ -389,7 +389,7 @@ class Database:
                 }
         
             return watermark_settings
-               except Exception as e:
+        except Exception as e:
             logging.error(f"Error getting video watermark for user {user_id}: {e}")
             # Return default settings on error
             return {
