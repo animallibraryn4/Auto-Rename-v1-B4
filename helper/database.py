@@ -42,7 +42,7 @@ class Database:
             audio='By @Animelibraryn4',
             subtitle='By @Animelibraryn4',
             video='Encoded By @Animelibraryn4',
-            media_type=None
+            media_type=None,
             # Add watermark settings with default values
             video_watermark={
                 "enabled": False,
