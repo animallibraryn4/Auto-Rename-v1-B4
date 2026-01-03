@@ -347,72 +347,70 @@ class Database:
         except Exception as e:
             logging.error(f"Error setting mode for user {user_id}: {e}")
             return False
-
-    # Add to database.py in Database class
-
+            
     async def get_video_watermark(self, user_id):
         """Get user's video watermark settings"""
         try:
             user = await self.col.find_one({"_id": int(user_id)})
             return user.get("video_watermark", {
-            "enabled": False,
-            "text": "",
-            "image_path": "",  # For image watermarks
-            "position": "bottom-right",  # top-left, top-right, bottom-left, bottom-right
-            "opacity": 0.7,
-            "font_size": 24,
-            "font_color": "white"
-        })
-    except Exception as e:
-        logging.error(f"Error getting video watermark for user {user_id}: {e}")
-        return {"enabled": False}
+                "enabled": False,
+                "text": "",
+                "image_path": "",  # For image watermarks
+                "position": "bottom-right",  # top-left, top-right, bottom-left, bottom-right
+                "opacity": 0.7,
+                "font_size": 24,
+                "font_color": "white"
+            })
+        except Exception as e:
+            logging.error(f"Error getting video watermark for user {user_id}: {e}")
+            return {"enabled": False}
 
     async def set_video_watermark(self, user_id, watermark_settings):
         """Set user's video watermark settings"""
-    try:
-        await self.col.update_one(
-            {"_id": int(user_id)},
-            {"$set": {"video_watermark": watermark_settings}},
-            upsert=True
-        )
-        return True
-    except Exception as e:
-        logging.error(f"Error setting video watermark for user {user_id}: {e}")
-        return False
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {"video_watermark": watermark_settings}},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting video watermark for user {user_id}: {e}")
+            return False
 
-async def set_text_watermark(self, user_id, text, position="bottom-right", font_size=24, font_color="white", opacity=0.7):
-    """Set text watermark"""
-    watermark_settings = {
-        "enabled": True,
-        "type": "text",
-        "text": text,
-        "position": position,
-        "font_size": font_size,
-        "font_color": font_color,
-        "opacity": opacity,
-        "image_path": ""
-    }
-    return await self.set_video_watermark(user_id, watermark_settings)
+    async def set_text_watermark(self, user_id, text, position="bottom-right", font_size=24, font_color="white", opacity=0.7):
+        """Set text watermark"""
+        watermark_settings = {
+            "enabled": True,
+            "type": "text",
+            "text": text,
+            "position": position,
+            "font_size": font_size,
+            "font_color": font_color,
+            "opacity": opacity,
+            "image_path": ""
+        }
+        return await self.set_video_watermark(user_id, watermark_settings)
 
-async def set_image_watermark(self, user_id, image_file_id, position="bottom-right", opacity=0.7):
-    """Set image watermark"""
-    watermark_settings = {
-        "enabled": True,
-        "type": "image",
-        "text": "",
-        "position": position,
-        "font_size": 24,
-        "font_color": "white",
-        "opacity": opacity,
-        "image_file_id": image_file_id,
-        "image_path": ""
-    }
-    return await self.set_video_watermark(user_id, watermark_settings)
+    async def set_image_watermark(self, user_id, image_file_id, position="bottom-right", opacity=0.7):
+        """Set image watermark"""
+        watermark_settings = {
+            "enabled": True,
+            "type": "image",
+            "text": "",
+            "position": position,
+            "font_size": 24,
+            "font_color": "white",
+            "opacity": opacity,
+            "image_file_id": image_file_id,
+            "image_path": ""
+        }
+        return await self.set_video_watermark(user_id, watermark_settings)
 
-async def disable_watermark(self, user_id):
-    """Disable watermark"""
-    watermark_settings = {"enabled": False}
-    return await self.set_video_watermark(user_id, watermark_settings)
+    async def disable_watermark(self, user_id):
+        """Disable watermark"""
+        watermark_settings = {"enabled": False}
+        return await self.set_video_watermark(user_id, watermark_settings)
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
