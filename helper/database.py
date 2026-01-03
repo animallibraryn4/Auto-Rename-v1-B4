@@ -347,6 +347,50 @@ class Database:
         except Exception as e:
             logging.error(f"Error setting mode for user {user_id}: {e}")
             return False
+
+
+    async def get_video_watermark(self, user_id):
+        """Get user's video watermark settings"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            if not user:
+                # Return default settings if user doesn't exist
+                return {
+                    "enabled": False,
+                    "text": "",
+                    "image_path": "",
+                    "position": "bottom-right",
+                    "opacity": 0.7,
+                    "font_size": 24,
+                    "font_color": "white"
+                }
+        
+        # Get watermark settings or return default
+        watermark_settings = user.get("video_watermark")
+        if not watermark_settings:
+            return {
+                "enabled": False,
+                "text": "",
+                "image_path": "",
+                "position": "bottom-right",
+                "opacity": 0.7,
+                "font_size": 24,
+                "font_color": "white"
+            }
+        
+        return watermark_settings
+    except Exception as e:
+        logging.error(f"Error getting video watermark for user {user_id}: {e}")
+        # Return default settings on error
+        return {
+            "enabled": False,
+            "text": "",
+            "image_path": "",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 24,
+            "font_color": "white"
+        }
             
     async def get_video_watermark(self, user_id):
         """Get user's video watermark settings"""
