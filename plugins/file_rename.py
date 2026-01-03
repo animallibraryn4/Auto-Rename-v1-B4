@@ -416,47 +416,77 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
     position = watermark_settings.get("position", "bottom-right")
     opacity = watermark_settings.get("opacity", 0.7)
     
-    # Map position to FFmpeg coordinates
-    position_map = {
-        "top-left": "10:10",  # 10 pixels from top and left
-        "top-right": "main_w-overlay_w-10:10",
-        "bottom-left": "10:main_h-overlay_h-10",
-        "bottom-right": "main_w-overlay_w-10:main_h-overlay_h-10",
-        "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2"
-    }
-    
-    ffmpeg_position = position_map.get(position, "main_w-overlay_w-10:main_h-overlay_h-10")
-    
+    # First check if FFmpeg is available
     ffmpeg_cmd = shutil.which('ffmpeg')
     if ffmpeg_cmd is None:
-        raise Exception("FFmpeg not found")
+        logger.error("FFmpeg not found in system PATH")
+        return input_path  # Skip watermark if FFmpeg is not available
+    
+    # Map position to FFmpeg coordinates with proper padding
+    position_map = {
+        "top-left": "10:10",  # 10 pixels from top and left
+        "top-right": "main_w-text_w-10:10",
+        "bottom-left": "10:main_h-text_h-10",
+        "bottom-right": "main_w-text_w-10:main_h-text_h-10",
+        "center": "(main_w-text_w)/2:(main_h-text_h)/2"
+    }
+    
+    ffmpeg_position = position_map.get(position, "main_w-text_w-10:main_h-text_h-10")
     
     if watermark_type == "text":
         # Text watermark
         text = watermark_settings.get("text", "")
+        if not text:
+            logger.warning("Text watermark enabled but no text provided")
+            return input_path
+            
         font_size = watermark_settings.get("font_size", 24)
         font_color = watermark_settings.get("font_color", "white")
         
-        # Escape special characters for FFmpeg
-        text = text.replace(":", "\\:").replace("'", "'\\\\\\''")
+        # Escape special characters for FFmpeg drawtext
+        # Replace single quotes and escape special characters
+        text = text.replace("'", "'\\\\\\''").replace(":", "\\:")
         
         command = [
             ffmpeg_cmd,
             '-i', input_path,
-            '-vf', f"drawtext=text='{text}':fontcolor={font_color}@0.7:"
-                   f"fontsize={font_size}:x={ffmpeg_position.split(':')[0]}:"
-                   f"y={ffmpeg_position.split(':')[1]}:"
-                   f"shadowcolor=black@0.5:shadowx=2:shadowy=2",
+            '-vf', f"drawtext=text='{text}':x={ffmpeg_position.split(':')[0]}:"
+                   f"y={ffmpeg_position.split(':')[1]}:fontsize={font_size}:"
+                   f"fontcolor={font_color}@{opacity}:"
+                   f"box=1:boxcolor=black@0.3:boxborderw=5",
             '-codec:a', 'copy',
-            '-loglevel', 'error',
+            '-loglevel', 'warning',  # Changed from error to warning for more details
             '-y',
             output_path
         ]
+        
     elif watermark_type == "image":
         # Image watermark
+        image_file_id = watermark_settings.get("image_file_id", "")
         image_path = watermark_settings.get("image_path", "")
-        if not os.path.exists(image_path):
-            return input_path  # Image not found, skip watermark
+        
+        # Check if we have an image path
+        if not image_path or not os.path.exists(image_path):
+            # Try to get image from file_id stored in database
+            if image_file_id:
+                # We need to download the image first - this requires client context
+                # For now, skip image watermark if path doesn't exist
+                logger.warning(f"Image watermark path not found: {image_path}")
+                return input_path
+            else:
+                logger.warning("Image watermark enabled but no image provided")
+                return input_path
+        
+        # Adjust position for image overlay
+        position_map_image = {
+            "top-left": "10:10",
+            "top-right": "main_w-overlay_w-10:10",
+            "bottom-left": "10:main_h-overlay_h-10",
+            "bottom-right": "main_w-overlay_w-10:main_h-overlay_h-10",
+            "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2"
+        }
+        
+        ffmpeg_position = position_map_image.get(position, "main_w-overlay_w-10:main_h-overlay_h-10")
         
         command = [
             ffmpeg_cmd,
@@ -465,24 +495,40 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             '-filter_complex', f"[1]format=rgba,colorchannelmixer=aa={opacity}[logo];"
                              f"[0][logo]overlay={ffmpeg_position}",
             '-codec:a', 'copy',
-            '-loglevel', 'error',
+            '-loglevel', 'warning',
             '-y',
             output_path
         ]
+    else:
+        logger.warning(f"Unknown watermark type: {watermark_type}")
+        return input_path
     
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
+    logger.info(f"Executing FFmpeg command: {' '.join(command)}")
     
-    if process.returncode != 0:
-        error_message = stderr.decode()
-        logger.error(f"Watermark error: {error_message}")
-        return input_path  # Return original if watermark fails
-    
-    return output_path
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            error_message = stderr.decode() if stderr else "Unknown error"
+            logger.error(f"Watermark error (exit code {process.returncode}): {error_message}")
+            return input_path  # Return original if watermark fails
+        
+        # Verify output file was created
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.info(f"Watermark applied successfully: {output_path}")
+            return output_path
+        else:
+            logger.error(f"Watermark output file not created or empty: {output_path}")
+            return input_path
+            
+    except Exception as e:
+        logger.error(f"Exception during watermark processing: {str(e)}")
+        return input_path
 
 async def process_rename(client: Client, message: Message):
     ph_path = None
@@ -724,15 +770,17 @@ async def process_rename(client: Client, message: Message):
             try:
                 watermarked_path = f"{metadata_path}.watermarked.mkv"
                 watermarked_path = await add_video_watermark(metadata_path, watermarked_path, watermark_settings)
-          
+        
                 if watermarked_path != metadata_path and os.path.exists(watermarked_path):
                     # Remove old file and use watermarked one
                     if os.path.exists(metadata_path):
                         os.remove(metadata_path)
-                    os.rename(watermarked_path, metadata_path)
-            except Exception as e:
-                logger.error(f"Watermark application failed: {e}")
-
+                os.rename(watermarked_path, metadata_path)
+                logger.info(f"Watermark applied successfully, using: {metadata_path}")
+            else:
+                logger.warning("Watermark processing skipped or failed, using original file")
+        except Exception as e:
+            logger.error(f"Watermark application failed: {e}")
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
