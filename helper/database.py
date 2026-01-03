@@ -335,6 +335,37 @@ class Database:
             logging.error(f"Error getting mode for user {user_id}: {e}")
             return "file_mode"
 
+    async def get_watermark(self, user_id):
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("watermark", "")
+        except Exception as e:
+            logging.error(f"Error getting watermark for user {user_id}: {e}")
+            return ""
+
+    async def set_watermark(self, user_id, watermark):
+        try:
+            await self.col.update_one(
+            {"_id": int(user_id)},
+            {"$set": {"watermark": watermark}},
+            upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting watermark for user {user_id}: {e}")
+            return False
+
+    async def delete_watermark(self, user_id):
+        try:
+            await self.col.update_one(
+            {"_id": int(user_id)},
+            {"$unset": {"watermark": ""}}
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error deleting watermark for user {user_id}: {e}")
+            return False
+
     async def set_mode(self, user_id, mode):
         """Set user's mode preference"""
         try:
@@ -347,6 +378,10 @@ class Database:
         except Exception as e:
             logging.error(f"Error setting mode for user {user_id}: {e}")
             return False
+
+    # Add to database.py in the Database class
+    
+
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
