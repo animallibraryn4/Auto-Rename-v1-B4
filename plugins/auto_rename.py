@@ -38,61 +38,42 @@ async def auto_rename_command(client, message):
         "Remember, it might take some time, but I'll ensure your files are renamed perfectly!✨"
     )
 
-@Client.on_message(filters.private & filters.command("setmedia"))
-async def set_media_command(client, message):
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📄 Document", callback_data="setmedia_document")],
-        [InlineKeyboardButton("🎥 Video", callback_data="setmedia_video")]
-    ])
-    await message.reply_text("**Please select the media type you want to set:**", reply_markup=keyboard)
-
-@Client.on_callback_query(filters.regex("^setmedia_"))
-async def handle_media_selection(client, callback_query):
-    user_id = callback_query.from_user.id
-    media_type = callback_query.data.split("_", 1)[1]
-    await codeflixbots.set_media_preference(user_id, media_type)
-    await callback_query.answer(f"Media preference set to: {media_type.title()}")
-    await callback_query.message.edit_text(f"✅ **Media preference set to:** `{media_type.title()}`")
-
-# =====================================================
-# INFO COMMAND IMPLEMENTATION
-# =====================================================
-
 @Client.on_message(filters.private & filters.command("info"))
 async def info_command(client, message):
     user_id = message.from_user.id
-    info_mode_users.add(user_id)
+    info_mode_users.add(user_id) # Disable auto-rename worker
     
     cancel_btn = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel_info")]])
     
     ask_msg = await message.reply_text(
-        "**Send the file you want to get MediaInfo for.**\n\n"
-        "Note: Auto-rename is temporarily disabled.",
+        "**Please send the file you want to analyze.**\n\n"
+        "• Auto-rename is paused.\n"
+        "• Sending another command will cancel this.",
         reply_markup=cancel_btn
     )
 
     try:
-        # Wait for user response (timeout 5 minutes)
+        # Listen for the next message
         response = await client.listen(chat_id=user_id, filters=filters.private, timeout=300)
         
-        # If user sends another command, abort info mode
+        # If user sends another command, stop info mode
         if response.text and response.text.startswith("/"):
             info_mode_users.discard(user_id)
             return
 
         if not (response.document or response.video or response.audio):
-            await response.reply_text("❌ Please send a valid media file.")
+            await response.reply_text("❌ This is not a valid file. /info mode stopped.")
             info_mode_users.discard(user_id)
             return
 
-        ms = await response.reply_text("`Extracting MediaInfo...`")
+        ms = await response.reply_text("`🔍 Analyzing MediaInfo...`")
         
         file = response.document or response.video or response.audio
-        file_name = getattr(file, "file_name", "Unknown")
+        file_name = getattr(file, "file_name", "Unknown_File")
         file_size = getattr(file, "file_size", 0)
         date = datetime.now().strftime("%B %d, %Y")
         
-        # Generate formatted output
+        # Format the output as requested
         info_text = (
             f"MediaInfo - {file_name}\n"
             f"{date}\n"
@@ -101,15 +82,17 @@ async def info_command(client, message):
             f"By: Bot Station\n"
             f"📁 File: {file_name}\n\n"
             f"📌 General\n"
-            f"Complete name: {file_name}\n"
+            f"Format: {file_name.split('.')[-1].upper() if '.' in file_name else 'MKV'}\n"
             f"File size: {round(file_size/1048576, 2)} MB\n"
-            f"Format: {file_name.split('.')[-1].upper() if '.' in file_name else 'Unknown'}"
+            f"Duration: {getattr(file, 'duration', 'N/A')}\n"
         )
         
         await ms.edit_text(f"<code>{info_text}</code>")
         
     except asyncio.TimeoutError:
-        await message.reply_text("Process timed out. Please try again.")
+        await ask_msg.edit_text("❌ Time limit exceeded. /info mode closed.")
+    except Exception as e:
+        print(f"Info Error: {e}")
     finally:
         info_mode_users.discard(user_id)
 
@@ -117,6 +100,6 @@ async def info_command(client, message):
 async def cancel_info_callback(client, query):
     user_id = query.from_user.id
     info_mode_users.discard(user_id)
-    await query.message.edit_text("❌ `/info` process has been cancelled.")
+    await query.message.edit_text("❌ `/info` process cancelled. Auto-rename re-enabled.")
     await query.answer()
-    
+                          
