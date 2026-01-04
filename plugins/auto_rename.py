@@ -1,4 +1,3 @@
-
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import codeflixbots
 import os
@@ -12,8 +11,44 @@ from pyrogram.enums import ParseMode
 
 # Import the auto_rename_files function from file_rename.py
 from plugins.file_rename import auto_rename_files
+
+# Dictionary to track users in /info mode (in-memory, will reset on bot restart)
 info_mode_users = {}
 
+# Add this function to database.py first, then use it
+async def set_info_mode(user_id, status=True):
+    """Set user info mode status"""
+    try:
+        await codeflixbots.col.update_one(
+            {"_id": int(user_id)},
+            {"$set": {"info_mode": status}},
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Error setting info mode for user {user_id}: {e}")
+        return False
+
+async def get_info_mode(user_id):
+    """Get user info mode status"""
+    try:
+        user = await codeflixbots.col.find_one({"_id": int(user_id)})
+        return user.get("info_mode", False) if user else False
+    except Exception as e:
+        print(f"Error getting info mode for user {user_id}: {e}")
+        return False
+
+async def clear_info_mode(user_id):
+    """Clear user info mode"""
+    try:
+        await codeflixbots.col.update_one(
+            {"_id": int(user_id)},
+            {"$unset": {"info_mode": ""}}
+        )
+        return True
+    except Exception as e:
+        print(f"Error clearing info mode for user {user_id}: {e}")
+        return False
 
 @Client.on_message(filters.private & filters.command("autorename"))
 async def auto_rename_command(client, message):
@@ -282,7 +317,10 @@ async def info_command(client, message):
     """Handle /info command - temporarily disable auto rename and get file info"""
     user_id = message.from_user.id
     
-    # Set user to info mode
+    # Set user to info mode in database
+    await set_info_mode(user_id, True)
+    
+    # Also update in-memory dictionary
     info_mode_users[user_id] = {
         "active": True,
         "message_id": message.id
@@ -310,6 +348,9 @@ async def cancel_info_callback(client, callback_query):
     if user_id in info_mode_users:
         del info_mode_users[user_id]
     
+    # Clear from database
+    await clear_info_mode(user_id)
+    
     await callback_query.message.edit_text(
         "❌ File information mode cancelled.",
         reply_markup=None
@@ -321,8 +362,17 @@ async def handle_info_mode_file(client, message):
     """Handle file sent during /info mode"""
     user_id = message.from_user.id
     
-    # Check if user is in info mode
-    if user_id not in info_mode_users or not info_mode_users[user_id]["active"]:
+    # Check if user is in info mode (check both in-memory and database)
+    in_info_mode = False
+    
+    # First check in-memory
+    if user_id in info_mode_users and info_mode_users[user_id]["active"]:
+        in_info_mode = True
+    else:
+        # Check database
+        in_info_mode = await get_info_mode(user_id)
+    
+    if not in_info_mode:
         # Not in info mode, proceed with normal auto rename
         return await auto_rename_files(client, message)
     
@@ -409,6 +459,9 @@ async def handle_info_mode_file(client, message):
         if user_id in info_mode_users:
             del info_mode_users[user_id]
         
+        # Clear from database
+        await clear_info_mode(user_id)
+        
         # Remove downloaded file
         if 'file_path' in locals() and file_path and os.path.exists(file_path):
             try:
@@ -422,24 +475,14 @@ async def check_info_mode_exit(client, message):
     user_id = message.from_user.id
     
     # Check if user is in info mode and command is not /info
-    if user_id in info_mode_users and not message.command[0] == "info":
+    in_info_mode = await get_info_mode(user_id)
+    
+    if in_info_mode and not message.command[0] == "info":
         # Exit info mode
-        del info_mode_users[user_id]
+        if user_id in info_mode_users:
+            del info_mode_users[user_id]
+        
+        # Clear from database
+        await clear_info_mode(user_id)
+        
         await message.reply_text("ℹ️ Info mode exited. Auto rename is now active again.")
-
-@Client.on_message(filters.private & (filters.document | filters.video))
-async def handle_info_mode_file(client, message):
-    """Handle file sent during /info mode"""
-    user_id = message.from_user.id
-    
-    # DEBUG: Check if info mode is working
-    print(f"DEBUG: User {user_id} sending file. Info mode status: {user_id in info_mode_users}")
-    
-    # Check if user is in info mode
-    if user_id not in info_mode_users or not info_mode_users[user_id].get("active", False):
-        # Not in info mode, proceed with normal auto rename
-        print(f"DEBUG: User {user_id} not in info mode, calling auto_rename_files")
-        return await auto_rename_files(client, message)
-    
-    print(f"DEBUG: User {user_id} is in info mode, processing file for info")
-    # Rest of the function remains the same...
