@@ -453,7 +453,4 @@ async def cleanup_old_sessions():
             del info_mode_users[user_id]
             logger.info(f"Cleaned up old info session for user {user_id}")
 
-# Start cleanup task when bot starts
-@Client.on_start()
-async def start_cleanup(client):
-    asyncio.create_task(cleanup_old_sessions())
+
