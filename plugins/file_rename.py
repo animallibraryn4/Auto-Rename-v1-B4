@@ -782,12 +782,12 @@ async def process_rename(client: Client, message: Message):
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
-    
-    # Check if user is in /info mode
+
+    # ADD THIS BLOCK: Disable auto-rename if /info is active
     if user_id in info_mode_users:
-        return # Do nothing, let the /info handler take the file
-        
-    # Rest of your existing code...
+        return 
+
+    # Existing logic follows...
     if not await is_user_verified(user_id):
     
     # Check verification
