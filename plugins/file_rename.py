@@ -16,6 +16,7 @@ from helper.utils import progress_for_pyrogram, humanbytes, convert
 from helper.database import codeflixbots
 from config import Config
 from plugins import is_user_verified, send_verification
+from plugins.auto_rename import info_mode_users
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -781,6 +782,13 @@ async def process_rename(client: Client, message: Message):
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
+    
+    # Check if user is in /info mode
+    if user_id in info_mode_users:
+        return # Do nothing, let the /info handler take the file
+        
+    # Rest of your existing code...
+    if not await is_user_verified(user_id):
     
     # Check verification
     if not await is_user_verified(user_id):
