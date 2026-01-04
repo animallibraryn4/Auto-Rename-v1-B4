@@ -10,7 +10,10 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pyrogram.enums import ParseMode
 
-# You might want to update the autorename command response to mention the mode feature:
+# Import the auto_rename_files function from file_rename.py
+from plugins.file_rename import auto_rename_files
+info_mode_users = {}
+
 
 @Client.on_message(filters.private & filters.command("autorename"))
 async def auto_rename_command(client, message):
@@ -73,14 +76,6 @@ async def handle_media_selection(client, callback_query):
     # Acknowledge the callback and send confirmation
     await callback_query.answer(f"Media preference set to: {media_type} ✅")
     await callback_query.message.edit_text(f"**Media preference set to:** {media_type} ✅")
-    
-
-
-# ===== INFO COMMAND IMPLEMENTATION =====
-
-
-# Dictionary to track users in /info mode
-info_mode_users = {}
 
 def format_file_size(size_bytes):
     """Convert bytes to human readable format"""
