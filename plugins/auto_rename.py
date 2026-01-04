@@ -11,7 +11,7 @@ from pyrogram.enums import ParseMode
 import logging
 
 # Import from your main rename module
-from file_rename import auto_rename_files
+from plugins.file_rename import auto_rename_files
 
 # Setup logger
 logger = logging.getLogger(__name__)
