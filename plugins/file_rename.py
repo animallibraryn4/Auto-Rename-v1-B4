@@ -1,23 +1,4 @@
 
-# In file_rename.py inside add_video_watermark function
-
-command = [
-    ffmpeg_cmd,
-    '-i', input_path,
-    '-vf', f"drawtext=text='{text}':x={ffmpeg_position.split(':')[0]}:"
-           f"y={ffmpeg_position.split(':')[1]}:fontsize={font_size}:"
-           f"fontcolor={font_color}@{opacity}:"
-           f"box=1:boxcolor=black@0.3:boxborderw=5",
-    '-c:v', 'libx264',      # Use the X264 encoder
-    '-preset', 'ultrafast',  # 'ultrafast' for speed, 'veryfast' for balance
-    '-crf', '28',           # Higher CRF (24-28) = smaller file size, lower quality
-    '-c:a', 'copy',         # Keep original audio (saves time)
-    '-loglevel', 'warning',
-    '-y', output_path
-]
-
-
-
 
 import os
 import re
