@@ -783,10 +783,10 @@ async def process_rename(client: Client, message: Message):
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
 
-    # ✅ Corrected indentation: Disable auto-rename if /info is active
-    if user_id in info_mode_users:
-        return # This must be indented with 4 spaces or 1 tab
-
+    # ✅ Check if user is in info mode (disable auto-rename if in info mode)
+    if user_id in info_mode_users:  # This should now work with the dictionary
+        return  # Skip auto-rename and let the info handler process the file
+    
     # Check verification
     if not await is_user_verified(user_id):
         curr = time.time()
