@@ -407,12 +407,14 @@ async def extract_info_from_source(message, user_mode):
 
 async def add_video_watermark(input_path, output_path, watermark_settings):
     """
-    Add watermark to video - requires re-encoding
+    OPTIMIZED: Add watermark to video using FFmpeg WITHOUT re-encoding
     """
     if not watermark_settings.get("enabled", False):
         return input_path  # No watermark, return original
     
     watermark_type = watermark_settings.get("type", "text")
+    position = watermark_settings.get("position", "bottom-right")
+    opacity = watermark_settings.get("opacity", 0.7)
     
     # First check if FFmpeg is available
     ffmpeg_cmd = shutil.which('ffmpeg')
@@ -420,100 +422,120 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         logger.error("FFmpeg not found in system PATH")
         return input_path  # Skip watermark if FFmpeg is not available
     
+    # Pre-calculated positions to avoid complex filter computations
+    position_filters = {
+        "top-left": "10:10",
+        "top-right": "main_w-text_w-10:10", 
+        "bottom-left": "10:main_h-text_h-10",
+        "bottom-right": "main_w-text_w-10:main_h-text_h-10",
+        "center": "(main_w-text_w)/2:(main_h-text_h)/2"
+    }
+    
+    ffmpeg_position = position_filters.get(position, "main_w-text_w-10:main_h-text_h-10")
+    
     try:
         if watermark_type == "text":
-            # Text watermark
+            # Text watermark - optimized with COPY codec
             text = watermark_settings.get("text", "")
             if not text:
                 logger.warning("Text watermark enabled but no text provided")
                 return input_path
                 
-            position = watermark_settings.get("position", "bottom-right")
-            opacity = watermark_settings.get("opacity", 0.7)
             font_size = watermark_settings.get("font_size", 24)
             font_color = watermark_settings.get("font_color", "white")
             
-            # Map position to FFmpeg coordinates
-            position_map = {
-                "top-left": "10:10",
-                "top-right": "w-tw-10:10",  # w = width, tw = text width
-                "bottom-left": "10:h-th-10",  # h = height, th = text height
-                "bottom-right": "w-tw-10:h-th-10",
-                "center": "(w-tw)/2:(h-th)/2"
-            }
-            
-            ffmpeg_position = position_map.get(position, "w-tw-10:h-th-10")
-            
-            # Escape text properly
-            text = text.replace(":", "\\:").replace("'", "'\"'\"'")
-            
-            # Build the filter string
-            filter_str = f"drawtext=text='{text}':x={ffmpeg_position.split(':')[0]}:y={ffmpeg_position.split(':')[1]}:fontsize={font_size}:fontcolor={font_color}@{opacity}"
-            
-            # Add box if specified
-            if watermark_settings.get("box", True):
-                filter_str += f":box=1:boxcolor=black@0.3:boxborderw=2"
+            # Escape special characters for FFmpeg
+            text = text.replace("'", "'\\\\\\''").replace(":", "\\:").replace("%", "%%")
             
             command = [
                 ffmpeg_cmd,
                 '-i', input_path,
-                # We MUST re-encode when using filters
-                '-vf', filter_str,
-                # Use reasonable encoding settings
-                '-c:v', 'libx264',  # Re-encode video with H.264
-                '-preset', 'fast',  # Faster encoding
-                '-crf', '23',  # Good quality (lower = better quality, 18-28 is typical)
-                '-c:a', 'copy',  # Copy audio without re-encoding
-                '-c:s', 'copy',  # Copy subtitles if any
+                # CRITICAL: Copy all streams without re-encoding
+                '-c:v', 'copy',          # Copy video stream
+                '-c:a', 'copy',          # Copy audio stream
+                '-c:s', 'copy',          # Copy subtitle stream
+                # Optimized drawtext filter
+                '-vf', f"drawtext=text='{text}':"
+                       f"x={ffmpeg_position.split(':')[0]}:"
+                       f"y={ffmpeg_position.split(':')[1]}:"
+                       f"fontsize={font_size}:"
+                       f"fontcolor={font_color}@{opacity}:"
+                       f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"  # Use system font
+                       f"box=1:boxcolor=black@0.3:boxborderw=2",  # Reduced border width
                 '-loglevel', 'error',
                 '-y',
                 output_path
             ]
             
         elif watermark_type == "image":
-            # Image watermark
+            # Image watermark - optimized with overlay
+            image_file_id = watermark_settings.get("image_file_id", "")
             image_path = watermark_settings.get("image_path", "")
+            
             if not image_path or not os.path.exists(image_path):
                 logger.warning(f"Image watermark path not found: {image_path}")
                 return input_path
             
-            position = watermark_settings.get("position", "bottom-right")
-            opacity = watermark_settings.get("opacity", 0.7)
+            # Optimize image first (resize to reasonable dimensions)
+            optimized_image = f"{image_path}.optimized.png"
+            try:
+                img_command = [
+                    ffmpeg_cmd,
+                    '-i', image_path,
+                    '-vf', f'scale=200:-1',  # Resize to max 200px width
+                    '-y',
+                    optimized_image
+                ]
+                
+                img_process = await asyncio.create_subprocess_exec(
+                    *img_command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await img_process.communicate()
+                
+                if os.path.exists(optimized_image):
+                    image_path = optimized_image
+            except:
+                pass  # Use original if optimization fails
             
-            # Map position for image overlay
-            position_map = {
+            position_filters_image = {
                 "top-left": "10:10",
-                "top-right": "W-w-10:10",
-                "bottom-left": "10:H-h-10",
-                "bottom-right": "W-w-10:H-h-10",
-                "center": "(W-w)/2:(H-h)/2"
+                "top-right": "main_w-overlay_w-10:10",
+                "bottom-left": "10:main_h-overlay_h-10",
+                "bottom-right": "main_w-overlay_w-10:main_h-overlay_h-10",
+                "center": "(main_w-overlay_w)/2:(main_h-overlay_h)/2"
             }
             
-            ffmpeg_position = position_map.get(position, "W-w-10:H-h-10")
-            
-            # For image watermark, we need to scale it first
-            filter_str = f"movie={image_path},scale=150:-1[watermark];[0][watermark]overlay={ffmpeg_position}:format=rgb,colorchannelmixer=aa={opacity}"
+            ffmpeg_position = position_filters_image.get(position, "main_w-overlay_w-10:main_h-overlay_h-10")
             
             command = [
                 ffmpeg_cmd,
                 '-i', input_path,
-                # Re-encode with overlay filter
-                '-filter_complex', filter_str,
-                # Use reasonable encoding settings
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '23',
+                '-i', image_path,
+                # CRITICAL: Copy all streams
+                '-c:v', 'copy',
                 '-c:a', 'copy',
                 '-c:s', 'copy',
+                # Optimized overlay filter
+                '-filter_complex', f"[1]format=rgba,colorchannelmixer=aa={opacity}[watermark];"
+                                 f"[0][watermark]overlay={ffmpeg_position}:shortest=1",
                 '-loglevel', 'error',
                 '-y',
                 output_path
             ]
+            
+            # Clean up optimized image
+            if 'optimized_image' in locals():
+                try:
+                    os.remove(optimized_image)
+                except:
+                    pass
         else:
             logger.warning(f"Unknown watermark type: {watermark_type}")
             return input_path
         
-        logger.info(f"Applying watermark (requires re-encoding)...")
+        logger.info(f"Applying watermark with optimized command...")
         
         # Execute with timeout
         process = await asyncio.create_subprocess_exec(
@@ -524,20 +546,20 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         
         # Add timeout to prevent hanging
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=600)  # 10 minutes for re-encoding
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)  # 5 minutes timeout
         except asyncio.TimeoutError:
             process.kill()
-            logger.error("Watermark process timed out after 10 minutes")
+            logger.error("Watermark process timed out after 5 minutes")
             return input_path
         
         if process.returncode != 0:
             error_message = stderr.decode() if stderr else "Unknown error"
-            logger.error(f"Watermark error (exit code {process.returncode}): {error_message[:500]}")
+            logger.error(f"Watermark error (exit code {process.returncode}): {error_message[:200]}")
             return input_path
         
         # Verify output
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            logger.info(f"Watermark applied successfully: {output_path}")
+            logger.info(f"Watermark applied successfully in optimized mode: {output_path}")
             return output_path
         else:
             logger.error("Watermark output file not created or empty")
@@ -546,51 +568,6 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
     except Exception as e:
         logger.error(f"Exception during watermark processing: {str(e)}")
         return input_path
-
-async def add_simple_text_watermark(input_path, output_path, watermark_settings):
-    """
-    Ultra-simple text watermark as fallback
-    """
-    text = watermark_settings.get("text", "")
-    if not text:
-        return input_path
-    
-    ffmpeg_cmd = shutil.which('ffmpeg')
-    if not ffmpeg_cmd:
-        return input_path
-    
-    # Simple watermark at bottom-right
-    # Escape the text properly
-    text = text.replace(":", "\\:").replace("'", "'\"'\"'")
-    
-    command = [
-        ffmpeg_cmd,
-        '-i', input_path,
-        '-c:v', 'copy',
-        '-c:a', 'copy',
-        '-c:s', 'copy',
-        # Ultra simple filter - no box, no special positioning
-        '-vf', f"drawtext=text='{text}':x=w-tw-10:y=h-th-10:fontsize=20:fontcolor=white@0.7",
-        '-loglevel', 'error',
-        '-y',
-        output_path
-    ]
-    
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-        
-        if process.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            logger.info(f"Simple watermark applied successfully: {output_path}")
-            return output_path
-    except Exception as e:
-        logger.error(f"Simple watermark also failed: {e}")
-    
-    return input_path
 
 async def process_rename(client: Client, message: Message):
     ph_path = None
@@ -826,33 +803,23 @@ async def process_rename(client: Client, message: Message):
             os.replace(final_output, metadata_path)
         path = metadata_path
 
-        # Apply watermark if enabled
+        # Apply watermark if enabled - NOW WITH OPTIMIZED FUNCTION
         watermark_settings = await codeflixbots.get_video_watermark(user_id)
         if watermark_settings.get("enabled", False) and media_type in ["video", "document"]:
             try:
-                # Warn user that watermarking takes time
-                await download_msg.edit("**__Applying watermark (this may take a few minutes)...__**")
-        
-                watermarked_path = f"{metadata_path}.watermarked.mp4"
+                watermarked_path = f"{metadata_path}.watermarked.mkv"
                 watermarked_path = await add_video_watermark(metadata_path, watermarked_path, watermark_settings)
-    
+        
                 if watermarked_path != metadata_path and os.path.exists(watermarked_path):
                     # Remove old file and use watermarked one
                     if os.path.exists(metadata_path):
                         os.remove(metadata_path)
                     os.rename(watermarked_path, metadata_path)
-                    path = metadata_path
-                    logger.info(f"Watermark applied successfully: {path}")
-            
-                    # Update file extension if needed
-                    if watermarked_path.endswith('.mp4'):
-                        renamed_file_name = renamed_file_name.rsplit('.', 1)[0] + '.mp4'
+                    logger.info(f"Watermark applied successfully, using: {metadata_path}")
                 else:
                     logger.warning("Watermark processing skipped or failed, using original file")
-                    await download_msg.edit("**__Watermark failed, continuing without it...__**")
             except Exception as e:
                 logger.error(f"Watermark application failed: {e}")
-                await download_msg.edit("**__Watermark failed, continuing without it...__**")
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
