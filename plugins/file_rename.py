@@ -569,21 +569,6 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         logger.error(f"Exception during watermark processing: {str(e)}")
         return input_path
 
-async def add_video_watermark(input_path, output_path, watermark_settings):
-    """
-    Add watermark to video using FFmpeg
-    """
-    if not watermark_settings.get("enabled", False):
-        return input_path  # No watermark, return original
-    
-    watermark_type = watermark_settings.get("type", "text")
-    position = watermark_settings.get("position", "bottom-right")
-    opacity = watermark_settings.get("opacity", 0.7)
-    
-    # First check if FFmpeg is available
-    ffmpeg_cmd = shutil.which('ffmpeg')
-    if ffmpeg_cmd is None:
-
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
