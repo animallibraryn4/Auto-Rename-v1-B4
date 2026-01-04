@@ -1,386 +1,459 @@
-import motor.motor_asyncio
-import datetime
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from helper.database import codeflixbots
+import os
+import asyncio
+import subprocess
+import tempfile
+from datetime import datetime
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.enums import ParseMode
 import logging
-from config import Config
-from .utils import send_log
 
-class Database:
-    def __init__(self, uri, database_name):
-        try:
-            self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
-            self._client.server_info()
-            logging.info("Successfully connected to MongoDB")
-        except Exception as e:
-            logging.error(f"Failed to connect to MongoDB: {e}")
-            raise e
-        self.codeflixbots = self._client[database_name]
-        self.col = self.codeflixbots.user
+# Import from your main rename module
+from file_rename import auto_rename_files
 
-    def new_user(self, id):
-        return dict(
-            _id=int(id),
-            join_date=datetime.date.today().isoformat(),
-            file_id=None,
-            caption=None,
-            metadata=True,
-            metadata_code="Telegram : @Animelibraryn4",
-            format_template=None,
-            thumbnails={},
-            temp_quality=None,
-            use_global_thumb=False,  # New field for global thumbnail toggle
-            global_thumb=None,       # Stores the global thumbnail file_id
-            ban_status=dict(
-                is_banned=False,
-                ban_duration=0,
-                banned_on=datetime.date.max.isoformat(),
-                ban_reason=''
-            ),
-            # Preserving all existing metadata fields
-            title='Encoded by @Animelibraryn4',
-            author='@Animelibraryn4',
-            artist='@Animelibraryn4',
-            audio='By @Animelibraryn4',
-            subtitle='By @Animelibraryn4',
-            video='Encoded By @Animelibraryn4',
-            media_type=None
+# Setup logger
+logger = logging.getLogger(__name__)
+
+# Dictionary to track users in /info mode
+info_mode_users = {}
+
+# ===== AUTO RENAME COMMAND =====
+
+@Client.on_message(filters.private & filters.command("autorename"))
+async def auto_rename_command(client, message):
+    user_id = message.from_user.id
+    
+    # Get current mode
+    current_mode = await codeflixbots.get_mode(user_id)
+    
+    # Extract and validate the format from the command
+    command_parts = message.text.split(maxsplit=1)
+    if len(command_parts) < 2 or not command_parts[1].strip():
+        await message.reply_text(
+            "**Please provide a new name after the command /autorename**\n\n"
+            f"**Current Mode:** `{current_mode.replace('_', ' ').title()}`\n"
+            "**File Mode:** Extracts from file name\n"
+            "**Caption Mode:** Extracts from file caption\n"
+            "Use /mode to switch modes\n\n"
+            "Here's how to use it:\n"
+            "**Example format:** ` /autorename S[SE.NUM]EP[EP.NUM] your video title [QUALITY]`\n\n"
+            "**Available Variables:**\n"
+            "• `[SE.NUM]` or `{season}` - Season number\n"
+            "• `[EP.NUM]` or `{episode}` - Episode number\n"
+            "• `[QUALITY]` or `{quality}` - Video quality\n"
+            "• `[filename]` - Original filename\n"
+            "• `[filesize]` - File size\n"
+            "• `[duration]` - Video duration"
         )
+        return
 
-    async def add_user(self, b, m):
-        u = m.from_user
-        if not await self.is_user_exist(u.id):
-            user = self.new_user(u.id)
-            try:
-                await self.col.insert_one(user)
-                await send_log(b, u)
-            except Exception as e:
-                logging.error(f"Error adding user {u.id}: {e}")
+    format_template = command_parts[1].strip()
 
-    async def is_user_exist(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return bool(user)
-        except Exception as e:
-            logging.error(f"Error checking if user {id} exists: {e}")
-            return False
+    # Save the format template in the database
+    await codeflixbots.set_format_template(user_id, format_template)
 
-    async def total_users_count(self):
-        try:
-            count = await self.col.count_documents({})
-            return count
-        except Exception as e:
-            logging.error(f"Error counting users: {e}")
-            return 0
+    # Send confirmation message
+    await message.reply_text(
+        f"**🌟 Auto Rename Format Saved!**\n\n"
+        f"**Mode:** `{current_mode.replace('_', ' ').title()}`\n"
+        f"**Your Template:** `{format_template}`\n\n"
+        "📩 **Now send your files and I'll rename them automatically!**\n\n"
+        "💡 **Tip:** Use `/mode` to switch between file name and caption extraction."
+    )
 
-    async def get_all_users(self):
-        try:
-            all_users = self.col.find({})
-            return all_users
-        except Exception as e:
-            logging.error(f"Error getting all users: {e}")
-            return None
+# ===== SET MEDIA COMMAND =====
 
-    async def delete_user(self, user_id):
-        try:
-            await self.col.delete_many({"_id": int(user_id)})
-        except Exception as e:
-            logging.error(f"Error deleting user {user_id}: {e}")
+@Client.on_message(filters.private & filters.command("setmedia"))
+async def set_media_command(client, message):
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📄 Document", callback_data="setmedia_document")],
+        [InlineKeyboardButton("🎥 Video", callback_data="setmedia_video")],
+        [InlineKeyboardButton("🎵 Audio", callback_data="setmedia_audio")]
+    ])
 
-    async def set_thumbnail(self, id, file_id):
-        try:
-            await self.col.update_one({"_id": int(id)}, {"$set": {"file_id": file_id}})
-        except Exception as e:
-            logging.error(f"Error setting thumbnail for user {id}: {e}")
+    await message.reply_text(
+        "**📁 Select Media Type:**\n"
+        "• **Document:** Send as Telegram document\n"
+        "• **Video:** Send as Telegram video\n"
+        "• **Audio:** Send as Telegram audio\n\n"
+        "This affects how the file will be sent back to you.",
+        reply_markup=keyboard
+    )
 
-    async def get_thumbnail(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("file_id", None) if user else None
-        except Exception as e:
-            logging.error(f"Error getting thumbnail for user {id}: {e}")
-            return None
+@Client.on_callback_query(filters.regex("^setmedia_"))
+async def handle_media_selection(client, callback_query):
+    user_id = callback_query.from_user.id
+    media_type = callback_query.data.split("_", 1)[1]
 
-    async def set_caption(self, id, caption):
-        try:
-            await self.col.update_one({"_id": int(id)}, {"$set": {"caption": caption}})
-        except Exception as e:
-            logging.error(f"Error setting caption for user {id}: {e}")
+    await codeflixbots.set_media_preference(user_id, media_type)
+    await callback_query.answer(f"✅ Set to: {media_type}")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 Back to Settings", callback_data="help")]
+    ])
+    
+    await callback_query.message.edit_text(
+        f"**✅ Media preference saved!**\n\n"
+        f"All renamed files will be sent as: **{media_type}**\n\n"
+        "You can change this anytime using `/setmedia`",
+        reply_markup=keyboard
+    )
 
-    async def get_caption(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("caption", None) if user else None
-        except Exception as e:
-            logging.error(f"Error getting caption for user {id}: {e}")
-            return None
+# ===== INFO COMMAND FUNCTIONS =====
 
-    async def set_format_template(self, id, format_template):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)}, {"$set": {"format_template": format_template}}
-            )
-        except Exception as e:
-            logging.error(f"Error setting format template for user {id}: {e}")
+def format_file_size(size_bytes):
+    """Convert bytes to human readable format"""
+    if size_bytes == 0:
+        return "0 B"
+    
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    for unit in units:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"
 
-    async def get_format_template(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("format_template", None) if user else None
-        except Exception as e:
-            logging.error(f"Error getting format template for user {id}: {e}")
-            return None
+def format_duration(seconds):
+    """Convert seconds to HH:MM:SS format"""
+    if seconds == 0:
+        return "00:00:00"
+    
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    async def set_media_preference(self, id, media_type):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)}, {"$set": {"media_type": media_type}}
-            )
-        except Exception as e:
-            logging.error(f"Error setting media preference for user {id}: {e}")
-
-    async def get_media_preference(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("media_type", None) if user else None
-        except Exception as e:
-            logging.error(f"Error getting media preference for user {id}: {e}")
-            return None
-
-    async def get_metadata(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('metadata', "Off")
-
-    async def set_metadata(self, user_id, metadata):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'metadata': metadata}})
-
-    async def get_title(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('title', 'Encoded by @Animelibraryn4')
-
-    async def set_title(self, user_id, title):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'title': title}})
-
-    async def get_author(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('author', '@Animelibraryn4')
-
-    async def set_author(self, user_id, author):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'author': author}})
-
-    async def get_artist(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('artist', '@Animelibraryn4')
-
-    async def set_artist(self, user_id, artist):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'artist': artist}})
-
-    async def get_audio(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('audio', 'By @Animelibraryn4')
-
-    async def set_audio(self, user_id, audio):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'audio': audio}})
-
-    async def get_subtitle(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('subtitle', "By @Animelibraryn4")
-
-    async def set_subtitle(self, user_id, subtitle):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'subtitle': subtitle}})
-
-    async def get_video(self, user_id):
-        user = await self.col.find_one({'_id': int(user_id)})
-        return user.get('video', 'Encoded By @Animelibraryn4')
-
-    async def set_video(self, user_id, video):
-        await self.col.update_one({'_id': int(user_id)}, {'$set': {'video': video}})
-
-    # Quality Thumbnail Methods
-    async def set_quality_thumbnail(self, id, quality, file_id):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$set": {f"thumbnails.{quality}": file_id}},
-                upsert=True
-            )
-        except Exception as e:
-            logging.error(f"Error setting thumbnail for quality {quality} for user {id}: {e}")
-
-    async def get_quality_thumbnail(self, id, quality):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            if user and "thumbnails" in user:
-                return user["thumbnails"].get(quality)
-            return None
-        except Exception as e:
-            logging.error(f"Error getting thumbnail for quality {quality} for user {id}: {e}")
-            return None
-
-    async def get_all_thumbnails(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            if user and "thumbnails" in user:
-                return user["thumbnails"]
-            return {}
-        except Exception as e:
-            logging.error(f"Error getting all thumbnails for user {id}: {e}")
-            return {}
-
-    # Temporary quality storage methods
-    async def set_temp_quality(self, id, quality):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$set": {"temp_quality": quality}},
-                upsert=True
-            )
-        except Exception as e:
-            logging.error(f"Error setting temp quality for user {id}: {e}")
-
-    async def get_temp_quality(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("temp_quality") if user else None
-        except Exception as e:
-            logging.error(f"Error getting temp quality for user {id}: {e}")
-            return None
-
-    async def clear_temp_quality(self, id):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$unset": {"temp_quality": ""}}
-            )
-        except Exception as e:
-            logging.error(f"Error clearing temp quality for user {id}: {e}")
-
-    # Global Thumbnail Methods
-    async def set_global_thumb(self, id, file_id):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$set": {"global_thumb": file_id}},
-                upsert=True
-            )
-        except Exception as e:
-            logging.error(f"Error setting global thumbnail for user {id}: {e}")
-
-    async def get_global_thumb(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("global_thumb") if user else None
-        except Exception as e:
-            logging.error(f"Error getting global thumbnail for user {id}: {e}")
-            return None
-
-    async def toggle_global_thumb(self, id, status: bool):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$set": {"use_global_thumb": status}},
-                upsert=True
-            )
-        except Exception as e:
-            logging.error(f"Error toggling global thumb for user {id}: {e}")
-
-    async def is_global_thumb_enabled(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("use_global_thumb", False) if user else False
-        except Exception as e:
-            logging.error(f"Error checking global thumb status for user {id}: {e}")
-            return False
-# Add these methods to the Database class in database.py
-# Add them anywhere after the existing methods, before the codeflixbots initialization
-
-    async def get_verify_status(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            if user:
-                # Check if user has verify_status field, if not return 0
-                return user.get("verify_status", 0)
-            return 0
-        except Exception as e:
-            logging.error(f"Error getting verify status for user {id}: {e}")
-            return 0
-
-    async def set_verify_status(self, id, verify_status):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$set": {"verify_status": verify_status}},
-                upsert=True
-            )
-            return True
-        except Exception as e:
-            logging.error(f"Error setting verify status for user {id}: {e}")
-            return False
-
-    async def delete_verify_status(self, id):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$unset": {"verify_status": ""}}
-            )
-            return True
-        except Exception as e:
-            logging.error(f"Error deleting verify status for user {id}: {e}")
-            return False
-
-    async def get_mode(self, user_id):
-        """Get user's mode preference (file_mode or caption_mode)"""
-        try:
-            user = await self.col.find_one({"_id": int(user_id)})
-            return user.get("mode", "file_mode")  # Default to file_mode
-        except Exception as e:
-            logging.error(f"Error getting mode for user {user_id}: {e}")
-            return "file_mode"
-
-    async def set_mode(self, user_id, mode):
-        """Set user's mode preference"""
-        try:
-            await self.col.update_one(
-            {"_id": int(user_id)},
-            {"$set": {"mode": mode}},
-            upsert=True
-            )
-            return True
-        except Exception as e:
-            logging.error(f"Error setting mode for user {user_id}: {e}")
-            return False
-
-    # Info Mode methods
-    async def set_info_mode(self, id, status):
-        try:
-            await self.col.update_one(
-            {"_id": int(id)},
-            {"$set": {"info_mode": status}},
-            upsert=True
-            )
-            return True
-        except Exception as e:
-            logging.error(f"Error setting info mode for user {id}: {e}")
-            return False
- 
-    async def get_info_mode(self, id):
-        try:
-            user = await self.col.find_one({"_id": int(id)})
-            return user.get("info_mode", False) if user else False
-        except Exception as e:
-            logging.error(f"Error getting info mode for user {id}: {e}")
-            return False
-
-    async def clear_info_mode(self, id):
-        try:
-            await self.col.update_one(
-                {"_id": int(id)},
-                {"$unset": {"info_mode": ""}}
-            )
-            return True
-        except Exception as e:
-            logging.error(f"Error clearing info mode for user {id}: {e}")
-            return False
+async def extract_media_info(file_path):
+    """Extract media information using ffprobe"""
+    try:
+        cmd = [
+            'ffprobe',
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            '-show_streams',
+            file_path
+        ]
         
-# Initialize database connection
-codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            error_msg = stderr.decode()[:200] if stderr else "Unknown error"
+            logger.error(f"FFprobe error: {error_msg}")
+            return None
+        
+        import json
+        return json.loads(stdout.decode())
+    except Exception as e:
+        logger.error(f"Error extracting media info: {e}")
+        return None
 
+def format_media_info_output(media_info, filename, file_size, user_name):
+    """Format media information into a readable message"""
+    if not media_info:
+        return "❌ Unable to extract media information from this file."
+    
+    try:
+        format_info = media_info.get('format', {})
+        streams = media_info.get('streams', [])
+        
+        # Current date
+        current_date = datetime.now().strftime("%B %d, %Y")
+        
+        # Format output
+        output = []
+        output.append(f"**📊 Media Information**\n")
+        output.append(f"━━━━━━━━━━━━━━━━━━━━\n")
+        output.append(f"📁 **File:** `{filename}`")
+        output.append(f"🗓️ **Date:** {current_date}")
+        output.append(f"👤 **Requested by:** {user_name}")
+        output.append(f"📦 **Size:** {format_file_size(file_size)}\n")
+        
+        # General Information
+        output.append("**📌 General Information**")
+        output.append(f"• Format: `{format_info.get('format_name', 'N/A')}`")
+        output.append(f"• Duration: `{format_duration(float(format_info.get('duration', 0)))}`")
+        
+        bit_rate = format_info.get('bit_rate', '0')
+        if bit_rate != '0':
+            bit_rate_kbps = int(bit_rate) // 1000
+            output.append(f"• Bitrate: `{bit_rate_kbps} kb/s`")
+        
+        # Video streams
+        video_streams = [s for s in streams if s['codec_type'] == 'video']
+        if video_streams:
+            output.append(f"\n**🎬 Video Streams: {len(video_streams)}**")
+            for idx, video in enumerate(video_streams, 1):
+                output.append(f"\n**Video #{idx}**")
+                output.append(f"  Codec: `{video.get('codec_name', 'N/A')}`")
+                width = video.get('width', 'N/A')
+                height = video.get('height', 'N/A')
+                if width != 'N/A' and height != 'N/A':
+                    output.append(f"  Resolution: `{width}x{height}`")
+                
+                frame_rate = video.get('r_frame_rate', 'N/A')
+                if frame_rate != 'N/A':
+                    try:
+                        num, den = map(int, frame_rate.split('/'))
+                        fps = num / den if den != 0 else num
+                        output.append(f"  FPS: `{fps:.3f}`")
+                    except:
+                        output.append(f"  FPS: `{frame_rate}`")
+        
+        # Audio streams
+        audio_streams = [s for s in streams if s['codec_type'] == 'audio']
+        if audio_streams:
+            output.append(f"\n**🎵 Audio Streams: {len(audio_streams)}**")
+            for idx, audio in enumerate(audio_streams, 1):
+                output.append(f"\n**Audio #{idx}**")
+                output.append(f"  Codec: `{audio.get('codec_name', 'N/A')}`")
+                output.append(f"  Channels: `{audio.get('channels', 'N/A')}`")
+                output.append(f"  Sample Rate: `{audio.get('sample_rate', 'N/A')} Hz`")
+                
+                # Language
+                audio_tags = audio.get('tags', {})
+                language = audio_tags.get('language', audio_tags.get('LANGUAGE', 'Unknown'))
+                output.append(f"  Language: `{language}`")
+        
+        # Subtitle streams
+        subtitle_streams = [s for s in streams if s['codec_type'] == 'subtitle']
+        if subtitle_streams:
+            output.append(f"\n**💬 Subtitle Streams: {len(subtitle_streams)}**")
+            for idx, subtitle in enumerate(subtitle_streams, 1):
+                output.append(f"\n**Subtitle #{idx}**")
+                output.append(f"  Format: `{subtitle.get('codec_name', 'N/A')}`")
+                
+                # Language
+                subtitle_tags = subtitle.get('tags', {})
+                language = subtitle_tags.get('language', subtitle_tags.get('LANGUAGE', 'Unknown'))
+                output.append(f"  Language: `{language}`")
+        
+        output.append(f"\n━━━━━━━━━━━━━━━━━━━━")
+        output.append(f"ℹ️ Use `/autorename` to set up automatic renaming")
+        
+        return "\n".join(output)
+    
+    except Exception as e:
+        logger.error(f"Error formatting media info: {e}")
+        return f"❌ Error processing media information:\n`{str(e)[:200]}`"
 
+@Client.on_message(filters.private & filters.command("info"))
+async def info_command(client, message):
+    """Handle /info command - temporarily disable auto rename and get file info"""
+    user_id = message.from_user.id
+    
+    # Exit if already in info mode
+    if user_id in info_mode_users:
+        del info_mode_users[user_id]
+        await message.reply_text("ℹ️ Exited info mode.")
+        return
+    
+    # Set user to info mode
+    info_mode_users[user_id] = {
+        "active": True,
+        "message_id": message.id,
+        "start_time": datetime.now()
+    }
+    
+    # Ask user to send a file
+    buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Exit Info Mode", callback_data="exit_info_mode")]
+    ])
+    
+    await message.reply_text(
+        "**📋 File Information Mode**\n\n"
+        "📁 Please send me a file (video/document) to analyze.\n"
+        "I will extract and display detailed media information.\n\n"
+        "⚠️ **Note:** Auto-rename is temporarily disabled in this mode.\n"
+        "Send `/info` again or click the button below to exit.\n\n"
+        "✨ **Supported formats:** MP4, MKV, AVI, MOV, etc.",
+        reply_markup=buttons
+    )
+
+@Client.on_callback_query(filters.regex("^exit_info_mode$"))
+async def exit_info_mode_callback(client, callback_query):
+    """Handle exit button for /info mode"""
+    user_id = callback_query.from_user.id
+    
+    if user_id in info_mode_users:
+        del info_mode_users[user_id]
+        await callback_query.answer("Exited info mode")
+    
+    await callback_query.message.edit_text(
+        "✅ **Info mode exited.**\n\n"
+        "Auto-rename is now active again.\n"
+        "Send `/info` to analyze another file.",
+        reply_markup=None
+    )
+
+async def safe_auto_rename_files(client, message):
+    """Wrapper for auto_rename_files with error handling"""
+    try:
+        await auto_rename_files(client, message)
+    except Exception as e:
+        logger.error(f"Error in auto rename: {e}")
+        await message.reply_text(f"❌ Error processing file: {str(e)[:200]}")
+
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
+async def handle_file_upload(client, message):
+    """Main handler for uploaded files - routes to info mode or auto rename"""
+    user_id = message.from_user.id
+    
+    # Check if user is in info mode
+    if user_id in info_mode_users and info_mode_users[user_id]["active"]:
+        # Process for info mode
+        await process_file_for_info(client, message)
+    else:
+        # Process for auto rename
+        await safe_auto_rename_files(client, message)
+
+async def process_file_for_info(client, message):
+    """Process file sent during /info mode"""
+    user_id = message.from_user.id
+    
+    processing_msg = await message.reply_text("🔍 **Analyzing file...**\n\nPlease wait, this may take a moment.")
+    
+    # Get file details
+    if message.document:
+        filename = message.document.file_name or "document"
+        file_size = message.document.file_size or 0
+    elif message.video:
+        filename = message.video.file_name or f"video_{message.id}.mp4"
+        file_size = message.video.file_size or 0
+    elif message.audio:
+        filename = message.audio.file_name or f"audio_{message.id}.mp3"
+        file_size = message.audio.file_size or 0
+    else:
+        await processing_msg.edit_text("❌ Unsupported file type.")
+        return
+    
+    # Create temp directory
+    temp_dir = "temp_info_files"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"{user_id}_{message.id}_{filename}")
+    
+    try:
+        # Download the file
+        await processing_msg.edit_text("📥 **Downloading file...**")
+        
+        file_path = await client.download_media(
+            message,
+            file_name=temp_path
+        )
+        
+        if not file_path or not os.path.exists(file_path):
+            await processing_msg.edit_text("❌ Failed to download file.")
+            return
+        
+        # Extract media info
+        await processing_msg.edit_text("📊 **Extracting information...**")
+        media_info = await extract_media_info(file_path)
+        
+        if media_info:
+            # Format the output
+            user_name = message.from_user.first_name or "User"
+            info_output = format_media_info_output(media_info, filename, file_size, user_name)
+            
+            # Send the info
+            await processing_msg.delete()
+            
+            # Split if too long
+            if len(info_output) > 4000:
+                # Send in parts
+                parts = []
+                current = ""
+                for line in info_output.split('\n'):
+                    if len(current) + len(line) + 1 < 4000:
+                        current += line + '\n'
+                    else:
+                        parts.append(current)
+                        current = line + '\n'
+                if current:
+                    parts.append(current)
+                
+                # Send first part
+                first_msg = await message.reply_text(
+                    parts[0],
+                    parse_mode=ParseMode.MARKDOWN,
+                    disable_web_page_preview=True
+                )
+                
+                # Send remaining parts
+                for part in parts[1:]:
+                    await message.reply_text(
+                        part,
+                        parse_mode=ParseMode.MARKDOWN,
+                        disable_web_page_preview=True
+                    )
+            else:
+                await message.reply_text(
+                    info_output,
+                    parse_mode=ParseMode.MARKDOWN,
+                    disable_web_page_preview=True
+                )
+        else:
+            await processing_msg.edit_text(
+                "❌ **Unable to extract information.**\n\n"
+                "Possible reasons:\n"
+                "• File is corrupted\n"
+                "• Unsupported format\n"
+                "• FFmpeg not installed\n\n"
+                "Try another file or check the format."
+            )
+        
+    except Exception as e:
+        logger.error(f"Error in info mode processing: {e}")
+        await processing_msg.edit_text(f"❌ **Error:** {str(e)[:200]}")
+    
+    finally:
+        # Clean up
+        try:
+            if 'file_path' in locals() and file_path and os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            logger.error(f"Error cleaning up temp file: {e}")
+        
+        # Remove from info mode (single use)
+        if user_id in info_mode_users:
+            del info_mode_users[user_id]
+
+@Client.on_message(filters.private & filters.command("exit_info"))
+async def exit_info_command(client, message):
+    """Command to exit info mode"""
+    user_id = message.from_user.id
+    
+    if user_id in info_mode_users:
+        del info_mode_users[user_id]
+        await message.reply_text("✅ Exited info mode. Auto-rename is now active.")
+    else:
+        await message.reply_text("ℹ️ You are not in info mode.")
+
+# Auto-clear old info mode sessions
+async def cleanup_old_sessions():
+    """Clean up old info mode sessions"""
+    while True:
+        await asyncio.sleep(300)  # Check every 5 minutes
+        
+        current_time = datetime.now()
+        to_remove = []
+        
+        for user_id, data in info_mode_users.items():
+            if (current_time - data["start_time"]).total_seconds() > 600:  # 10 minutes
+                to_remove.append(user_id)
+        
+        for user_id in to_remove:
+            del info_mode_users[user_id]
+            logger.info(f"Cleaned up old info session for user {user_id}")
+
+# Start cleanup task when bot starts
+@Client.on_start()
+async def start_cleanup(client):
+    asyncio.create_task(cleanup_old_sessions())
