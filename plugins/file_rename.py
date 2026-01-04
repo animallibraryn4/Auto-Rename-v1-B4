@@ -1,3 +1,24 @@
+
+# In file_rename.py inside add_video_watermark function
+
+command = [
+    ffmpeg_cmd,
+    '-i', input_path,
+    '-vf', f"drawtext=text='{text}':x={ffmpeg_position.split(':')[0]}:"
+           f"y={ffmpeg_position.split(':')[1]}:fontsize={font_size}:"
+           f"fontcolor={font_color}@{opacity}:"
+           f"box=1:boxcolor=black@0.3:boxborderw=5",
+    '-c:v', 'libx264',      # Use the X264 encoder
+    '-preset', 'ultrafast',  # 'ultrafast' for speed, 'veryfast' for balance
+    '-crf', '28',           # Higher CRF (24-28) = smaller file size, lower quality
+    '-c:a', 'copy',         # Keep original audio (saves time)
+    '-loglevel', 'warning',
+    '-y', output_path
+]
+
+
+
+
 import os
 import re
 import time
@@ -452,22 +473,16 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             command = [
                 ffmpeg_cmd,
                 '-i', input_path,
-                # Use libx264 with reasonable settings for watermarking
-                '-c:v', 'libx264',
-                '-crf', '23',  # Good quality, reasonable file size
-                '-preset', 'fast',
-                '-c:a', 'copy',          # Copy audio stream
-                '-c:s', 'copy',          # Copy subtitle stream
-                # Apply watermark filter
-                '-vf', f"drawtext=text='{text}':"
-                       f"x={ffmpeg_position.split(':')[0]}:"
-                       f"y={ffmpeg_position.split(':')[1]}:"
-                       f"fontsize={font_size}:"
+                '-vf', f"drawtext=text='{text}':x={ffmpeg_position.split(':')[0]}:"
+                       f"y={ffmpeg_position.split(':')[1]}:fontsize={font_size}:"
                        f"fontcolor={font_color}@{opacity}:"
-                       f"box=1:boxcolor=black@0.3:boxborderw=2",
-                '-loglevel', 'error',
-                '-y',
-                output_path
+                       f"box=1:boxcolor=black@0.3:boxborderw=5",
+                '-c:v', 'libx264',      # Use the X264 encoder
+                '-preset', 'ultrafast',  # 'ultrafast' for speed, 'veryfast' for balance
+                '-crf', '28',           # Higher CRF (24-28) = smaller file size, lower quality
+                '-c:a', 'copy',         # Keep original audio (saves time)
+                '-loglevel', 'warning',
+                '-y', output_path
             ]
             
         elif watermark_type == "image":
