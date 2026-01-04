@@ -60,15 +60,17 @@ async def set_text_watermark_handler(client, query: CallbackQuery):
     await query.message.edit_text(
         "📝 **Set Text Watermark**\n\n"
         "Send me the text you want to use as a watermark.\n\n"
+        "💡 **Tips for better performance:**\n"
+        "• Keep text short (max 50 characters)\n"
+        "• Avoid complex unicode characters\n"
+        "• Simple fonts work faster\n\n"
         "**Example:** `@Animelibraryn4`\n"
-        "**Format:** Just send the text message\n\n"
-        "After sending text, I'll ask for position settings.",
+        "**Format:** Just send the text message",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="watermark_back")]
         ])
     )
     
-    # Store state for next message
     await codeflixbots.set_temp_quality(query.from_user.id, "awaiting_watermark_text")
 
 @Client.on_message(filters.private & filters.text)
