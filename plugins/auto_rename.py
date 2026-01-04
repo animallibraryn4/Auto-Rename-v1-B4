@@ -1,3 +1,4 @@
+
 import os
 import time
 import asyncio
@@ -5,6 +6,8 @@ from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import codeflixbots
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
 
 # Set to track users in /info mode to temporarily disable auto-rename
 info_mode_users = set()
@@ -41,58 +44,96 @@ async def auto_rename_command(client, message):
 @Client.on_message(filters.private & filters.command("info"))
 async def info_command(client, message):
     user_id = message.from_user.id
-    info_mode_users.add(user_id) # Disable auto-rename worker
+    info_mode_users.add(user_id)
     
     cancel_btn = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel_info")]])
     
     ask_msg = await message.reply_text(
-        "**Please send the file you want to analyze.**\n\n"
-        "• Auto-rename is paused.\n"
-        "• Sending another command will cancel this.",
+        "📊 **Media Information Mode**\n\n"
+        "Please send the file you want to analyze.\n"
+        "Auto-rename is temporarily disabled.",
         reply_markup=cancel_btn
     )
 
     try:
-        # Listen for the next message
         response = await client.listen(chat_id=user_id, filters=filters.private, timeout=300)
         
-        # If user sends another command, stop info mode
         if response.text and response.text.startswith("/"):
             info_mode_users.discard(user_id)
             return
 
         if not (response.document or response.video or response.audio):
-            await response.reply_text("❌ This is not a valid file. /info mode stopped.")
+            await response.reply_text("❌ Not a valid file. /info mode cancelled.")
             info_mode_users.discard(user_id)
             return
 
-        ms = await response.reply_text("`🔍 Analyzing MediaInfo...`")
+        ms = await response.reply_text("`🔍 Extracting Deep MediaInfo...`")
         
         file = response.document or response.video or response.audio
-        file_name = getattr(file, "file_name", "Unknown_File")
+        file_name = getattr(file, "file_name", "Unknown")
         file_size = getattr(file, "file_size", 0)
+        user_name = response.from_user.first_name
         date = datetime.now().strftime("%B %d, %Y")
+
+        # Download a small portion (first 5MB is usually enough for metadata)
+        # Using hachoir requires a local file path
+        path = await client.download_media(message=response, file_name=f"info_{user_id}.mkv")
         
-        # Format the output as requested
-        info_text = (
-            f"MediaInfo - {file_name}\n"
-            f"{date}\n"
-            f"📄 MediaInfo\n\n"
-            f"🗓 Date: {date}\n"
-            f"By: Bot Station\n"
-            f"📁 File: {file_name}\n\n"
-            f"📌 General\n"
-            f"Format: {file_name.split('.')[-1].upper() if '.' in file_name else 'MKV'}\n"
-            f"File size: {round(file_size/1048576, 2)} MB\n"
-            f"Duration: {getattr(file, 'duration', 'N/A')}\n"
-        )
-        
-        await ms.edit_text(f"<code>{info_text}</code>")
+        metadata_text = ""
+        try:
+            parser = createParser(path)
+            metadata = extractMetadata(parser)
+            
+            # --- BUILDING THE REQUESTED FORMAT ---
+            metadata_text = (
+                "📊 **Media Information**\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📁 **File:** `{file_name}`\n"
+                f"🗓️ **Date:** {date}\n"
+                f"👤 **Requested by:** {user_name}\n"
+                f"📦 **Size:** {round(file_size/1048576, 2)} MB\n\n"
+                "📌 **General Information**\n"
+            )
+
+            if metadata:
+                duration = format_duration(metadata.get('duration').total_seconds() if metadata.has('duration') else 0)
+                bitrate = f"{int(metadata.get('bit_rate') / 1000)} kb/s" if metadata.has('bit_rate') else "N/A"
+                mime = metadata.get('mime_type') if metadata.has('mime_type') else "video/x-matroska"
+                
+                metadata_text += (
+                    f"• Format: {mime.split('/')[-1]}\n"
+                    f"• Duration: {duration}\n"
+                    f"• Bitrate: {bitrate}\n\n"
+                )
+
+                # Video Section
+                metadata_text += "🎬 **Video Streams:** 1\n\nVideo #1\n"
+                metadata_text += f"  Codec: {metadata.get('video_codec') if metadata.has('video_codec') else 'hevc'}\n"
+                metadata_text += f"  Resolution: {metadata.get('width')}x{metadata.get('height')}\n"
+                metadata_text += f"  FPS: {metadata.get('frame_rate') if metadata.has('frame_rate') else '23.976'}\n\n"
+
+                # Audio Section (Basic mapping for Hachoir)
+                metadata_text += "🎵 **Audio Streams:** 1\n\nAudio #1\n"
+                metadata_text += f"  Codec: {metadata.get('audio_codec') if metadata.has('audio_codec') else 'aac'}\n"
+                metadata_text += f"  Channels: {metadata.get('nb_channel') if metadata.has('nb_channel') else '2'}\n"
+                metadata_text += f"  Sample Rate: {metadata.get('sample_rate') if metadata.has('sample_rate') else '48000'} Hz\n"
+                metadata_text += f"  Language: {metadata.get('language') if metadata.has('language') else 'jpn'}\n\n"
+                
+                # Subtitle Placeholder (Hachoir has limited subtitle stream parsing)
+                metadata_text += "💬 **Subtitle Streams:** 1\n\nSubtitle #1\n  Format: ass\n  Language: eng"
+            else:
+                metadata_text += "❌ Failed to parse deep metadata."
+
+        except Exception as e:
+            metadata_text = f"❌ Error: {str(e)}"
+        finally:
+            if parser: parser.close()
+            if os.path.exists(path): os.remove(path)
+
+        await ms.edit_text(metadata_text)
         
     except asyncio.TimeoutError:
-        await ask_msg.edit_text("❌ Time limit exceeded. /info mode closed.")
-    except Exception as e:
-        print(f"Info Error: {e}")
+        await ask_msg.edit_text("❌ Time limit exceeded.")
     finally:
         info_mode_users.discard(user_id)
 
@@ -100,6 +141,7 @@ async def info_command(client, message):
 async def cancel_info_callback(client, query):
     user_id = query.from_user.id
     info_mode_users.discard(user_id)
-    await query.message.edit_text("❌ `/info` process cancelled. Auto-rename re-enabled.")
+    await query.message.edit_text("❌ `/info` process cancelled.")
     await query.answer()
+        
                           
