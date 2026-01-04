@@ -347,6 +347,38 @@ class Database:
         except Exception as e:
             logging.error(f"Error setting mode for user {user_id}: {e}")
             return False
+
+    # Info Mode methods
+    async def set_info_mode(self, id, status):
+        try:
+            await self.col.update_one(
+            {"_id": int(id)},
+            {"$set": {"info_mode": status}},
+            upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting info mode for user {id}: {e}")
+            return False
+ 
+    async def get_info_mode(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("info_mode", False) if user else False
+        except Exception as e:
+            logging.error(f"Error getting info mode for user {id}: {e}")
+            return False
+
+    async def clear_info_mode(self, id):
+        try:
+            await self.col.update_one(
+                {"_id": int(id)},
+                {"$unset": {"info_mode": ""}}
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error clearing info mode for user {id}: {e}")
+            return False
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
