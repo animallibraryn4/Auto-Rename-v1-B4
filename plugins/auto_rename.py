@@ -1,12 +1,12 @@
 import os
 import time
+import asyncio
 from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import codeflixbots
-from pyrogram.errors import ListenerStopped
 
-# Dictionary to track users currently in /info mode to disable auto-rename
+# Set to track users in /info mode to temporarily disable auto-rename
 info_mode_users = set()
 
 @Client.on_message(filters.private & filters.command("autorename"))
@@ -31,7 +31,7 @@ async def auto_rename_command(client, message):
     await codeflixbots.set_format_template(user_id, format_template)
 
     await message.reply_text(
-        f"**Fantastic! You're ready to auto-rename your files.**\n\n"
+        f"**🌟 Fantastic! You're ready to auto-rename your files.**\n\n"
         f"**Current Mode:** `{current_mode.replace('_', ' ').title()}`\n\n"
         f"📩 Simply send the file(s) you want to rename.\n\n"
         f"**Your saved template:** `{format_template}`\n\n"
@@ -44,10 +44,7 @@ async def set_media_command(client, message):
         [InlineKeyboardButton("📄 Document", callback_data="setmedia_document")],
         [InlineKeyboardButton("🎥 Video", callback_data="setmedia_video")]
     ])
-    await message.reply_text(
-        "**Please select the media type you want to set:**",
-        reply_markup=keyboard
-    )
+    await message.reply_text("**Please select the media type you want to set:**", reply_markup=keyboard)
 
 @Client.on_callback_query(filters.regex("^setmedia_"))
 async def handle_media_selection(client, callback_query):
@@ -64,7 +61,7 @@ async def handle_media_selection(client, callback_query):
 @Client.on_message(filters.private & filters.command("info"))
 async def info_command(client, message):
     user_id = message.from_user.id
-    info_mode_users.add(user_id) # Disable auto-rename for this user
+    info_mode_users.add(user_id)
     
     cancel_btn = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel_info")]])
     
@@ -75,13 +72,12 @@ async def info_command(client, message):
     )
 
     try:
-        # Wait for user to send a file or another command
+        # Wait for user response (timeout 5 minutes)
         response = await client.listen(chat_id=user_id, filters=filters.private, timeout=300)
         
-        # If user sends a command, stop info mode
+        # If user sends another command, abort info mode
         if response.text and response.text.startswith("/"):
             info_mode_users.discard(user_id)
-            await ask_msg.delete()
             return
 
         if not (response.document or response.video or response.audio):
@@ -91,24 +87,29 @@ async def info_command(client, message):
 
         ms = await response.reply_text("`Extracting MediaInfo...`")
         
-        # Extract basic info (Using MediaInfo command if installed on VPS, otherwise custom logic)
-        # For this implementation, we simulate the output format requested
         file = response.document or response.video or response.audio
-        file_name = file.file_name
+        file_name = getattr(file, "file_name", "Unknown")
         file_size = getattr(file, "file_size", 0)
         date = datetime.now().strftime("%B %d, %Y")
         
-        # Note: To get full details as shown in your example, you usually need 'mediainfo' binary installed
-        # and a wrapper like 'pymediainfo'. Here is a structured response.
-        info_text = f"MediaInfo - {file_name}\n{date}\n📄 MediaInfo\n\n"
-        info_text += f"🗓 Date: {date}\nBy: Bot Station\n📁 File: {file_name}\n\n"
-        info_text += f"📌 General\nComplete name: {file_name}\nFile size: {round(file_size/1048576, 2)} MB\n"
-        # ... Add more fields as needed or call external mediainfo tool ...
+        # Generate formatted output
+        info_text = (
+            f"MediaInfo - {file_name}\n"
+            f"{date}\n"
+            f"📄 MediaInfo\n\n"
+            f"🗓 Date: {date}\n"
+            f"By: Bot Station\n"
+            f"📁 File: {file_name}\n\n"
+            f"📌 General\n"
+            f"Complete name: {file_name}\n"
+            f"File size: {round(file_size/1048576, 2)} MB\n"
+            f"Format: {file_name.split('.')[-1].upper() if '.' in file_name else 'Unknown'}"
+        )
         
         await ms.edit_text(f"<code>{info_text}</code>")
         
-    except Exception as e:
-        print(f"Error in /info: {e}")
+    except asyncio.TimeoutError:
+        await message.reply_text("Process timed out. Please try again.")
     finally:
         info_mode_users.discard(user_id)
 
