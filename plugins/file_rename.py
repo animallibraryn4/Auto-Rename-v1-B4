@@ -407,7 +407,7 @@ async def extract_info_from_source(message, user_mode):
 
 async def add_video_watermark(input_path, output_path, watermark_settings):
     """
-    OPTIMIZED: Add watermark to video using FFmpeg WITHOUT re-encoding
+    OPTIMIZED: Add watermark to video using FFmpeg
     """
     if not watermark_settings.get("enabled", False):
         return input_path  # No watermark, return original
@@ -435,7 +435,7 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
     
     try:
         if watermark_type == "text":
-            # Text watermark - optimized with COPY codec
+            # Text watermark - we need to re-encode when applying filter
             text = watermark_settings.get("text", "")
             if not text:
                 logger.warning("Text watermark enabled but no text provided")
@@ -444,18 +444,21 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             font_size = watermark_settings.get("font_size", 24)
             font_color = watermark_settings.get("font_color", "white")
             
-            # FIXED: Simplified text escaping - remove fontfile parameter
-            # FFmpeg will use default font which is always available
-            text = text.replace("'", "''").replace(":", "\\:")  # Escape single quotes and colons
+            # Escape special characters
+            text = text.replace("'", "''").replace(":", "\\:")
             
+            # Determine if we should try to preserve quality
+            # For watermarking, we'll use a balanced approach
             command = [
                 ffmpeg_cmd,
                 '-i', input_path,
-                # CRITICAL: Copy all streams without re-encoding
-                '-c:v', 'copy',          # Copy video stream
+                # Use libx264 with reasonable settings for watermarking
+                '-c:v', 'libx264',
+                '-crf', '23',  # Good quality, reasonable file size
+                '-preset', 'fast',
                 '-c:a', 'copy',          # Copy audio stream
                 '-c:s', 'copy',          # Copy subtitle stream
-                # FIXED: Simplified drawtext filter without fontfile
+                # Apply watermark filter
                 '-vf', f"drawtext=text='{text}':"
                        f"x={ffmpeg_position.split(':')[0]}:"
                        f"y={ffmpeg_position.split(':')[1]}:"
@@ -468,7 +471,7 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             ]
             
         elif watermark_type == "image":
-            # Image watermark - optimized with overlay
+            # Image watermark - also needs re-encoding
             image_file_id = watermark_settings.get("image_file_id", "")
             image_path = watermark_settings.get("image_path", "")
             
@@ -513,11 +516,13 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
                 ffmpeg_cmd,
                 '-i', input_path,
                 '-i', image_path,
-                # CRITICAL: Copy all streams
-                '-c:v', 'copy',
+                # Re-encode video with overlay
+                '-c:v', 'libx264',
+                '-crf', '23',
+                '-preset', 'fast',
                 '-c:a', 'copy',
                 '-c:s', 'copy',
-                # Optimized overlay filter
+                # Apply overlay filter
                 '-filter_complex', f"[1]format=rgba,colorchannelmixer=aa={opacity}[watermark];"
                                  f"[0][watermark]overlay={ffmpeg_position}:shortest=1",
                 '-loglevel', 'error',
@@ -535,7 +540,7 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             logger.warning(f"Unknown watermark type: {watermark_type}")
             return input_path
         
-        logger.info(f"Applying watermark with optimized command...")
+        logger.info(f"Applying watermark with re-encoding...")
         
         # Execute with timeout
         process = await asyncio.create_subprocess_exec(
@@ -546,10 +551,10 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         
         # Add timeout to prevent hanging
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)  # 5 minutes timeout
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=600)  # 10 minutes timeout for re-encoding
         except asyncio.TimeoutError:
             process.kill()
-            logger.error("Watermark process timed out after 5 minutes")
+            logger.error("Watermark process timed out after 10 minutes")
             return input_path
         
         if process.returncode != 0:
@@ -559,7 +564,7 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         
         # Verify output
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            logger.info(f"Watermark applied successfully in optimized mode: {output_path}")
+            logger.info(f"Watermark applied successfully: {output_path}")
             return output_path
         else:
             logger.error("Watermark output file not created or empty")
