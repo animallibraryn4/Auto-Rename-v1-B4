@@ -783,13 +783,10 @@ async def process_rename(client: Client, message: Message):
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
 
-    # ADD THIS BLOCK: Disable auto-rename if /info is active
+    # ✅ Corrected indentation: Disable auto-rename if /info is active
     if user_id in info_mode_users:
-        return 
+        return # This must be indented with 4 spaces or 1 tab
 
-    # Existing logic follows...
-    if not await is_user_verified(user_id):
-    
     # Check verification
     if not await is_user_verified(user_id):
         curr = time.time()
