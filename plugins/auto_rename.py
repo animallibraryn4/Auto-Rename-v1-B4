@@ -1,17 +1,15 @@
-
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from helper.database import codeflixbots
 import os
+import time
 import asyncio
 import subprocess
-import tempfile
+import json
 from datetime import datetime
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
+from helper.database import codeflixbots
 
-# Import the auto_rename_files function from file_rename.py
-from plugins.file_rename import auto_rename_files
+
 info_mode_users = {}
 
 
