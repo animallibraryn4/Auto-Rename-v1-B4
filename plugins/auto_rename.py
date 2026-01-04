@@ -181,26 +181,13 @@ async def info_command(client, message):
     )
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
-async def handle_info_mode_file(client, message):
+async def info_mode_file_handler(client, message):
     user_id = message.from_user.id
     
-    # Check if user is in info mode
+    # Only process if user is in info mode
     if user_id in info_mode_users:
-        # User is in info mode, process the file for info
         await process_file_for_info(client, message)
-    else:
-        # User is NOT in info mode, so we need to call auto_rename_files
-        # But we need to import it first
-        try:
-            from plugins.file_rename import auto_rename_files
-            await auto_rename_files(client, message)
-        except ImportError as e:
-            print(f"Error importing auto_rename_files: {e}")
-            # If import fails, let the file_rename.py handler process it
-            pass
-    
-    # User is in info mode, process the file
-    await process_file_for_info(client, message)
+    # If not in info mode, do nothing - let file_rename.py handle i
 
 async def process_file_for_info(client, message):
     user_id = message.from_user.id
