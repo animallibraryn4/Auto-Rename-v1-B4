@@ -70,15 +70,20 @@ async def info_command(client, message):
 
         ms = await response.reply_text("`🔍 Downloading and analyzing media file...`")
         
-        # Download the file
-        file_path = await response.download()
+        # Download the file with a safe filename
+        file_path = await response.download(file_name=f"temp_{int(time.time())}")
         
         # Analyze with MediaInfo
         media_info = MediaInfo.parse(file_path)
         
-        file_name = getattr(response.document or response.video or response.audio, "file_name", "Unknown_File")
+        # Get file name safely
+        file_obj = response.document or response.video or response.audio
+        file_name = getattr(file_obj, "file_name", "Unknown_File")
+        # Clean the filename to avoid encoding issues
+        file_name = file_name.encode('utf-8', 'ignore').decode('utf-8')
+        
         date = datetime.now().strftime("%B %d, %Y")
-        user_name = message.from_user.first_name
+        user_name = message.from_user.first_name or "User"
         
         # Get general track (usually track 0)
         general_track = next((track for track in media_info.tracks if track.track_type == "General"), None)
@@ -92,27 +97,75 @@ async def info_command(client, message):
         # Get text/subtitle tracks
         text_tracks = [track for track in media_info.tracks if track.track_type == "Text"]
         
+        # Helper function to safely get attributes with encoding handling
+        def safe_get(obj, attr, default='N/A'):
+            try:
+                value = getattr(obj, attr, default)
+                if value and value != default:
+                    # Try to encode/decode to handle special characters
+                    if isinstance(value, str):
+                        value = value.encode('utf-8', 'ignore').decode('utf-8')
+                return value if value else default
+            except:
+                return default
+        
         # Format the output
-        info_text = f"📊 Media Information\n"
+        info_text = "📊 Media Information\n"
         info_text += "━━━━━━━━━━━━━━━━━━━━\n\n"
         info_text += f"📁 File: {file_name}\n"
-        info_text += f"🗓️ Date: {datetime.now().strftime('%B %d, %Y')}\n"
+        info_text += f"🗓️ Date: {date}\n"
         info_text += f"👤 Requested by: {user_name}\n"
         
         if general_track:
-            file_size = getattr(general_track, 'file_size', 0)
-            info_text += f"📦 Size: {humanize.naturalsize(file_size) if file_size else 'N/A'}\n\n"
+            file_size = safe_get(general_track, 'file_size', 0)
+            if file_size and file_size != 'N/A':
+                try:
+                    size_text = humanize.naturalsize(int(file_size))
+                except:
+                    size_text = f"{round(int(file_size)/1048576, 2)} MB"
+                info_text += f"📦 Size: {size_text}\n\n"
+            else:
+                info_text += f"📦 Size: N/A\n\n"
         else:
             info_text += f"📦 Size: N/A\n\n"
         
-        info_text += f"📌 General Information\n"
+        info_text += "📌 General Information\n"
         if general_track:
-            format_name = getattr(general_track, 'format', 'N/A')
-            if format_name == "Matroska":
+            format_name = safe_get(general_track, 'format', 'N/A')
+            if format_name and "Matroska" in format_name:
                 format_name = "matroska,webm"
             info_text += f"• Format: {format_name}\n"
-            info_text += f"• Duration: {getattr(general_track, 'duration', 'N/A')}\n"
-            info_text += f"• Bitrate: {getattr(general_track, 'overall_bit_rate', 'N/A')} b/s\n\n"
+            
+            # Format duration
+            duration = safe_get(general_track, 'duration', 'N/A')
+            if duration and duration != 'N/A':
+                try:
+                    # Convert milliseconds to HH:MM:SS
+                    duration_ms = int(duration)
+                    hours = duration_ms // 3600000
+                    minutes = (duration_ms % 3600000) // 60000
+                    seconds = (duration_ms % 60000) // 1000
+                    duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                except:
+                    duration_str = duration
+                info_text += f"• Duration: {duration_str}\n"
+            else:
+                info_text += "• Duration: N/A\n"
+            
+            # Format bitrate
+            bitrate = safe_get(general_track, 'overall_bit_rate', 'N/A')
+            if bitrate and bitrate != 'N/A':
+                try:
+                    bitrate_num = int(bitrate)
+                    if bitrate_num > 1000:
+                        bitrate_str = f"{bitrate_num // 1000} kb/s"
+                    else:
+                        bitrate_str = f"{bitrate_num} b/s"
+                except:
+                    bitrate_str = bitrate
+                info_text += f"• Bitrate: {bitrate_str}\n\n"
+            else:
+                info_text += "• Bitrate: N/A\n\n"
         else:
             info_text += "• Format: N/A\n• Duration: N/A\n• Bitrate: N/A\n\n"
         
@@ -120,25 +173,40 @@ async def info_command(client, message):
         info_text += f"🎬 Video Streams: {len(video_tracks)}\n\n"
         for i, track in enumerate(video_tracks, 1):
             info_text += f"Video #{i}\n"
-            info_text += f"  Codec: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
-            info_text += f"  Resolution: {getattr(track, 'width', 'N/A')}x{getattr(track, 'height', 'N/A')}\n"
-            info_text += f"  FPS: {getattr(track, 'frame_rate', 'N/A')}\n\n"
+            codec = safe_get(track, 'codec_id', safe_get(track, 'format', 'N/A')).lower()
+            info_text += f"  Codec: {codec}\n"
+            width = safe_get(track, 'width', 'N/A')
+            height = safe_get(track, 'height', 'N/A')
+            info_text += f"  Resolution: {width}x{height}\n"
+            fps = safe_get(track, 'frame_rate', 'N/A')
+            if fps and fps != 'N/A':
+                try:
+                    fps = round(float(fps), 3)
+                except:
+                    pass
+            info_text += f"  FPS: {fps}\n\n"
         
         # Audio Streams
         info_text += f"🎵 Audio Streams: {len(audio_tracks)}\n\n"
         for i, track in enumerate(audio_tracks, 1):
             info_text += f"Audio #{i}\n"
-            info_text += f"  Codec: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
-            info_text += f"  Channels: {getattr(track, 'channel_s', 'N/A')}\n"
-            info_text += f"  Sample Rate: {getattr(track, 'sampling_rate', 'N/A')} Hz\n"
-            info_text += f"  Language: {getattr(track, 'language', 'N/A')}\n\n"
+            codec = safe_get(track, 'codec_id', safe_get(track, 'format', 'N/A')).lower()
+            info_text += f"  Codec: {codec}\n"
+            channels = safe_get(track, 'channel_s', safe_get(track, 'channels', 'N/A'))
+            info_text += f"  Channels: {channels}\n"
+            sample_rate = safe_get(track, 'sampling_rate', 'N/A')
+            info_text += f"  Sample Rate: {sample_rate} Hz\n"
+            language = safe_get(track, 'language', 'und')  'und' for undefined
+            info_text += f"  Language: {language}\n\n".
         
         # Subtitle Streams
         info_text += f"💬 Subtitle Streams: {len(text_tracks)}\n\n"
         for i, track in enumerate(text_tracks, 1):
             info_text += f"Subtitle #{i}\n"
-            info_text += f"  Format: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
-            info_text += f"  Language: {getattr(track, 'language', 'N/A')}\n\n"
+            format_ = safe_get(track, 'codec_id', safe_get(track, 'format', 'N/A')).lower()
+            info_text += f"  Format: {format_}\n"
+            language = safe_get(track, 'language', 'und')
+            info_text += f"  Language: {language}\n\n"
         
         # Clean up downloaded file
         try:
@@ -146,20 +214,27 @@ async def info_command(client, message):
         except:
             pass
         
+        # Ensure the info_text is properly encoded before sending
+        try:
+            info_text_encoded = info_text.encode('utf-8', 'ignore').decode('utf-8')
+        except:
+            info_text_encoded = info_text
+        
+        # Check if message is too long (Telegram limit is ~4096 characters)
+        if len(info_text_encoded) > 4000:
+            info_text_encoded = info_text_encoded[:3990] + "\n... (truncated)"
+        
         # Send the formatted info
-        await ms.edit_text(f"```{info_text}```")
+        await ms.edit_text(f"```{info_text_encoded}```")
         
     except asyncio.TimeoutError:
         await ask_msg.edit_text("❌ Time limit exceeded. /info mode closed.")
     except Exception as e:
         print(f"Info Error: {e}")
-        await ms.edit_text(f"❌ Error analyzing file: {str(e)}")
+        try:
+            error_msg = str(e).encode('utf-8', 'ignore').decode('utf-8')
+            await ms.edit_text(f"❌ Error analyzing file: {error_msg[:100]}")
+        except:
+            await ms.edit_text("❌ Error analyzing file. Please try with a different file.")
     finally:
         info_mode_users.discard(user_id)
-
-@Client.on_callback_query(filters.regex("cancel_info"))
-async def cancel_info_callback(client, query):
-    user_id = query.from_user.id
-    info_mode_users.discard(user_id)
-    await query.message.edit_text("❌ `/info` process cancelled. Auto-rename re-enabled.")
-    await query.answer()
