@@ -426,3 +426,20 @@ async def check_info_mode_exit(client, message):
         # Exit info mode
         del info_mode_users[user_id]
         await message.reply_text("ℹ️ Info mode exited. Auto rename is now active again.")
+
+@Client.on_message(filters.private & (filters.document | filters.video))
+async def handle_info_mode_file(client, message):
+    """Handle file sent during /info mode"""
+    user_id = message.from_user.id
+    
+    # DEBUG: Check if info mode is working
+    print(f"DEBUG: User {user_id} sending file. Info mode status: {user_id in info_mode_users}")
+    
+    # Check if user is in info mode
+    if user_id not in info_mode_users or not info_mode_users[user_id].get("active", False):
+        # Not in info mode, proceed with normal auto rename
+        print(f"DEBUG: User {user_id} not in info mode, calling auto_rename_files")
+        return await auto_rename_files(client, message)
+    
+    print(f"DEBUG: User {user_id} is in info mode, processing file for info")
+    # Rest of the function remains the same...
