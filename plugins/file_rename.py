@@ -444,8 +444,9 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
             font_size = watermark_settings.get("font_size", 24)
             font_color = watermark_settings.get("font_color", "white")
             
-            # Escape special characters for FFmpeg
-            text = text.replace("'", "'\\\\\\''").replace(":", "\\:").replace("%", "%%")
+            # FIXED: Simplified text escaping - remove fontfile parameter
+            # FFmpeg will use default font which is always available
+            text = text.replace("'", "''").replace(":", "\\:")  # Escape single quotes and colons
             
             command = [
                 ffmpeg_cmd,
@@ -454,14 +455,13 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
                 '-c:v', 'copy',          # Copy video stream
                 '-c:a', 'copy',          # Copy audio stream
                 '-c:s', 'copy',          # Copy subtitle stream
-                # Optimized drawtext filter
+                # FIXED: Simplified drawtext filter without fontfile
                 '-vf', f"drawtext=text='{text}':"
                        f"x={ffmpeg_position.split(':')[0]}:"
                        f"y={ffmpeg_position.split(':')[1]}:"
                        f"fontsize={font_size}:"
                        f"fontcolor={font_color}@{opacity}:"
-                       f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"  # Use system font
-                       f"box=1:boxcolor=black@0.3:boxborderw=2",  # Reduced border width
+                       f"box=1:boxcolor=black@0.3:boxborderw=2",
                 '-loglevel', 'error',
                 '-y',
                 output_path
@@ -554,7 +554,7 @@ async def add_video_watermark(input_path, output_path, watermark_settings):
         
         if process.returncode != 0:
             error_message = stderr.decode() if stderr else "Unknown error"
-            logger.error(f"Watermark error (exit code {process.returncode}): {error_message[:200]}")
+            logger.error(f"Watermark error (exit code {process.returncode}): {error_message}")
             return input_path
         
         # Verify output
