@@ -180,7 +180,7 @@ async def info_command(client, message):
         reply_markup=cancel_btn
     )
 
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=0)
 async def info_mode_file_handler(client, message):
     user_id = message.from_user.id
     
