@@ -10,4 +10,4 @@ humanize
 pyromod
 ffmpeg-python
 cloudscraper
-pymediainfo
+# Ensure ffmpeg is installed system-wide for ffprobe
