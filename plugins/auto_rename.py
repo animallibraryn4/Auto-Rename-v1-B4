@@ -316,15 +316,13 @@ async def cancel_info_callback(client, callback_query):
     )
     await callback_query.answer("Cancelled")
 
-@Client.on_message(filters.private & (filters.document | filters.video))
-async def handle_info_mode_file(client, message):
-    """Handle file sent during /info mode"""
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=0)
+async def info_mode_file_handler(client, message):
     user_id = message.from_user.id
     
-    # Check if user is in info mode
-    if user_id not in info_mode_users or not info_mode_users[user_id]["active"]:
-        # Not in info mode, proceed with normal auto rename
-        return await auto_rename_files(client, message)
+    # Only process if user is in info mode
+    if user_id in info_mode_users:
+        await process_file_for_info(client, message)
     
     # User is in info mode, process file for info
     processing_msg = await message.reply_text("🔍 Analyzing file... Please wait.")
