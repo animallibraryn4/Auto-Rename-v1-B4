@@ -1,4 +1,3 @@
-
 import os
 import time
 import asyncio
@@ -6,8 +5,8 @@ from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import codeflixbots
-from hachoir.metadata import extractMetadata
-from hachoir.parser import createParser
+from pymediainfo import MediaInfo  # Install with: pip install pymediainfo
+import humanize  # Install with: pip install humanize
 
 # Set to track users in /info mode to temporarily disable auto-rename
 info_mode_users = set()
@@ -44,96 +43,117 @@ async def auto_rename_command(client, message):
 @Client.on_message(filters.private & filters.command("info"))
 async def info_command(client, message):
     user_id = message.from_user.id
-    info_mode_users.add(user_id)
+    info_mode_users.add(user_id) # Disable auto-rename worker
     
     cancel_btn = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel_info")]])
     
     ask_msg = await message.reply_text(
-        "📊 **Media Information Mode**\n\n"
-        "Please send the file you want to analyze.\n"
-        "Auto-rename is temporarily disabled.",
+        "**Please send the file you want to analyze.**\n\n"
+        "• Auto-rename is paused.\n"
+        "• Sending another command will cancel this.",
         reply_markup=cancel_btn
     )
 
     try:
+        # Listen for the next message
         response = await client.listen(chat_id=user_id, filters=filters.private, timeout=300)
         
+        # If user sends another command, stop info mode
         if response.text and response.text.startswith("/"):
             info_mode_users.discard(user_id)
             return
 
         if not (response.document or response.video or response.audio):
-            await response.reply_text("❌ Not a valid file. /info mode cancelled.")
+            await response.reply_text("❌ This is not a valid file. /info mode stopped.")
             info_mode_users.discard(user_id)
             return
 
-        ms = await response.reply_text("`🔍 Extracting Deep MediaInfo...`")
+        ms = await response.reply_text("`🔍 Downloading and analyzing media file...`")
         
-        file = response.document or response.video or response.audio
-        file_name = getattr(file, "file_name", "Unknown")
-        file_size = getattr(file, "file_size", 0)
-        user_name = response.from_user.first_name
+        # Download the file
+        file_path = await response.download()
+        
+        # Analyze with MediaInfo
+        media_info = MediaInfo.parse(file_path)
+        
+        file_name = getattr(response.document or response.video or response.audio, "file_name", "Unknown_File")
         date = datetime.now().strftime("%B %d, %Y")
-
-        # Download a small portion (first 5MB is usually enough for metadata)
-        # Using hachoir requires a local file path
-        path = await client.download_media(message=response, file_name=f"info_{user_id}.mkv")
+        user_name = message.from_user.first_name
         
-        metadata_text = ""
+        # Get general track (usually track 0)
+        general_track = next((track for track in media_info.tracks if track.track_type == "General"), None)
+        
+        # Get video tracks
+        video_tracks = [track for track in media_info.tracks if track.track_type == "Video"]
+        
+        # Get audio tracks
+        audio_tracks = [track for track in media_info.tracks if track.track_type == "Audio"]
+        
+        # Get text/subtitle tracks
+        text_tracks = [track for track in media_info.tracks if track.track_type == "Text"]
+        
+        # Format the output
+        info_text = f"📊 Media Information\n"
+        info_text += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        info_text += f"📁 File: {file_name}\n"
+        info_text += f"🗓️ Date: {datetime.now().strftime('%B %d, %Y')}\n"
+        info_text += f"👤 Requested by: {user_name}\n"
+        
+        if general_track:
+            file_size = getattr(general_track, 'file_size', 0)
+            info_text += f"📦 Size: {humanize.naturalsize(file_size) if file_size else 'N/A'}\n\n"
+        else:
+            info_text += f"📦 Size: N/A\n\n"
+        
+        info_text += f"📌 General Information\n"
+        if general_track:
+            format_name = getattr(general_track, 'format', 'N/A')
+            if format_name == "Matroska":
+                format_name = "matroska,webm"
+            info_text += f"• Format: {format_name}\n"
+            info_text += f"• Duration: {getattr(general_track, 'duration', 'N/A')}\n"
+            info_text += f"• Bitrate: {getattr(general_track, 'overall_bit_rate', 'N/A')} b/s\n\n"
+        else:
+            info_text += "• Format: N/A\n• Duration: N/A\n• Bitrate: N/A\n\n"
+        
+        # Video Streams
+        info_text += f"🎬 Video Streams: {len(video_tracks)}\n\n"
+        for i, track in enumerate(video_tracks, 1):
+            info_text += f"Video #{i}\n"
+            info_text += f"  Codec: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
+            info_text += f"  Resolution: {getattr(track, 'width', 'N/A')}x{getattr(track, 'height', 'N/A')}\n"
+            info_text += f"  FPS: {getattr(track, 'frame_rate', 'N/A')}\n\n"
+        
+        # Audio Streams
+        info_text += f"🎵 Audio Streams: {len(audio_tracks)}\n\n"
+        for i, track in enumerate(audio_tracks, 1):
+            info_text += f"Audio #{i}\n"
+            info_text += f"  Codec: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
+            info_text += f"  Channels: {getattr(track, 'channel_s', 'N/A')}\n"
+            info_text += f"  Sample Rate: {getattr(track, 'sampling_rate', 'N/A')} Hz\n"
+            info_text += f"  Language: {getattr(track, 'language', 'N/A')}\n\n"
+        
+        # Subtitle Streams
+        info_text += f"💬 Subtitle Streams: {len(text_tracks)}\n\n"
+        for i, track in enumerate(text_tracks, 1):
+            info_text += f"Subtitle #{i}\n"
+            info_text += f"  Format: {getattr(track, 'codec_id', getattr(track, 'format', 'N/A')).lower()}\n"
+            info_text += f"  Language: {getattr(track, 'language', 'N/A')}\n\n"
+        
+        # Clean up downloaded file
         try:
-            parser = createParser(path)
-            metadata = extractMetadata(parser)
-            
-            # --- BUILDING THE REQUESTED FORMAT ---
-            metadata_text = (
-                "📊 **Media Information**\n"
-                "━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"📁 **File:** `{file_name}`\n"
-                f"🗓️ **Date:** {date}\n"
-                f"👤 **Requested by:** {user_name}\n"
-                f"📦 **Size:** {round(file_size/1048576, 2)} MB\n\n"
-                "📌 **General Information**\n"
-            )
-
-            if metadata:
-                duration = format_duration(metadata.get('duration').total_seconds() if metadata.has('duration') else 0)
-                bitrate = f"{int(metadata.get('bit_rate') / 1000)} kb/s" if metadata.has('bit_rate') else "N/A"
-                mime = metadata.get('mime_type') if metadata.has('mime_type') else "video/x-matroska"
-                
-                metadata_text += (
-                    f"• Format: {mime.split('/')[-1]}\n"
-                    f"• Duration: {duration}\n"
-                    f"• Bitrate: {bitrate}\n\n"
-                )
-
-                # Video Section
-                metadata_text += "🎬 **Video Streams:** 1\n\nVideo #1\n"
-                metadata_text += f"  Codec: {metadata.get('video_codec') if metadata.has('video_codec') else 'hevc'}\n"
-                metadata_text += f"  Resolution: {metadata.get('width')}x{metadata.get('height')}\n"
-                metadata_text += f"  FPS: {metadata.get('frame_rate') if metadata.has('frame_rate') else '23.976'}\n\n"
-
-                # Audio Section (Basic mapping for Hachoir)
-                metadata_text += "🎵 **Audio Streams:** 1\n\nAudio #1\n"
-                metadata_text += f"  Codec: {metadata.get('audio_codec') if metadata.has('audio_codec') else 'aac'}\n"
-                metadata_text += f"  Channels: {metadata.get('nb_channel') if metadata.has('nb_channel') else '2'}\n"
-                metadata_text += f"  Sample Rate: {metadata.get('sample_rate') if metadata.has('sample_rate') else '48000'} Hz\n"
-                metadata_text += f"  Language: {metadata.get('language') if metadata.has('language') else 'jpn'}\n\n"
-                
-                # Subtitle Placeholder (Hachoir has limited subtitle stream parsing)
-                metadata_text += "💬 **Subtitle Streams:** 1\n\nSubtitle #1\n  Format: ass\n  Language: eng"
-            else:
-                metadata_text += "❌ Failed to parse deep metadata."
-
-        except Exception as e:
-            metadata_text = f"❌ Error: {str(e)}"
-        finally:
-            if parser: parser.close()
-            if os.path.exists(path): os.remove(path)
-
-        await ms.edit_text(metadata_text)
+            os.remove(file_path)
+        except:
+            pass
+        
+        # Send the formatted info
+        await ms.edit_text(f"```{info_text}```")
         
     except asyncio.TimeoutError:
-        await ask_msg.edit_text("❌ Time limit exceeded.")
+        await ask_msg.edit_text("❌ Time limit exceeded. /info mode closed.")
+    except Exception as e:
+        print(f"Info Error: {e}")
+        await ms.edit_text(f"❌ Error analyzing file: {str(e)}")
     finally:
         info_mode_users.discard(user_id)
 
@@ -141,7 +161,5 @@ async def info_command(client, message):
 async def cancel_info_callback(client, query):
     user_id = query.from_user.id
     info_mode_users.discard(user_id)
-    await query.message.edit_text("❌ `/info` process cancelled.")
+    await query.message.edit_text("❌ `/info` process cancelled. Auto-rename re-enabled.")
     await query.answer()
-        
-                          
