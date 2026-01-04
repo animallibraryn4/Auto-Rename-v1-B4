@@ -4,20 +4,61 @@ import os
 import asyncio
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pyrogram.enums import ParseMode
 import logging
-
-# Import from your main rename module
-from plugins.file_rename import auto_rename_files
 
 # Setup logger
 logger = logging.getLogger(__name__)
 
 # Dictionary to track users in /info mode
 info_mode_users = {}
+
+# Background task for cleanup
+cleanup_task = None
+
+# ===== IMPORT HANDLING =====
+# Try to import auto_rename_files with multiple fallbacks
+auto_rename_files_func = None
+
+try:
+    # Try direct import
+    from file_rename import auto_rename_files as arf_func
+    auto_rename_files_func = arf_func
+    logger.info("Successfully imported auto_rename_files")
+except ImportError as e:
+    logger.error(f"Failed to import auto_rename_files: {e}")
+    
+    # Define fallback function
+    async def fallback_auto_rename(client, message):
+        from plugins import is_user_verified, send_verification
+        
+        user_id = message.from_user.id
+        if not await is_user_verified(user_id):
+            await send_verification(client, message)
+            return
+        
+        await message.reply_text(
+            "📁 **File Processing**\n\n"
+            "The auto rename feature is currently initializing.\n"
+            "Please try again in a moment."
+        )
+    
+    auto_rename_files_func = fallback_auto_rename
+
+# Create wrapper function
+async def safe_auto_rename_files(client, message):
+    """Wrapper for auto rename with error handling"""
+    if auto_rename_files_func:
+        try:
+            await auto_rename_files_func(client, message)
+        except Exception as e:
+            logger.error(f"Error in auto rename: {e}")
+            await message.reply_text(f"❌ Error: {str(e)[:200]}")
+    else:
+        await message.reply_text("❌ Auto rename feature is not available.")
 
 # ===== AUTO RENAME COMMAND =====
 
@@ -294,27 +335,6 @@ async def exit_info_mode_callback(client, callback_query):
         reply_markup=None
     )
 
-async def safe_auto_rename_files(client, message):
-    """Wrapper for auto_rename_files with error handling"""
-    try:
-        await auto_rename_files(client, message)
-    except Exception as e:
-        logger.error(f"Error in auto rename: {e}")
-        await message.reply_text(f"❌ Error processing file: {str(e)[:200]}")
-
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
-async def handle_file_upload(client, message):
-    """Main handler for uploaded files - routes to info mode or auto rename"""
-    user_id = message.from_user.id
-    
-    # Check if user is in info mode
-    if user_id in info_mode_users and info_mode_users[user_id]["active"]:
-        # Process for info mode
-        await process_file_for_info(client, message)
-    else:
-        # Process for auto rename
-        await safe_auto_rename_files(client, message)
-
 async def process_file_for_info(client, message):
     """Process file sent during /info mode"""
     user_id = message.from_user.id
@@ -425,6 +445,19 @@ async def process_file_for_info(client, message):
         if user_id in info_mode_users:
             del info_mode_users[user_id]
 
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
+async def handle_file_upload(client, message):
+    """Main handler for uploaded files - routes to info mode or auto rename"""
+    user_id = message.from_user.id
+    
+    # Check if user is in info mode
+    if user_id in info_mode_users and info_mode_users[user_id]["active"]:
+        # Process for info mode
+        await process_file_for_info(client, message)
+    else:
+        # Process for auto rename using the wrapper
+        await safe_auto_rename_files(client, message)
+
 @Client.on_message(filters.private & filters.command("exit_info"))
 async def exit_info_command(client, message):
     """Command to exit info mode"""
@@ -436,21 +469,38 @@ async def exit_info_command(client, message):
     else:
         await message.reply_text("ℹ️ You are not in info mode.")
 
-# Auto-clear old info mode sessions
+# Background cleanup task
 async def cleanup_old_sessions():
     """Clean up old info mode sessions"""
     while True:
-        await asyncio.sleep(300)  # Check every 5 minutes
-        
-        current_time = datetime.now()
-        to_remove = []
-        
-        for user_id, data in info_mode_users.items():
-            if (current_time - data["start_time"]).total_seconds() > 600:  # 10 minutes
-                to_remove.append(user_id)
-        
-        for user_id in to_remove:
-            del info_mode_users[user_id]
-            logger.info(f"Cleaned up old info session for user {user_id}")
+        try:
+            await asyncio.sleep(300)  # Check every 5 minutes
+            
+            current_time = datetime.now()
+            to_remove = []
+            
+            for user_id, data in info_mode_users.items():
+                if (current_time - data["start_time"]).total_seconds() > 600:  # 10 minutes
+                    to_remove.append(user_id)
+            
+            for user_id in to_remove:
+                if user_id in info_mode_users:
+                    del info_mode_users[user_id]
+                    logger.info(f"Cleaned up old info session for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {e}")
+            await asyncio.sleep(60)
 
+# Start cleanup task when module loads
+import threading
 
+def start_cleanup_background():
+    """Start cleanup task in background thread"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(cleanup_old_sessions())
+
+# Start background cleanup thread
+cleanup_thread = threading.Thread(target=start_cleanup_background, daemon=True)
+cleanup_thread.start()
+logger.info("Started background cleanup thread for info mode sessions")
