@@ -196,8 +196,8 @@ async def info_command(client, message):
             info_text += f"  Channels: {channels}\n"
             sample_rate = safe_get(track, 'sampling_rate', 'N/A')
             info_text += f"  Sample Rate: {sample_rate} Hz\n"
-            language = safe_get(track, 'language', 'und')  'und' for undefined
-            info_text += f"  Language: {language}\n\n".
+            language = safe_get(track, 'language', 'und')  # 'und' for undefined
+            info_text += f"  Language: {language}\n\n"
         
         # Subtitle Streams
         info_text += f"💬 Subtitle Streams: {len(text_tracks)}\n\n"
