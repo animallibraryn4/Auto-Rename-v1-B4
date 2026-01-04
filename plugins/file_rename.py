@@ -830,19 +830,29 @@ async def process_rename(client: Client, message: Message):
         watermark_settings = await codeflixbots.get_video_watermark(user_id)
         if watermark_settings.get("enabled", False) and media_type in ["video", "document"]:
             try:
-                watermarked_path = f"{metadata_path}.watermarked.mkv"
-                watermarked_path = await add_video_watermark(metadata_path, watermarked_path, watermark_settings)
+                # Warn user that watermarking takes time
+                await download_msg.edit("**__Applying watermark (this may take a few minutes)...__**")
         
+                watermarked_path = f"{metadata_path}.watermarked.mp4"
+                watermarked_path = await add_video_watermark(metadata_path, watermarked_path, watermark_settings)
+    
                 if watermarked_path != metadata_path and os.path.exists(watermarked_path):
                     # Remove old file and use watermarked one
                     if os.path.exists(metadata_path):
                         os.remove(metadata_path)
                     os.rename(watermarked_path, metadata_path)
-                    logger.info(f"Watermark applied successfully, using: {metadata_path}")
+                    path = metadata_path
+                    logger.info(f"Watermark applied successfully: {path}")
+            
+                    # Update file extension if needed
+                    if watermarked_path.endswith('.mp4'):
+                        renamed_file_name = renamed_file_name.rsplit('.', 1)[0] + '.mp4'
                 else:
                     logger.warning("Watermark processing skipped or failed, using original file")
+                    await download_msg.edit("**__Watermark failed, continuing without it...__**")
             except Exception as e:
                 logger.error(f"Watermark application failed: {e}")
+                await download_msg.edit("**__Watermark failed, continuing without it...__**")
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
