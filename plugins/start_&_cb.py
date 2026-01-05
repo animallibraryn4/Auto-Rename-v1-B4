@@ -5,8 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 
 from helper.database import codeflixbots
-from config import *
-from config import Config
+from config import Config, Txt
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
