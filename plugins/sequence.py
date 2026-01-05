@@ -394,6 +394,9 @@ async def switch_mode_cmd(client, message):
     user_id = message.from_user.id
     current_mode = user_mode.get(user_id, "file")
     
+    # Save to database
+    await codeflixbots.set_mode(user_id, f"{current_mode}_mode")
+    
     # Create buttons based on current mode
     if current_mode == "file":
         buttons = InlineKeyboardMarkup([
