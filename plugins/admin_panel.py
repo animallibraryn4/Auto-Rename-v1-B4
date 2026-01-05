@@ -58,45 +58,120 @@ async def get_stats(bot, message):
 
 @Client.on_message(filters.command("broadcast") & filters.user(Config.ADMIN) & filters.reply)
 async def broadcast_handler(bot: Client, m: Message):
-    await bot.send_message(Config.LOG_CHANNEL, f"{m.from_user.mention} or {m.from_user.id} Is Started The Broadcast......")
-    all_users = await codeflixbots.get_all_users()
+    """Fixed broadcast function - simpler and more reliable"""
+    
+    # Send to log channel
+    try:
+        await bot.send_message(
+            Config.LOG_CHANNEL, 
+            f"📢 {m.from_user.mention} ({m.from_user.id}) started a broadcast"
+        )
+    except:
+        pass  # Don't stop if log channel fails
+    
+    # Get the message to broadcast
     broadcast_msg = m.reply_to_message
-    sts_msg = await m.reply_text("Broadcast Started..!") 
-    done = 0
-    failed = 0
-    success = 0
-    start_time = time.time()
+    
+    # Get all users
+    all_users = await codeflixbots.get_all_users()
     total_users = await codeflixbots.total_users_count()
+    
+    # Start message
+    sts_msg = await m.reply_text(f"📢 **Starting Broadcast...**\nTotal Users: {total_users}\nStatus: Preparing...")
+    
+    success = 0
+    failed = 0
+    deleted = 0
+    progress = 0
+    
+    # Track start time
+    import datetime
+    start_time = time.time()
+    
+    # Process users
     async for user in all_users:
-        sts = await send_msg(user['_id'], broadcast_msg)
-        if sts == 200:
-           success += 1
-        else:
-           failed += 1
-        if sts == 400:
-           await codeflixbots.delete_user(user['_id'])
-        done += 1
-        if not done % 20:
-           await sts_msg.edit(f"Broadcast In Progress: \n\nTotal Users {total_users} \nCompleted : {done} / {total_users}\nSuccess : {success}\nFailed : {failed}")
-    completed_in = datetime.timedelta(seconds=int(time.time() - start_time))
-    await sts_msg.edit(f"Bʀᴏᴀᴅᴄᴀꜱᴛ Cᴏᴍᴩʟᴇᴛᴇᴅ: \nCᴏᴍᴩʟᴇᴛᴇᴅ Iɴ `{completed_in}`.\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nFailed: {failed}")
-           
+        try:
+            user_id = user['_id']
+            
+            # Try to send message
+            try:
+                await broadcast_msg.copy(chat_id=int(user_id))
+                success += 1
+                
+            # Handle various errors
+            except FloodWait as e:
+                # Wait for flood control
+                await asyncio.sleep(e.value)
+                # Try again
+                try:
+                    await broadcast_msg.copy(chat_id=int(user_id))
+                    success += 1
+                except:
+                    failed += 1
+                    
+            except (InputUserDeactivated, UserIsBlocked):
+                # User blocked or deleted account
+                deleted += 1
+                await codeflixbots.delete_user(user_id)
+                
+            except PeerIdInvalid:
+                # Invalid user ID
+                failed += 1
+                
+            except Exception as e:
+                # Any other error
+                failed += 1
+                
+        except Exception as e:
+            # Error processing user
+            failed += 1
+        
+        # Update progress every 20 users or 5 seconds
+        progress += 1
+        if progress % 20 == 0 or time.time() - start_time > 5:
+            try:
+                await sts_msg.edit_text(
+                    f"📢 **Broadcast in Progress**\n\n"
+                    f"• ✅ Success: {success}\n"
+                    f"• ❌ Failed: {failed}\n"
+                    f"• 🗑️ Deleted: {deleted}\n"
+                    f"• 📊 Progress: {progress}/{total_users}\n"
+                    f"• ⏱️ Time: {int(time.time() - start_time)}s"
+                )
+            except:
+                pass  # Don't crash if edit fails
+    
+    # Calculate time taken
+    completed_in = int(time.time() - start_time)
+    
+    # Final message
+    await sts_msg.edit_text(
+        f"✅ **Broadcast Completed!**\n\n"
+        f"📊 **Statistics:**\n"
+        f"• ✅ Successfully sent: {success}\n"
+        f"• ❌ Failed to send: {failed}\n"
+        f"• 🗑️ Inactive users removed: {deleted}\n"
+        f"• ⏱️ Time taken: {completed_in} seconds\n"
+        f"• 📈 Success rate: {round((success/total_users)*100, 2) if total_users > 0 else 0}%"
+    )
+
 async def send_msg(user_id, message):
+    """Simple function to send message to a user"""
     try:
         await message.copy(chat_id=int(user_id))
-        return 200
+        return 200  # Success
     except FloodWait as e:
+        # Wait and try again
         await asyncio.sleep(e.value)
-        return send_msg(user_id, message)
-    except InputUserDeactivated:
-        logger.info(f"{user_id} : Deactivated")
-        return 400
-    except UserIsBlocked:
-        logger.info(f"{user_id} : Blocked The Bot")
-        return 400
+        try:
+            await message.copy(chat_id=int(user_id))
+            return 200
+        except:
+            return 400  # Failed after retry
+    except (InputUserDeactivated, UserIsBlocked):
+        return 400  # User blocked or deleted
     except PeerIdInvalid:
-        logger.info(f"{user_id} : User ID Invalid")
-        return 400
+        return 400  # Invalid user ID
     except Exception as e:
-        logger.error(f"{user_id} : {e}")
-        return 500
+        print(f"Broadcast error for user {user_id}: {e}")
+        return 500  # Other error
