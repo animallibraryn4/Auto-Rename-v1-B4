@@ -25,20 +25,6 @@ async def see_caption(client, message):
     else:
        await message.reply_text("**You Don't Have Any Caption ❌**")
 
-
-@Client.on_message(filters.private & filters.command(['view_thumb', 'viewthumb']))
-async def viewthumb(client, message):    
-    thumb = await codeflixbots.get_thumbnail(message.from_user.id)
-    if thumb:
-       await client.send_photo(chat_id=message.chat.id, photo=thumb)
-    else:
-        await message.reply_text("**You Don't Have Any Thumbnail ❌**") 
-
-@Client.on_message(filters.private & filters.command(['del_thumb', 'delthumb']))
-async def removethumb(client, message):
-    await codeflixbots.set_thumbnail(message.from_user.id, file_id=None)
-    await message.reply_text("**Thumbnail Deleted Successfully 🗑️**")
-
 @Client.on_message(filters.private & filters.photo)
 async def addthumbs(client, message):
     mkn = await message.reply_text("Please Wait ...")
