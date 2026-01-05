@@ -642,20 +642,24 @@ async def set_mode_callback(client, query):
     data = query.data
     user_id = query.from_user.id
     
+    # 1. Local state update karein
     if data == "set_mode_group":
         user_seq_mode[user_id] = "group"
-        await query.message.edit_text(
-            "<b>✅ Mode Set: Quality Flow</b>\n\n"
-            "<blockquote>Files will be sequenced by quality within each season.</blockquote>"
-        )
-        await query.answer("Quality Flow selected", show_alert=True)
-    elif data == "set_mode_per_ep":
+        await codeflixbots.set_mode(user_id, "group_mode") # Database mein save karein
+        msg_text = "<b>✅ Mode Set: Quality Flow</b>\n\n<blockquote>Files will be sequenced by quality within each season.</blockquote>"
+        alert_text = "Quality Flow selected"
+    else:
         user_seq_mode[user_id] = "per_ep"
-        await query.message.edit_text(
-            "<b>✅ Mode Set: Episode Flow</b>\n\n"
-            "<blockquote>Files will be sequenced episode by episode.</blockquote>"
-        )
-        await query.answer("Episode Flow selected", show_alert=True)
+        await codeflixbots.set_mode(user_id, "per_ep_mode") # Database mein save karein
+        msg_text = "<b>✅ Mode Set: Episode Flow</b>\n\n<blockquote>Files will be sequenced episode by episode.</blockquote>"
+        alert_text = "Episode Flow selected"
+
+    try:
+        await query.message.edit_text(msg_text)
+        await query.answer(alert_text, show_alert=True)
+    except Exception as e:
+        print(f"Callback Error: {e}")
+        
 
 @Client.on_callback_query(filters.regex(r'^(send_sequence|cancel_sequence)$'))
 async def sequence_control_callback(client, query):
