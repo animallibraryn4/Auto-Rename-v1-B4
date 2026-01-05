@@ -17,6 +17,11 @@ from helper.database import codeflixbots
 from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
+# Import sequence state if available
+try:
+    from plugins.sequence import user_sequences
+except ImportError:
+    user_sequences = {}  # Fallback if sequence.py not available
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
