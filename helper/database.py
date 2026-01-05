@@ -347,6 +347,29 @@ class Database:
         except Exception as e:
             logging.error(f"Error setting mode for user {user_id}: {e}")
             return False
+
+    # Sequence methods
+    async def set_sequence_mode(self, user_id, mode):
+        """Set user's sequence mode preference"""
+        try:
+            await self.col.update_one(
+            {"_id": int(user_id)},
+            {"$set": {"sequence_mode": mode}},
+            upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting sequence mode for user {user_id}: {e}")
+            return False
+
+    async def get_sequence_mode(self, user_id):
+        """Get user's sequence mode preference"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("sequence_mode", "per_ep")  # Default to episode flow
+        except Exception as e:
+            logging.error(f"Error getting sequence mode for user {user_id}: {e}")
+            return "per_ep"
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
