@@ -204,6 +204,338 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
     return sorted_files, current_mode
 
 # =====================================================
+# CALLBACK QUERY HANDLERS - MOVED TO TOP
+# =====================================================
+
+@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
+async def set_seq_mode_callback(client, query):
+    """Handle sequence mode selection callback"""
+    user_id = query.from_user.id
+    selection = query.data.replace("set_mode_", "")
+    
+    print(f"Callback received: {query.data} from user {user_id}")
+    
+    try:
+        # Update database
+        success = await codeflixbots.set_sequence_mode(user_id, selection)
+        print(f"Database update success: {success}")
+        
+        # Update local state
+        user_seq_mode[user_id] = selection
+        
+        mode_text = "Episode Flow" if selection == "per_ep" else "Quality Flow"
+        example_text = "S1 EP1 Q720, S1 EP1 Q1080" if selection == "per_ep" else "S1 Q720 EP1, S1 Q720 EP2"
+        
+        await query.message.edit_text(
+            f"<b>✅ Sequence Mode Updated!</b>\n\n"
+            f"<blockquote><b>New Mode:</b> {mode_text}\n"
+            f"<b>Example Order:</b> {example_text}\n\n"
+            f"Now send your files or use /ls command.</blockquote>",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
+        )
+        await query.answer(f"Switched to {mode_text}!", show_alert=False)
+        
+    except Exception as e:
+        print(f"Error setting sequence mode: {e}")
+        import traceback
+        traceback.print_exc()
+        await query.answer("Error updating mode. Please try again.", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r'^close_data$'))
+async def close_callback_handler(client, query):
+    """Handle close button callback"""
+    try:
+        await query.message.delete()
+        await query.answer("Closed", show_alert=False)
+    except Exception as e:
+        print(f"Error deleting message: {e}")
+        await query.answer("Message already deleted", show_alert=False)
+
+
+@Client.on_callback_query(filters.regex(r'^mode_(file|caption)$'))
+async def mode_callback_handler(client, query):
+    """Handle mode switching callbacks"""
+    data = query.data
+    user_id = query.from_user.id
+    
+    print(f"Mode callback received: {data} from user {user_id}")
+    
+    if data == "mode_file":
+        user_mode[user_id] = "file"
+        # Save to database
+        await codeflixbots.set_mode(user_id, "file_mode")
+        
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
+            [InlineKeyboardButton("Caption Mode", callback_data="mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+        ])
+        text = (
+            "<b>🔄 Sequence Mode Settings</b>\n\n"
+            "<blockquote><b>Current Mode:</b> File Mode\n\n"
+            "<b>📝 File Mode:</b> Sequence files using filename\n"
+            "<b>🏷️ Caption Mode:</b> Sequence files using file caption\n\n"
+            "✅ <i>Mode switched to File Mode!</i></blockquote>"
+        )
+        
+        await query.message.edit_text(text, reply_markup=buttons)
+        await query.answer("Switched to File Mode!", show_alert=False)
+        
+    elif data == "mode_caption":
+        user_mode[user_id] = "caption"
+        # Save to database
+        await codeflixbots.set_mode(user_id, "caption_mode")
+        
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("File Mode", callback_data="mode_file")],
+            [InlineKeyboardButton("✅ Caption Mode", callback_data="mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+        ])
+        text = (
+            "<b>🔄 Sequence Mode Settings</b>\n\n"
+            "<blockquote><b>Current Mode:</b> Caption Mode\n\n"
+            "<b>📝 File Mode:</b> Sequence files using filename\n"
+            "<b>🏷️ Caption Mode:</b> Sequence files using file caption\n\n"
+            "✅ <i>Mode switched to Caption Mode!</i></blockquote>"
+        )
+        
+        await query.message.edit_text(text, reply_markup=buttons)
+        await query.answer("Switched to Caption Mode!", show_alert=False)
+
+
+@Client.on_callback_query(filters.regex(r'^close_mode$'))
+async def close_mode_callback(client, query):
+    """Handle close mode callback"""
+    try:
+        await query.message.delete()
+        await query.answer("Closed mode settings", show_alert=False)
+    except:
+        await query.answer("Message already deleted", show_alert=False)
+
+
+@Client.on_callback_query(filters.regex(r'^(send_sequence|cancel_sequence)$'))
+async def sequence_control_callback(client, query):
+    """Handle sequence control callbacks"""
+    data = query.data
+    user_id = query.from_user.id
+    
+    print(f"Sequence control callback: {data} from user {user_id}")
+    
+    if data == "send_sequence":
+        if user_id in user_sequences:
+            await send_sequence_files(client, query.message, user_id)
+        else:
+            await query.answer("No sequence found!", show_alert=True)
+    elif data == "cancel_sequence":
+        user_sequences.pop(user_id, None)
+        user_notification_msg.pop(user_id, None)
+        update_tasks.pop(user_id, None)
+        await query.message.edit_text("<blockquote>❌ Sequence cancelled.</blockquote>")
+        await query.answer("Sequence cancelled", show_alert=False)
+
+
+@Client.on_callback_query(filters.regex(r'^ls_(chat|channel|close)_'))
+async def ls_callback_handlers(client, query):
+    """Handle LS callback handlers"""
+    data = query.data
+    user_id = query.from_user.id
+    
+    print(f"LS callback received: {data} from user {user_id}")
+    
+    # Extract target_user_id from callback data
+    try:
+        parts = data.split("_")
+        action = parts[1]  # chat, channel, or close
+        target_user_id = int(parts[2])
+    except (IndexError, ValueError):
+        await query.answer("Invalid callback data.", show_alert=True)
+        return
+    
+    if user_id != target_user_id:
+        await query.answer("This button is not for you!", show_alert=True)
+        return
+    
+    if target_user_id not in user_ls_state:
+        await query.answer("Session expired. Please start again with /ls", show_alert=True)
+        try:
+            await query.message.delete()
+        except:
+            pass
+        return
+    
+    ls_data = user_ls_state[target_user_id]
+    current_mode = ls_data.get("current_mode", "file")
+    
+    if action == "chat":
+        await query.message.edit_text("<blockquote>⏳ Fetching files from channel... Please wait.</blockquote>")
+        
+        try:
+            # Get messages between the two links
+            chat_id = ls_data["first_chat"]
+            start_msg_id = ls_data["first_msg_id"]
+            end_msg_id = ls_data["second_msg_id"]
+            
+            # Fetch messages
+            messages = await get_messages_between(client, chat_id, start_msg_id, end_msg_id)
+            
+            if not messages:
+                await query.message.edit_text("<blockquote>❌ No files found between the specified links.</blockquote>")
+                return
+            
+            # Process and sequence files WITH user mode
+            sorted_files, used_mode = await sequence_messages(client, messages, ls_data["mode"], target_user_id)
+            
+            if not sorted_files:
+                if used_mode == "caption":
+                    await query.message.edit_text(
+                        "<blockquote>❌ No files with captions found in the specified range.</blockquote>\n"
+                        "<blockquote>Switch to File mode using /sf or ensure files have captions.</blockquote>"
+                    )
+                else:
+                    await query.message.edit_text("<blockquote>❌ No valid files found to sequence.</blockquote>")
+                return
+            
+            mode_text = "File Mode" if used_mode == "file" else "Caption Mode"
+            skipped_count = len(messages) - len(sorted_files) if used_mode == "caption" else 0
+            
+            # Send files to user's chat
+            if skipped_count > 0:
+                await query.message.edit_text(
+                    f"<blockquote>📤 Sending {len(sorted_files)} files to chat... (Skipped {skipped_count} files without captions)</blockquote>"
+                )
+            else:
+                await query.message.edit_text(f"<blockquote>📤 Sending {len(sorted_files)} files to chat... Please wait.</blockquote>")
+            
+            for file in sorted_files:
+                try:
+                    await client.copy_message(user_id, from_chat_id=file["chat_id"], message_id=file["msg_id"])
+                    await asyncio.sleep(0.8)
+                except Exception as e:
+                    print(f"Error sending file: {e}")
+                    continue
+            
+            if skipped_count > 0:
+                await query.message.edit_text(
+                    f"<b>✅ Successfully sent {len(sorted_files)} files to your chat!</b>\n\n"
+                    f"<blockquote>Mode: {mode_text}\n"
+                    f"Note: {skipped_count} files skipped (no captions found)</blockquote>"
+                )
+            else:
+                await query.message.edit_text(
+                    f"<b>✅ Successfully sent {len(sorted_files)} files to your chat!</b>\n\n"
+                    f"<blockquote>Mode: {mode_text}</blockquote>"
+                )
+            
+        except Exception as e:
+            print(f"LS Chat error: {e}")
+            await query.message.edit_text("<blockquote>❌ An error occurred while processing files. Please try again.</blockquote>")
+        
+        # Clean up
+        if target_user_id in user_ls_state:
+            del user_ls_state[target_user_id]
+    
+    elif action == "channel":
+        await query.message.edit_text("<blockquote>⏳ Checking bot permissions in channel... Please wait.</blockquote>")
+        
+        try:
+            # Check if bot is admin in the channel
+            chat_id = ls_data["first_chat"]
+            
+            is_admin = await check_bot_admin(client, chat_id)
+            
+            if not is_admin:
+                await query.message.edit_text(
+                    "<b>❌ Bot is not admin in this channel!</b>\n\n"
+                    "<blockquote>To send files back to the channel, the bot must be added as an administrator "
+                    "with permission to post messages.</blockquote>"
+                )
+                return
+            
+            await query.message.edit_text("<blockquote>✅ Bot is admin! Fetching files from channel... Please wait.</blockquote>")
+            
+            # Get messages between the two links
+            start_msg_id = ls_data["first_msg_id"]
+            end_msg_id = ls_data["second_msg_id"]
+            
+            # Fetch messages
+            messages = await get_messages_between(client, chat_id, start_msg_id, end_msg_id)
+            
+            if not messages:
+                await query.message.edit_text("<blockquote>❌ No files found between the specified links.</blockquote>")
+                return
+            
+            # Process and sequence files WITH user mode
+            sorted_files, used_mode = await sequence_messages(client, messages, ls_data["mode"], target_user_id)
+            
+            if not sorted_files:
+                if used_mode == "caption":
+                    await query.message.edit_text(
+                        "<blockquote>❌ No files with captions found in the specified range.</blockquote>\n"
+                        "<blockquote>Switch to File mode using /sf or ensure files have captions.</blockquote>"
+                    )
+                else:
+                    await query.message.edit_text("<blockquote>❌ No valid files found to sequence.</blockquote>")
+                return
+            
+            mode_text = "File Mode" if used_mode == "file" else "Caption Mode"
+            skipped_count = len(messages) - len(sorted_files) if used_mode == "caption" else 0
+            
+            # Send files back to channel
+            if skipped_count > 0:
+                await query.message.edit_text(
+                    f"<blockquote>📤 Sending {len(sorted_files)} files to channel... (Skipped {skipped_count} files without captions)</blockquote>"
+                )
+            else:
+                await query.message.edit_text(f"<blockquote>📤 Sending {len(sorted_files)} files to channel... Please wait.</blockquote>")
+            
+            success_count = 0
+            for file in sorted_files:
+                try:
+                    await client.copy_message(chat_id, from_chat_id=file["chat_id"], message_id=file["msg_id"])
+                    await asyncio.sleep(2)  # Wait 2 seconds between sending files
+                    success_count += 1
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
+                except Exception as e:
+                    print(f"Error sending file to channel: {e}")
+                    continue
+            
+            if skipped_count > 0:
+                await query.message.edit_text(
+                    f"<b>✅ Successfully sent {success_count} files back to the channel!</b>\n\n"
+                    f"<blockquote>Mode: {mode_text}\n"
+                    f"Total files found: {len(messages)}\n"
+                    f"Files with captions: {len(sorted_files)}\n"
+                    f"Successfully sent: {success_count}\n"
+                    f"Skipped (no captions): {skipped_count}</blockquote>"
+                )
+            else:
+                await query.message.edit_text(
+                    f"<b>✅ Successfully sent {success_count} files back to the channel!</b>\n\n"
+                    f"<blockquote>Mode: {mode_text}\n"
+                    f"Total files found: {len(sorted_files)}\n"
+                    f"Successfully sent: {success_count}</blockquote>"
+                )
+            
+        except Exception as e:
+            print(f"LS Channel error: {e}")
+            await query.message.edit_text(f"<blockquote>❌ An error occurred: {str(e)[:200]}...</blockquote>")
+        
+        # Clean up
+        if target_user_id in user_ls_state:
+            del user_ls_state[target_user_id]
+            
+    elif action == "close":
+        # Handle Close button for LS
+        await query.message.delete()
+        await query.answer("Closed", show_alert=False)
+        
+        # Clean up
+        if target_user_id in user_ls_state:
+            del user_ls_state[target_user_id]
+
+# =====================================================
 # SEQUENCE COMMANDS
 # =====================================================
 
@@ -221,6 +553,15 @@ async def start_sequence(client, message):
     user_sequences[user_id] = []
     if user_id in user_notification_msg:
         del user_notification_msg[user_id]
+    
+    # Get current mode from database if not in local state
+    if user_id not in user_mode:
+        db_mode = await codeflixbots.get_mode(user_id)
+        user_mode[user_id] = "file" if "file" in db_mode else "caption"
+    
+    if user_id not in user_seq_mode:
+        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        user_seq_mode[user_id] = db_seq_mode
     
     # Get current mode
     current_mode = user_mode.get(user_id, "file")
@@ -392,10 +733,13 @@ async def send_sequence_files(client, message, user_id):
 async def switch_mode_cmd(client, message):
     """Handle /sf command to switch between File mode and Caption mode"""
     user_id = message.from_user.id
-    current_mode = user_mode.get(user_id, "file")
     
-    # Save to database
-    await codeflixbots.set_mode(user_id, f"{current_mode}_mode")
+    # Get current mode from database if not in local state
+    if user_id not in user_mode:
+        db_mode = await codeflixbots.get_mode(user_id)
+        user_mode[user_id] = "file" if "file" in db_mode else "caption"
+    
+    current_mode = user_mode.get(user_id, "file")
     
     # Create buttons based on current mode
     if current_mode == "file":
@@ -430,6 +774,11 @@ async def quality_mode_cmd(client, message):
     """Handle /fileseq command to choose sequence flow"""
     user_id = message.from_user.id
     
+    # Get current mode from database if not in local state
+    if user_id not in user_seq_mode:
+        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        user_seq_mode[user_id] = db_seq_mode
+    
     # Get current mode for display
     current_mode = user_seq_mode.get(user_id, "per_ep")
     current_text = "Episode Flow" if current_mode == "per_ep" else "Quality Flow"
@@ -461,44 +810,6 @@ async def quality_mode_cmd(client, message):
     await message.reply_text(text, reply_markup=buttons)
 
 
-@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
-async def set_seq_mode_callback(client, query):
-    """Handle sequence mode selection callback"""
-    user_id = query.from_user.id
-    selection = query.data.replace("set_mode_", "")
-    
-    try:
-        # Update database
-        await codeflixbots.set_sequence_mode(user_id, selection)
-        
-        # Update local state
-        user_seq_mode[user_id] = selection
-        
-        mode_text = "Episode Flow" if selection == "per_ep" else "Quality Flow"
-        example_text = "S1 EP1 Q720, S1 EP1 Q1080" if selection == "per_ep" else "S1 Q720 EP1, S1 Q720 EP2"
-        
-        await query.message.edit_text(
-            f"<b>✅ Sequence Mode Updated!</b>\n\n"
-            f"<blockquote><b>New Mode:</b> {mode_text}\n"
-            f"<b>Example Order:</b> {example_text}\n\n"
-            f"Now send your files or use /ls command.</blockquote>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
-        )
-        await query.answer(f"Switched to {mode_text}!", show_alert=False)
-        
-    except Exception as e:
-        print(f"Error setting sequence mode: {e}")
-        await query.answer("Error updating mode. Please try again.", show_alert=True)
-
-
-@Client.on_callback_query(filters.regex(r'^close_data$'))
-async def close_callback_handler(client, query):
-    """Handle close button callback"""
-    try:
-        await query.message.delete()
-    except:
-        await query.answer("Message already deleted", show_alert=False)
-
 # =====================================================
 # /ls COMMAND - Link Sequence from Channel
 # =====================================================
@@ -507,6 +818,15 @@ async def close_callback_handler(client, query):
 async def ls_command(client, message):
     """Handle /ls command for channel file sequencing"""
     user_id = message.from_user.id
+    
+    # Get user's current mode from database if not in local state
+    if user_id not in user_mode:
+        db_mode = await codeflixbots.get_mode(user_id)
+        user_mode[user_id] = "file" if "file" in db_mode else "caption"
+    
+    if user_id not in user_seq_mode:
+        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        user_seq_mode[user_id] = db_seq_mode
     
     # Get user's current mode
     current_mode = user_mode.get(user_id, "file")
@@ -630,266 +950,6 @@ async def handle_ls_links(client, message):
         await message.reply_text("<blockquote>❌ An error occurred. Please try again with valid links.</blockquote>")
         if user_id in user_ls_state:
             del user_ls_state[user_id]
-
-# =====================================================
-# CALLBACK QUERY HANDLERS
-# =====================================================
-
-@Client.on_callback_query(filters.regex(r'^mode_(file|caption)$|^close_mode$'))
-async def mode_callback_handler(client, query):
-    """Handle mode switching callbacks"""
-    data = query.data
-    user_id = query.from_user.id
-    
-    if data == "mode_file":
-        user_mode[user_id] = "file"
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
-        ])
-        text = (
-            "<b>🔄 Sequence Mode Settings</b>\n\n"
-            "<blockquote><b>Current Mode:</b> File Mode\n\n"
-            "<b>📝 File Mode:</b> Sequence files using filename\n"
-            "<b>🏷️ Caption Mode:</b> Sequence files using file caption\n\n"
-            "✅ <i>Mode switched to File Mode!</i></blockquote>"
-        )
-        
-        await query.message.edit_text(text, reply_markup=buttons)
-        await query.answer("Switched to File Mode!", show_alert=True)
-        
-    elif data == "mode_caption":
-        user_mode[user_id] = "caption"
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("✅ Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
-        ])
-        text = (
-            "<b>🔄 Sequence Mode Settings</b>\n\n"
-            "<blockquote><b>Current Mode:</b> Caption Mode\n\n"
-            "<b>📝 File Mode:</b> Sequence files using filename\n"
-            "<b>🏷️ Caption Mode:</b> Sequence files using file caption\n\n"
-            "✅ <i>Mode switched to Caption Mode!</i></blockquote>"
-        )
-        
-        await query.message.edit_text(text, reply_markup=buttons)
-        await query.answer("Switched to Caption Mode!", show_alert=True)
-        
-    elif data == "close_mode":
-        await query.message.delete()
-        await query.answer("Closed mode settings", show_alert=False)
-    
-
-@Client.on_callback_query(filters.regex(r'^(send_sequence|cancel_sequence)$'))
-async def sequence_control_callback(client, query):
-    """Handle sequence control callbacks"""
-    data = query.data
-    user_id = query.from_user.id
-    
-    if data == "send_sequence":
-        if user_id in user_sequences:
-            await send_sequence_files(client, query.message, user_id)
-    elif data == "cancel_sequence":
-        user_sequences.pop(user_id, None)
-        user_notification_msg.pop(user_id, None)
-        update_tasks.pop(user_id, None)
-        await query.message.edit_text("<blockquote>❌ Sequence cancelled.</blockquote>")
-
-@Client.on_callback_query(filters.regex(r'^ls_(chat|channel|close)_'))
-async def ls_callback_handlers(client, query):
-    """Handle LS callback handlers"""
-    data = query.data
-    user_id = query.from_user.id
-    
-    # Extract target_user_id from callback data
-    try:
-        parts = data.split("_")
-        action = parts[1]  # chat, channel, or close
-        target_user_id = int(parts[2])
-    except (IndexError, ValueError):
-        await query.answer("Invalid callback data.", show_alert=True)
-        return
-    
-    if user_id != target_user_id:
-        await query.answer("This button is not for you!", show_alert=True)
-        return
-    
-    if target_user_id not in user_ls_state:
-        await query.answer("Session expired. Please start again with /ls", show_alert=True)
-        await query.message.delete()
-        return
-    
-    ls_data = user_ls_state[target_user_id]
-    current_mode = ls_data.get("current_mode", "file")
-    
-    if action == "chat":
-        await query.message.edit_text("<blockquote>⏳ Fetching files from channel... Please wait.</blockquote>")
-        
-        try:
-            # Get messages between the two links
-            chat_id = ls_data["first_chat"]
-            start_msg_id = ls_data["first_msg_id"]
-            end_msg_id = ls_data["second_msg_id"]
-            
-            # Fetch messages
-            messages = await get_messages_between(client, chat_id, start_msg_id, end_msg_id)
-            
-            if not messages:
-                await query.message.edit_text("<blockquote>❌ No files found between the specified links.</blockquote>")
-                return
-            
-            # Process and sequence files WITH user mode
-            sorted_files, used_mode = await sequence_messages(client, messages, ls_data["mode"], target_user_id)
-            
-            if not sorted_files:
-                if used_mode == "caption":
-                    await query.message.edit_text(
-                        "<blockquote>❌ No files with captions found in the specified range.</blockquote>\n"
-                        "<blockquote>Switch to File mode using /sf or ensure files have captions.</blockquote>"
-                    )
-                else:
-                    await query.message.edit_text("<blockquote>❌ No valid files found to sequence.</blockquote>")
-                return
-            
-            mode_text = "File Mode" if used_mode == "file" else "Caption Mode"
-            skipped_count = len(messages) - len(sorted_files) if used_mode == "caption" else 0
-            
-            # Send files to user's chat
-            if skipped_count > 0:
-                await query.message.edit_text(
-                    f"<blockquote>📤 Sending {len(sorted_files)} files to chat... (Skipped {skipped_count} files without captions)</blockquote>"
-                )
-            else:
-                await query.message.edit_text(f"<blockquote>📤 Sending {len(sorted_files)} files to chat... Please wait.</blockquote>")
-            
-            for file in sorted_files:
-                try:
-                    await client.copy_message(user_id, from_chat_id=file["chat_id"], message_id=file["msg_id"])
-                    await asyncio.sleep(0.8)
-                except Exception as e:
-                    print(f"Error sending file: {e}")
-                    continue
-            
-            if skipped_count > 0:
-                await query.message.edit_text(
-                    f"<b>✅ Successfully sent {len(sorted_files)} files to your chat!</b>\n\n"
-                    f"<blockquote>Mode: {mode_text}\n"
-                    f"Note: {skipped_count} files skipped (no captions found)</blockquote>"
-                )
-            else:
-                await query.message.edit_text(
-                    f"<b>✅ Successfully sent {len(sorted_files)} files to your chat!</b>\n\n"
-                    f"<blockquote>Mode: {mode_text}</blockquote>"
-                )
-            
-        except Exception as e:
-            print(f"LS Chat error: {e}")
-            await query.message.edit_text("<blockquote>❌ An error occurred while processing files. Please try again.</blockquote>")
-        
-        # Clean up
-        if target_user_id in user_ls_state:
-            del user_ls_state[target_user_id]
-    
-    elif action == "channel":
-        await query.message.edit_text("<blockquote>⏳ Checking bot permissions in channel... Please wait.</blockquote>")
-        
-        try:
-            # Check if bot is admin in the channel
-            chat_id = ls_data["first_chat"]
-            
-            is_admin = await check_bot_admin(client, chat_id)
-            
-            if not is_admin:
-                await query.message.edit_text(
-                    "<b>❌ Bot is not admin in this channel!</b>\n\n"
-                    "<blockquote>To send files back to the channel, the bot must be added as an administrator "
-                    "with permission to post messages.</blockquote>"
-                )
-                return
-            
-            await query.message.edit_text("<blockquote>✅ Bot is admin! Fetching files from channel... Please wait.</blockquote>")
-            
-            # Get messages between the two links
-            start_msg_id = ls_data["first_msg_id"]
-            end_msg_id = ls_data["second_msg_id"]
-            
-            # Fetch messages
-            messages = await get_messages_between(client, chat_id, start_msg_id, end_msg_id)
-            
-            if not messages:
-                await query.message.edit_text("<blockquote>❌ No files found between the specified links.</blockquote>")
-                return
-            
-            # Process and sequence files WITH user mode
-            sorted_files, used_mode = await sequence_messages(client, messages, ls_data["mode"], target_user_id)
-            
-            if not sorted_files:
-                if used_mode == "caption":
-                    await query.message.edit_text(
-                        "<blockquote>❌ No files with captions found in the specified range.</blockquote>\n"
-                        "<blockquote>Switch to File mode using /sf or ensure files have captions.</blockquote>"
-                    )
-                else:
-                    await query.message.edit_text("<blockquote>❌ No valid files found to sequence.</blockquote>")
-                return
-            
-            mode_text = "File Mode" if used_mode == "file" else "Caption Mode"
-            skipped_count = len(messages) - len(sorted_files) if used_mode == "caption" else 0
-            
-            # Send files back to channel
-            if skipped_count > 0:
-                await query.message.edit_text(
-                    f"<blockquote>📤 Sending {len(sorted_files)} files to channel... (Skipped {skipped_count} files without captions)</blockquote>"
-                )
-            else:
-                await query.message.edit_text(f"<blockquote>📤 Sending {len(sorted_files)} files to channel... Please wait.</blockquote>")
-            
-            success_count = 0
-            for file in sorted_files:
-                try:
-                    await client.copy_message(chat_id, from_chat_id=file["chat_id"], message_id=file["msg_id"])
-                    await asyncio.sleep(2)  # Wait 2 seconds between sending files
-                    success_count += 1
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
-                except Exception as e:
-                    print(f"Error sending file to channel: {e}")
-                    continue
-            
-            if skipped_count > 0:
-                await query.message.edit_text(
-                    f"<b>✅ Successfully sent {success_count} files back to the channel!</b>\n\n"
-                    f"<blockquote>Mode: {mode_text}\n"
-                    f"Total files found: {len(messages)}\n"
-                    f"Files with captions: {len(sorted_files)}\n"
-                    f"Successfully sent: {success_count}\n"
-                    f"Skipped (no captions): {skipped_count}</blockquote>"
-                )
-            else:
-                await query.message.edit_text(
-                    f"<b>✅ Successfully sent {success_count} files back to the channel!</b>\n\n"
-                    f"<blockquote>Mode: {mode_text}\n"
-                    f"Total files found: {len(sorted_files)}\n"
-                    f"Successfully sent: {success_count}</blockquote>"
-                )
-            
-        except Exception as e:
-            print(f"LS Channel error: {e}")
-            await query.message.edit_text(f"<blockquote>❌ An error occurred: {str(e)[:200]}...</blockquote>")
-        
-        # Clean up
-        if target_user_id in user_ls_state:
-            del user_ls_state[target_user_id]
-            
-    elif action == "close":
-        # Handle Close button for LS
-        await query.message.delete()
-        
-        # Clean up
-        if target_user_id in user_ls_state:
-            del user_ls_state[target_user_id]
 
 # =====================================================
 # CLEANUP FUNCTION
