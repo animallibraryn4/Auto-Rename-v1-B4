@@ -780,11 +780,15 @@ async def process_rename(client: Client, message: Message):
         cleanup_user_state(user_id)
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
-async def auto_rename_files(client, message):
+async def auto_rename_files_handler(client, message):
+    """Handle auto-renaming of files (group -1 to run AFTER sequence handler)"""
     user_id = message.from_user.id
 
     # ✅ Check if user is in info mode (disable auto-rename if in info mode)
-    if user_id in info_mode_users:  # This should now work with the dictionary
+    # We need to import info_mode_users from auto_rename.py
+    from plugins.auto_rename import info_mode_users
+    
+    if user_id in info_mode_users:
         return  # Skip auto-rename and let the info handler process the file
     
     # Check verification
