@@ -782,10 +782,14 @@ async def process_rename(client: Client, message: Message):
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
-
-    # ✅ Check if user is in info mode (disable auto-rename if in info mode)
-    if user_id in info_mode_users:  # This should now work with the dictionary
-        return  # Skip auto-rename and let the info handler process the file
+    
+    # ✅ Skip if user is in info mode
+    if user_id in info_mode_users:
+        return
+    
+    # ✅ NEW: Skip if user is in sequence mode
+    if user_id in user_sequences:
+        return  # Let sequence.py handle this file
     
     # Check verification
     if not await is_user_verified(user_id):
