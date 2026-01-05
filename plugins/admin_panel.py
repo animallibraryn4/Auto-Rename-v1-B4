@@ -45,7 +45,11 @@ async def tutorial(bot: Client, message: Message):
 @Client.on_message(filters.command(["stats", "status"]) & filters.user(Config.ADMIN))
 async def get_stats(bot, message):
     total_users = await codeflixbots.total_users_count()
-    uptime = time.strftime("%Hh%Mm%Ss", time.gmtime(time.time() - bot.uptime))    
+    # Simple uptime - calculate from when bot started
+    if hasattr(bot, 'start_time'):
+        uptime = time.strftime("%Hh%Mm%Ss", time.gmtime(time.time() - bot.start_time))
+    else:
+        uptime = "Unknown"    
     start_t = time.time()
     st = await message.reply('**Accessing The Details.....**')    
     end_t = time.time()
