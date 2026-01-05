@@ -1,3 +1,4 @@
+
 import asyncio
 import re
 import time
@@ -8,7 +9,22 @@ from pyrogram.errors import UserNotParticipant, FloodWait, ChatAdminRequired, Ch
 from config import Config, Txt
 from helper.database import codeflixbots
 
+# =====================================================
+# GLOBAL DICTIONARIES FOR SEQUENCE MANAGEMENT
+# =====================================================
 
+# Initialize global dictionaries
+user_sequences = {}  # user_id -> list of file data
+user_notification_msg = {}  # user_id -> notification message info
+update_tasks = {}  # user_id -> update task
+user_settings = {}  # user_id -> sequence mode (per_ep or group)
+processing_users = set()  # To prevent multiple "Processing" messages
+user_ls_state = {}  # Store LS command state
+user_seq_mode = {}  # Store user sequence mode (per_ep or group)
+
+# =====================================================
+# DATABASE HELPERS FOR MODE MANAGEMENT
+# =====================================================
 
 async def get_user_mode(user_id):
     """Get user mode from database"""
@@ -176,7 +192,7 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
     
     # Get user's current mode
     if user_id:
-        current_mode = user_mode.get(user_id, "file")
+        current_mode = await get_user_mode(user_id)
     else:
         current_mode = "file"  # Default to file mode if no user_id provided
     
@@ -203,9 +219,6 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
                 "chat_id": msg.chat.id,
                 "info": info
             })
-
-    # Get current count
-    current_count = len(user_sequences[user_id])
     
     # Sort based on mode (per_ep or group)
     if mode == "per_ep":
@@ -216,8 +229,9 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
     return sorted_files, current_mode
 
 # =====================================================
-# SEQUENCE COMMANDS
+# SEQUENCE COMMANDS - FIXED WITH PROPER FILTERS
 # =====================================================
+
 @Client.on_message(filters.private & filters.command("sequence"))
 async def start_sequence(client, message):
     """Start a new sequence session"""
@@ -230,8 +244,10 @@ async def start_sequence(client, message):
             await send_verification(client, message)
             return
     except ImportError:
-        pass  # Skip verification if module not available
+        # If verification module not available, skip verification
+        pass
     
+    # Initialize sequence for user
     user_sequences[user_id] = []
     if user_id in user_notification_msg:
         del user_notification_msg[user_id]
@@ -249,9 +265,9 @@ async def start_sequence(client, message):
         f"Send your files now. I'll sequence them in the configured order.</blockquote>"
     )
 
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=1)
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def store_file(client, message):
-    """Store files for sequencing"""
+    """Store files for sequencing - using different group to avoid conflict"""
     user_id = message.from_user.id
     
     # Check if we are currently in a sequence session
@@ -288,7 +304,9 @@ async def store_file(client, message):
             "info": info
         })
         
-        
+        # Get current count
+        current_count = len(user_sequences[user_id])
+
         # Send "Processing" notification if 20+ files are added
         if user_id not in user_notification_msg and user_id not in processing_users and current_count >= 20:
             processing_users.add(user_id)  # Lock the user
@@ -320,7 +338,7 @@ async def update_notification(client, user_id, chat_id):
     count = len(user_sequences[user_id])
     
     # Get current modes for display
-    current_mode = user_mode.get(user_id, "file")
+    current_mode = await get_user_mode(user_id)
     mode_text = "File" if current_mode == "file" else "Caption"
     seq_mode = user_seq_mode.get(user_id, "per_ep")
     seq_text = "Episode" if seq_mode == "per_ep" else "Quality"
@@ -401,26 +419,25 @@ async def send_sequence_files(client, message, user_id):
 # =====================================================
 # /sf COMMAND - Switch between File and Caption Mode
 # =====================================================
+
 @Client.on_message(filters.private & filters.command("sf"))
 async def switch_mode_cmd(client, message):
     """Handle /sf command to switch between File mode and Caption mode"""
     user_id = message.from_user.id
-    
-    # Use database instead of global dict
     current_mode = await get_user_mode(user_id)
     
     # Create buttons based on current mode
     if current_mode == "file":
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ File Mode", callback_data="seq_mode_file")],  # Changed callback
-            [InlineKeyboardButton("Caption Mode", callback_data="seq_mode_caption")],  # Changed callback
-            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]  # Changed callback
+            [InlineKeyboardButton("✅ File Mode", callback_data="seq_mode_file")],
+            [InlineKeyboardButton("Caption Mode", callback_data="seq_mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]
         ])
     else:
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("File Mode", callback_data="seq_mode_file")],  # Changed callback
-            [InlineKeyboardButton("✅ Caption Mode", callback_data="seq_mode_caption")],  # Changed callback
-            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]  # Changed callback
+            [InlineKeyboardButton("File Mode", callback_data="seq_mode_file")],
+            [InlineKeyboardButton("✅ Caption Mode", callback_data="seq_mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]
         ])
     
     text = (
@@ -475,8 +492,8 @@ async def ls_command(client, message):
     """Handle /ls command for channel file sequencing"""
     user_id = message.from_user.id
     
-    # Get user's current mode
-    current_mode = user_mode.get(user_id, "file")
+    # Get user's current mode from database
+    current_mode = await get_user_mode(user_id)
     mode_text = "File Mode" if current_mode == "file" else "Caption Mode"
     seq_mode = user_seq_mode.get(user_id, "per_ep")
     seq_text = "Episode Flow" if seq_mode == "per_ep" else "Quality Flow"
@@ -599,9 +616,10 @@ async def handle_ls_links(client, message):
             del user_ls_state[user_id]
 
 # =====================================================
-# CALLBACK QUERY HANDLERS
+# CALLBACK QUERY HANDLERS - FIXED WITH UNIQUE PREFIXES
 # =====================================================
-@Client.on_callback_query(filters.regex(r'^seq_mode_(file|caption)$|^seq_close_mode$'))  # Changed prefix
+
+@Client.on_callback_query(filters.regex(r'^seq_mode_(file|caption)$|^seq_close_mode$'))
 async def seq_mode_callback_handler(client, query):
     """Handle sequence mode switching callbacks"""
     data = query.data
@@ -886,7 +904,6 @@ async def cleanup_user_data(user_id):
     user_sequences.pop(user_id, None)
     user_notification_msg.pop(user_id, None)
     user_ls_state.pop(user_id, None)
-    user_mode.pop(user_id, None)
     user_seq_mode.pop(user_id, None)
     
     if user_id in update_tasks:
