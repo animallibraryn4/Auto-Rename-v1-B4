@@ -27,7 +27,7 @@ user_seq_mode = {}  # Store user sequence mode (per_ep or group)
 # =====================================================
 
 # Add these methods to your database.py class (append to existing Database class):
-"""
+
     async def get_rename_mode(self, id):
         """Get user's rename mode preference (file or caption)"""
         try:
@@ -60,7 +60,7 @@ user_seq_mode = {}  # Store user sequence mode (per_ep or group)
         except Exception as e:
             logging.error(f"Error toggling rename mode for user {id}: {e}")
             return "file"
-"""
+
 
 # =====================================================
 # SEQUENCE PARSING ENGINE
