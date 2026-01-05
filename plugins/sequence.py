@@ -637,30 +637,26 @@ async def mode_callback_handler(client, query):
         await query.message.delete()
         await query.answer("Closed mode settings", show_alert=False)
 
-@Client.on_callback_query(filters.regex(r'^set_mode_(group|per_ep)$'))
-async def set_mode_callback(client, query):
-    """Handle sequence mode callbacks"""
-    data = query.data
+@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
+async def set_seq_mode_callback(client, query):
     user_id = query.from_user.id
+    # Data nikaalein: 'per_ep' ya 'group'
+    selection = query.data.replace("set_mode_", "")
     
-    # 1. Local state update karein
-    if data == "set_mode_group":
-        user_seq_mode[user_id] = "group"
-        await codeflixbots.set_mode(user_id, "group_mode") # Database mein save karein
-        msg_text = "<b>✅ Mode Set: Quality Flow</b>\n\n<blockquote>Files will be sequenced by quality within each season.</blockquote>"
-        alert_text = "Quality Flow selected"
-    else:
-        user_seq_mode[user_id] = "per_ep"
-        await codeflixbots.set_mode(user_id, "per_ep_mode") # Database mein save karein
-        msg_text = "<b>✅ Mode Set: Episode Flow</b>\n\n<blockquote>Files will be sequenced episode by episode.</blockquote>"
-        alert_text = "Episode Flow selected"
-
-    try:
-        await query.message.edit_text(msg_text)
-        await query.answer(alert_text, show_alert=True)
-    except Exception as e:
-        print(f"Callback Error: {e}")
-        
+    # 1. Database update (database.py ke function ke mutabiq)
+    await codeflixbots.set_sequence_mode(user_id, selection)
+    
+    # 2. Local state update
+    user_seq_mode[user_id] = selection
+    
+    mode_text = "Episode Flow (S1 EP1 Q720, S1 EP1 Q1080)" if selection == "per_ep" else "Quality Flow (S1 Q720 EP1, S1 Q720 EP2)"
+    
+    await query.message.edit_text(
+        f"✅ **Sequence Mode Set To:**\n`{mode_text}`\n\nNow send your files or use /ls command.",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
+    )
+    await query.answer("Mode Updated!")
+    
 
 @Client.on_callback_query(filters.regex(r'^(send_sequence|cancel_sequence)$'))
 async def sequence_control_callback(client, query):
