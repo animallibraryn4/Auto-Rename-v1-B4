@@ -203,6 +203,9 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
                 "chat_id": msg.chat.id,
                 "info": info
             })
+
+    # Get current count
+    current_count = len(user_sequences[user_id])
     
     # Sort based on mode (per_ep or group)
     if mode == "per_ep":
