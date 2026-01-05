@@ -419,15 +419,14 @@ async def switch_mode_cmd(client, message):
         f"<i>ℹ️ If no caption is found in Caption Mode, those files will be skipped.</i></blockquote>"
     )
     
-    await message.reply_text(text, reply_markup=buttons)
+    await message.reply_text(text, reply_markup=buttons).
 
 # =====================================================
 # /fileseq COMMAND - Choose Sequence Flow
-# =====================================================
+# =====================================================.
 
-
-# Multiple commands ke liye:
-@Client.on_message(filters.private & filters.command(["start", "help", "mode"]))
+# Single command ke liye:
+@Client.on_message(filters.private & filters.command("fileseq"))
 async def quality_mode_cmd(client, message):
     """Handle /fileseq command to choose sequence flow"""
     text = (
