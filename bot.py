@@ -41,6 +41,8 @@ class Bot(Client):
 
         me = await self.get_me()
         print(f"{me.first_name} Is Started.....✨️")
+       
+        self.start_time = time.time()
 
         uptime_seconds = int(time.time() - self.start_time)
         uptime_string = str(timedelta(seconds=uptime_seconds))
