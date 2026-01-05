@@ -387,9 +387,14 @@ async def cancel_info_callback(client, query):
     await query.answer()
 
 # Exit info mode if user sends any command
-@Client.on_message(filters.private & filters.command)
+@Client.on_message(filters.private & filters.command([])) # Brackets added
 async def exit_info_mode_on_command(client, message):
     user_id = message.from_user.id
-    if user_id in info_mode_users and message.command[0] not in ["info", "start"]:
+    # message.command hamesha list hoti hai, isliye pehla element check karein
+    current_command = message.command[0].lower() 
+    
+    if user_id in info_mode_users and current_command not in ["info", "start"]:
         del info_mode_users[user_id]
         await message.reply_text("ℹ️ **Info mode exited.** Auto-rename is now active.")
+        
+
