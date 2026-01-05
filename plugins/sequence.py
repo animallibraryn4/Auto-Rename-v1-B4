@@ -1,4 +1,5 @@
-
+# In sequence.py, ensure you're only importing string commands
+from pyrogram import filters
 import asyncio
 import re
 import time
