@@ -969,4 +969,4 @@ SEQUENCE_HELP_TEXT = """
 • <b>Quality Flow</b> - Season → Quality → Episode
 
 <b>🔗 LS Mode:</b>
-Send two Telegram message links from the same channel to sequence files between them.</blockquote>
+Send two Telegram message links from the same channel to sequence files between them.</blockquote>"""
