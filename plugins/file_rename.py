@@ -17,6 +17,8 @@ from helper.database import codeflixbots
 from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
+from plugins.sequence import user_sequences
+
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -779,13 +781,18 @@ async def process_rename(client: Client, message: Message):
         # Clean up user state if queue is empty
         cleanup_user_state(user_id)
 
+# Then in the auto_rename_files handler:
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
-
-    # ✅ Check if user is in info mode (disable auto-rename if in info mode)
+    
+    # ✅ Check if user is in info mode
     if user_id in info_mode_users:  # This should now work with the dictionary
         return  # Skip auto-rename and let the info handler process the file
+    
+    # ✅ Check if user is in sequence mode (NEW CHECK)
+    if user_id in user_sequences:
+        return  # Skip auto-rename and let sequence handle the fi
     
     # Check verification
     if not await is_user_verified(user_id):
