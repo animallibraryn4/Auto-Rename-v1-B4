@@ -423,15 +423,20 @@ async def switch_mode_cmd(client, message):
 
 # =====================================================
 # /fileseq COMMAND - Choose Sequence Flow
-# =====================================================.
+# =====================================================
 
-# Single command ke liye:
 @Client.on_message(filters.private & filters.command("fileseq"))
 async def quality_mode_cmd(client, message):
     """Handle /fileseq command to choose sequence flow"""
+    user_id = message.from_user.id
+    
+    # Get current mode for display
+    current_mode = user_seq_mode.get(user_id, "per_ep")
+    current_text = "Episode Flow" if current_mode == "per_ep" else "Quality Flow"
+    
     text = (
-        "<b>➲ Choose File Sequence Order</b>\n\n"
-        "<blockquote>Select how your files will be sequenced:</blockquote>\n"
+        f"<b>➲ Choose File Sequence Order</b>\n\n"
+        f"<blockquote><b>Current Mode:</b> {current_text}</blockquote>\n\n"
         
         "<b>📺 Episode Flow:</b>\n"
         "<blockquote>Files are sent episode by episode.\n"
@@ -454,6 +459,45 @@ async def quality_mode_cmd(client, message):
     ])
     
     await message.reply_text(text, reply_markup=buttons)
+
+
+@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
+async def set_seq_mode_callback(client, query):
+    """Handle sequence mode selection callback"""
+    user_id = query.from_user.id
+    selection = query.data.replace("set_mode_", "")
+    
+    try:
+        # Update database
+        await codeflixbots.set_sequence_mode(user_id, selection)
+        
+        # Update local state
+        user_seq_mode[user_id] = selection
+        
+        mode_text = "Episode Flow" if selection == "per_ep" else "Quality Flow"
+        example_text = "S1 EP1 Q720, S1 EP1 Q1080" if selection == "per_ep" else "S1 Q720 EP1, S1 Q720 EP2"
+        
+        await query.message.edit_text(
+            f"<b>✅ Sequence Mode Updated!</b>\n\n"
+            f"<blockquote><b>New Mode:</b> {mode_text}\n"
+            f"<b>Example Order:</b> {example_text}\n\n"
+            f"Now send your files or use /ls command.</blockquote>",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
+        )
+        await query.answer(f"Switched to {mode_text}!", show_alert=False)
+        
+    except Exception as e:
+        print(f"Error setting sequence mode: {e}")
+        await query.answer("Error updating mode. Please try again.", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r'^close_data$'))
+async def close_callback_handler(client, query):
+    """Handle close button callback"""
+    try:
+        await query.message.delete()
+    except:
+        await query.answer("Message already deleted", show_alert=False)
 
 # =====================================================
 # /ls COMMAND - Link Sequence from Channel
@@ -636,26 +680,6 @@ async def mode_callback_handler(client, query):
     elif data == "close_mode":
         await query.message.delete()
         await query.answer("Closed mode settings", show_alert=False)
-
-@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
-async def set_seq_mode_callback(client, query):
-    user_id = query.from_user.id
-    # Data nikaalein: 'per_ep' ya 'group'
-    selection = query.data.replace("set_mode_", "")
-    
-    # 1. Database update (database.py ke function ke mutabiq)
-    await codeflixbots.set_sequence_mode(user_id, selection)
-    
-    # 2. Local state update
-    user_seq_mode[user_id] = selection
-    
-    mode_text = "Episode Flow (S1 EP1 Q720, S1 EP1 Q1080)" if selection == "per_ep" else "Quality Flow (S1 Q720 EP1, S1 Q720 EP2)"
-    
-    await query.message.edit_text(
-        f"✅ **Sequence Mode Set To:**\n`{mode_text}`\n\nNow send your files or use /ls command.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
-    )
-    await query.answer("Mode Updated!")
     
 
 @Client.on_callback_query(filters.regex(r'^(send_sequence|cancel_sequence)$'))
