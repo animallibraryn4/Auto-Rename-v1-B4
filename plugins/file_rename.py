@@ -18,7 +18,15 @@ from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
+# Add priority queue support
+import heapq
 
+class PriorityQueue:
+    def __init__(self):
+        self.queue = []
+        
+    async def add_task(self, priority, task):
+        heapq.heappush(self.queue, (priority, task))
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
