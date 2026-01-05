@@ -144,6 +144,39 @@ def standardize_quality_name(quality):
     
     return quality.capitalize()
 
+# ===== RESTORED FROM OLD FILE: ASS Subtitle Conversion =====
+async def convert_ass_subtitles(input_path, output_path):
+    """
+    Convert ASS subtitles to mov_text format for MP4 compatibility
+    (Restored from old file)
+    """
+    ffmpeg_cmd = shutil.which('ffmpeg')
+    if ffmpeg_cmd is None:
+        raise Exception("FFmpeg not found")
+    
+    command = [
+        ffmpeg_cmd,
+        '-i', input_path,
+        '-c:v', 'copy',
+        '-c:a', 'copy',
+        '-c:s', 'mov_text',  # Convert subtitles to mov_text format
+        '-map', '0',
+        '-loglevel', 'error',
+        '-y',  # Overwrite output file
+        output_path
+    ]
+    
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+    
+    if process.returncode != 0:
+        error_message = stderr.decode()
+        raise Exception(f"Subtitle conversion failed: {error_message}")
+
 async def convert_to_mkv(input_path, output_path):
     """
     Convert any video file to MKV format without re-encoding, preserving all streams
@@ -513,68 +546,38 @@ async def process_rename(client: Client, message: Message):
                 await download_msg.edit(f"**MKV Conversion Error:** {e}")
                 return
 
-        # ===== RESTORED FROM OLD FILE: ASS Subtitle Detection and Conversion =====
-        is_mp4_with_ass = False
-        if path.lower().endswith('.mp4'):
-            try:
-                ffprobe_cmd = shutil.which('ffprobe')
-                if ffprobe_cmd:
-                    command = [
-                        ffprobe_cmd,
-                        '-v', 'error',
-                        '-select_streams', 's',
-                        '-show_entries', 'stream=codec_name',
-                        '-of', 'csv=p=0',
-                        path
-                    ]
-                    process = await asyncio.create_subprocess_exec(
-                        *command,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-                    stdout, stderr = await process.communicate()
-                    if process.returncode == 0:
-                        subtitle_codec = stdout.decode().strip().lower()
-                        if 'ass' in subtitle_codec:
-                            is_mp4_with_ass = True
-            except Exception as e:
-                logger.warning(f"Error checking subtitle codec: {e}")
-
-        # ===== RESTORED FROM OLD FILE: Get Audio and Subtitle Metadata =====
-        # Get all metadata from database (RESTORED CRITICAL PART)
+        # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
+        # Get all metadata from database
         file_title = await codeflixbots.get_title(user_id)
         artist = await codeflixbots.get_artist(user_id)
         author = await codeflixbots.get_author(user_id)
         video_title = await codeflixbots.get_video(user_id)
-        audio_title = await codeflixbots.get_audio(user_id)  # RESTORED
-        subtitle_title = await codeflixbots.get_subtitle(user_id)  # RESTORED
+        audio_title = await codeflixbots.get_audio(user_id)
+        subtitle_title = await codeflixbots.get_subtitle(user_id)
 
-            # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
-            metadata_command = [
-                'ffmpeg',
-                '-i', path,
+        # Unified metadata command - safely copies all streams including subtitles
+        metadata_command = [
+            'ffmpeg',
+            '-i', path,
 
-                # Global metadata
-                '-metadata', f'title={file_title}',
-                '-metadata', f'artist={artist}',
-                '-metadata', f'author={author}',
+            # Global metadata
+            '-metadata', f'title={file_title}',
+            '-metadata', f'artist={artist}',
+            '-metadata', f'author={author}',
 
-                # Stream titles
-                '-metadata:s:v', 
-              f'title={video_title}',
-                '-metadata:s:a', 
-              f'title={audio_title}',
-                '-metadata:s:s', 
-              f'title={subtitle_title}',
+            # Stream titles
+            '-metadata:s:v', f'title={video_title}',
+            '-metadata:s:a', f'title={audio_title}',
+            '-metadata:s:s', f'title={subtitle_title}',
 
-                # Map and copy everything safely
-                '-map', '0',
-                '-c', 'copy',
+            # Map and copy everything safely
+            '-map', '0',
+            '-c', 'copy',
 
-                '-loglevel', 'error',
-                '-y',  # overwrite
-                metadata_path
-            ]
+            '-loglevel', 'error',
+            '-y',  # overwrite
+            metadata_path
+        ]
 
         process = await asyncio.create_subprocess_exec(
             *metadata_command,
@@ -588,8 +591,6 @@ async def process_rename(client: Client, message: Message):
             await download_msg.edit(f"**Metadata Error:**\n{error_message}")
             return
 
-        if is_mp4_with_ass:
-            os.replace(final_output, metadata_path)
         path = metadata_path
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
@@ -714,9 +715,7 @@ async def process_rename(client: Client, message: Message):
                     logger.warning(f"Error removing file {file_path}: {e}")
         
         # Clean up temporary files from subtitle conversion
-        temp_files = [f"{download_path}.temp.mkv", 
-                     f"{metadata_path}.temp.mp4", 
-                     f"{metadata_path}.final.mp4"]
+        temp_files = [f"{download_path}.temp.mkv"]
         for temp_file in temp_files:
             if os.path.exists(temp_file):
                 try:
