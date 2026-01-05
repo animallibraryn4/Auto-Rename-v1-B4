@@ -93,3 +93,14 @@ You can now send files for renaming in **{mode_value.replace('_', ' ').title()}*
 async def close_mode_callback(client, query: CallbackQuery):
     """Close mode selection message"""
     await query.message.delete()
+
+async def get_user_mode(user_id):
+    """Get user mode preference - integrates with sequence.py"""
+    # First check if user has sequence mode set
+    if user_id in user_sequences:
+        mode_type = user_mode.get(user_id, "file")
+        return f"sequence_{mode_type}"
+    
+    # Otherwise get from database
+    db_mode = await codeflixbots.get_mode(user_id)
+    return db_mode if db_mode else "file_mode"
