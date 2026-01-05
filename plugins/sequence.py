@@ -28,8 +28,8 @@ user_seq_mode = {}  # Store user sequence mode (per_ep or group).
 
 # Add these methods to your database.py class (append to existing Database class).
 """
-    async def get_rename_mode(self, id):
-        """Get user's rename mode preference (file or caption)"""
+    async def some_function():
+    """Get user's rename mode preference (file or caption)"""
         try:
             user = await self.col.find_one({"_id": int(id)})
             return user.get("rename_mode", "file")  # Default to file mode
