@@ -144,39 +144,6 @@ def standardize_quality_name(quality):
     
     return quality.capitalize()
 
-# ===== RESTORED FROM OLD FILE: ASS Subtitle Conversion =====
-async def convert_ass_subtitles(input_path, output_path):
-    """
-    Convert ASS subtitles to mov_text format for MP4 compatibility
-    (Restored from old file)
-    """
-    ffmpeg_cmd = shutil.which('ffmpeg')
-    if ffmpeg_cmd is None:
-        raise Exception("FFmpeg not found")
-    
-    command = [
-        ffmpeg_cmd,
-        '-i', input_path,
-        '-c:v', 'copy',
-        '-c:a', 'copy',
-        '-c:s', 'mov_text',  # Convert subtitles to mov_text format
-        '-map', '0',
-        '-loglevel', 'error',
-        '-y',  # Overwrite output file
-        output_path
-    ]
-    
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        error_message = stderr.decode()
-        raise Exception(f"Subtitle conversion failed: {error_message}")
-
 async def convert_to_mkv(input_path, output_path):
     """
     Convert any video file to MKV format without re-encoding, preserving all streams
@@ -582,47 +549,27 @@ async def process_rename(client: Client, message: Message):
         audio_title = await codeflixbots.get_audio(user_id)  # RESTORED
         subtitle_title = await codeflixbots.get_subtitle(user_id)  # RESTORED
 
-        # Apply metadata based on subtitle type
-        if is_mp4_with_ass:
-            # Convert ASS subtitles first, then apply metadata
-            temp_output = f"{metadata_path}.temp.mp4"
-            final_output = f"{metadata_path}.final.mp4"
-            
-            await convert_ass_subtitles(path, temp_output)
-            os.replace(temp_output, metadata_path)
-            path = metadata_path
-            
-            # Now add metadata with subtitle and audio stream titles
+            # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
             metadata_command = [
                 'ffmpeg',
                 '-i', path,
+
+                # Global metadata
                 '-metadata', f'title={file_title}',
                 '-metadata', f'artist={artist}',
                 '-metadata', f'author={author}',
+
+                # Stream titles
                 '-metadata:s:v', f'title={video_title}',
-                '-metadata:s:a', f'title={audio_title}',  # RESTORED: Audio stream title
-                '-metadata:s:s', f'title={subtitle_title}',  # RESTORED: Subtitle stream title
+                '-metadata:s:a', f'title={audio_title}',
+                '-metadata:s:s', f'title={subtitle_title}',
+
+                # Map and copy everything safely
                 '-map', '0',
                 '-c', 'copy',
+
                 '-loglevel', 'error',
-                '-y',  # Overwrite
-                final_output
-            ]
-        else:
-            # Original metadata command with RESTORED audio and subtitle metadata
-            metadata_command = [
-                'ffmpeg',
-                '-i', path,
-                '-metadata', f'title={file_title}',
-                '-metadata', f'artist={artist}',
-                '-metadata', f'author={author}',
-                '-metadata:s:v', f'title={video_title}',
-                '-metadata:s:a', f'title={audio_title}',  # RESTORED: Audio stream title
-                '-metadata:s:s', f'title={subtitle_title}',  # RESTORED: Subtitle stream title
-                '-map', '0',
-                '-c', 'copy',
-                '-loglevel', 'error',
-                '-y',  # Overwrite
+                '-y',  # overwrite
                 metadata_path
             ]
 
