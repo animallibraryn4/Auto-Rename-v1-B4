@@ -20,13 +20,22 @@ async def auto_rename_command(client, message):
     command_parts = message.text.split(maxsplit=1)
     if len(command_parts) < 2 or not command_parts[1].strip():
         await message.reply_text(
-            "**Please provide a new name after the command /autorename**\n\n"
-            f"**Current Mode:** `{current_mode.replace('_', ' ').title()}`\n"
-            "**File Mode:** Extracts from file name\n"
-            "**Caption Mode:** Extracts from file caption\n"
-            "Use /mode to switch modes\n\n"
-            "Here's how to use it:\n"
-            "**Example format:** ` /autorename S[SE.NUM]EP[EP.NUM] your video title [QUALITY]`"
+        await message.reply_text(
+            "**📝 HOW TO USE AUTO-RENAME**\n\n"
+            "**Step 1:** Choose your mode\n"
+            f"Current Mode: `{current_mode.replace('_', ' ').title()}`\n"
+            "• **File Mode**: Looks at file names\n"
+            "• **Caption Mode**: Looks at file captions\n"
+            "Use /mode to switch\n\n"
+            "**Step 2:** Send the format you want\n"
+            "Example: `/autorename Naruto S[SE.NUM]-E[EP.NUM] [QUALITY]`\n\n"
+            "**Step 3:** Send your files!\n\n"
+            "📌 **Variables you can use:**\n"
+            "• [SE.NUM] → Season number\n"
+            "• [EP.NUM] → Episode number\n"
+            "• [QUALITY] → Quality (720p, 1080p)\n\n"
+            "**Try this example:**\n"
+            "`/autorename Naruto S[SE.NUM] Episode [EP.NUM] [QUALITY]`"
         )
         return
 
