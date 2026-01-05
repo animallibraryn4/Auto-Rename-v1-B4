@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from helper.database import codeflixbots
 from config import Txt
 
+# Keep only the basic /mode command in mode.py
 @Client.on_message(filters.private & filters.command("mode"))
 async def mode_command(client, message: Message):
     """Handle /mode command to switch between File Mode and Caption Mode"""
@@ -13,13 +14,11 @@ async def mode_command(client, message: Message):
 📊 **Current Mode:** `{current_mode.replace('_', ' ').title()}`
 
 **🔹 File Mode:**
-• Extracts season, episode, and quality from **file name**
-• Ignores file caption
+• Extracts information from **file names**
 • Best for files with proper naming patterns
 
 **🔸 Caption Mode:**
-• Extracts season, episode, and quality from **file caption**
-• Ignores file name
+• Extracts information from **file captions**
 • Best for files where caption contains the information
 
 **Choose your preferred mode:**
@@ -48,6 +47,7 @@ async def mode_command(client, message: Message):
         reply_markup=buttons,
         disable_web_page_preview=True
     )
+
 
 @Client.on_callback_query(filters.regex(r"^set_mode_"))
 async def set_mode_callback(client, query: CallbackQuery):
