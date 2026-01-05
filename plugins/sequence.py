@@ -206,41 +206,18 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
 # =====================================================
 # CALLBACK QUERY HANDLERS - MOVED TO TOP
 # =====================================================
-
-@Client.on_callback_query(filters.regex(r'^set_mode_(per_ep|group)$'))
+@Client.on_callback_query(filters.regex("^set_mode_(per_ep|group)$"))
 async def set_seq_mode_callback(client, query):
-    """Handle sequence mode selection callback"""
     user_id = query.from_user.id
     selection = query.data.replace("set_mode_", "")
-    
-    print(f"Callback received: {query.data} from user {user_id}")
-    
-    try:
-        # Update database
-        success = await codeflixbots.set_sequence_mode(user_id, selection)
-        print(f"Database update success: {success}")
-        
-        # Update local state
-        user_seq_mode[user_id] = selection
-        
-        mode_text = "Episode Flow" if selection == "per_ep" else "Quality Flow"
-        example_text = "S1 EP1 Q720, S1 EP1 Q1080" if selection == "per_ep" else "S1 Q720 EP1, S1 Q720 EP2"
-        
-        await query.message.edit_text(
-            f"<b>✅ Sequence Mode Updated!</b>\n\n"
-            f"<blockquote><b>New Mode:</b> {mode_text}\n"
-            f"<b>Example Order:</b> {example_text}\n\n"
-            f"Now send your files or use /ls command.</blockquote>",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Close", callback_data="close_data")]])
-        )
-        await query.answer(f"Switched to {mode_text}!", show_alert=False)
-        
-    except Exception as e:
-        print(f"Error setting sequence mode: {e}")
-        import traceback
-        traceback.print_exc()
-        await query.answer("Error updating mode. Please try again.", show_alert=True)
 
+    await codeflixbots.set_sequence_mode(user_id, selection)
+    user_seq_mode[user_id] = selection
+
+    await query.answer(
+        "Episode Flow enabled ✅" if selection == "per_ep" else "Quality Flow enabled ✅",
+        show_alert=True
+    )
 
 @Client.on_callback_query(filters.regex(r'^close_data$'))
 async def close_callback_handler(client, query):
