@@ -20,7 +20,6 @@ async def auto_rename_command(client, message):
     command_parts = message.text.split(maxsplit=1)
     if len(command_parts) < 2 or not command_parts[1].strip():
         await message.reply_text(
-        await message.reply_text(
             "**📝 HOW TO USE AUTO-RENAME**\n\n"
             "**Step 1:** Choose your mode\n"
             f"Current Mode: `{current_mode.replace('_', ' ').title()}`\n"
