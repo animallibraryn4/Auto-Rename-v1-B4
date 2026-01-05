@@ -425,7 +425,9 @@ async def switch_mode_cmd(client, message):
 # /fileseq COMMAND - Choose Sequence Flow
 # =====================================================
 
-@Client.on_message(filters.private & filters.command("fileseq"))
+
+# Multiple commands ke liye:
+@Client.on_message(filters.private & filters.command(["start", "help", "mode"]))
 async def quality_mode_cmd(client, message):
     """Handle /fileseq command to choose sequence flow"""
     text = (
