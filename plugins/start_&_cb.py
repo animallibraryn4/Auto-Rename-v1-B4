@@ -24,18 +24,11 @@ async def start(client, message: Message):
     # Only file uploads will ask for verification (handled in file_rename.py)
 
     # Initial interactive text and sticker sequence
-    m = await message.reply_text("ᴏɴᴇᴇ-ᴄʜᴀɴ!, ʜᴏᴡ ᴀʀᴇ ʏᴏᴜ \nᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ. . .")
-    await asyncio.sleep(0.4)
-    await m.edit_text("🎊")
+    # Simple welcome animation
+    m = await message.reply_text("ꜱᴛᴀʀᴛɪɴɢ...")
     await asyncio.sleep(0.5)
-    await m.edit_text("⚡")
-    await asyncio.sleep(0.5)
-    await m.edit_text("ꜱᴛᴀʀᴛɪɴɢ...")
-    await asyncio.sleep(0.4)
     await m.delete()
-
-    # Send sticker after the text sequence
-    await message.reply_sticker("CAACAgUAAxkBAAECroBmQKMAAQ-Gw4nibWoj_pJou2vP1a4AAlQIAAIzDxlVkNBkTEb1Lc4eBA")
+    m = await message.reply_text("ᴏɴᴇᴇ-ᴄʜᴀɴ!, ʜᴏᴡ ᴀʀᴇ ʏᴏᴜ \nᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ. . .")
 
     # Define buttons for the start message
     buttons = InlineKeyboardMarkup([
