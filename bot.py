@@ -11,12 +11,13 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
 
-pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
+# Comment out or remove this line
+# pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
 
 
-class Bot(Client):
+class RenameBot(Client):  # CHANGED FROM Bot TO RenameBot
 
     def __init__(self):
         super().__init__(
@@ -67,4 +68,4 @@ class Bot(Client):
 
 
 if __name__ == "__main__":
-    Bot().run()
+    RenameBot().run()  # CHANGED FROM Bot() TO RenameBot()
