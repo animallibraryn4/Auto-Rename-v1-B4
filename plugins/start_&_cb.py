@@ -94,9 +94,18 @@ async def cb_handler(client, query: CallbackQuery):
         )
 
     elif data == "help":
-        # Ensure these lines have 4 spaces or 1 tab indentation
+        # Get bot info properly
         bot = await client.get_me()
-        mention = bot.mention if hasattr(bot, 'mention') else f"@{bot.username}"
+        
+        # FIX: Ensure mention is always a string
+        if hasattr(bot, 'mention'):
+            # If mention is a Bot object, get the username instead
+            if isinstance(bot.mention, Client):
+                mention = f"@{bot.username}" if bot.username else bot.first_name
+            else:
+                mention = str(bot.mention)
+        else:
+            mention = f"@{bot.username}" if bot.username else bot.first_name
         
         await query.message.edit_text(
             text=Txt.HELP_TXT.format(mention=mention),
@@ -258,8 +267,17 @@ async def bought(client, message):
 async def help_command(client, message):
     # Get bot info properly
     bot = await client.get_me()
-    mention = bot.mention if hasattr(bot, 'mention') else f"@{bot.username}"
-
+    
+    # FIX: Ensure mention is always a string
+    if hasattr(bot, 'mention'):
+        # If mention is a Bot object, get the username instead
+        if isinstance(bot.mention, Client):
+            mention = f"@{bot.username}" if bot.username else bot.first_name
+        else:
+            mention = str(bot.mention)
+    else:
+        mention = f"@{bot.username}" if bot.username else bot.first_name
+    
     await message.reply_text(
         text=Txt.HELP_TXT.format(mention=mention),
         disable_web_page_preview=True,
