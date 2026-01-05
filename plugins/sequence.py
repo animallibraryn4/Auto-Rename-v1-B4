@@ -8,15 +8,24 @@ from pyrogram.errors import UserNotParticipant, FloodWait, ChatAdminRequired, Ch
 from config import Config, Txt
 from helper.database import codeflixbots
 
-# Global dictionaries for sequence management
-user_sequences = {}  # user_id -> list of file data
-user_notification_msg = {}  # user_id -> notification message info
-update_tasks = {}  # user_id -> update task
-user_settings = {}  # user_id -> sequence mode (per_ep or group)
-processing_users = set()  # To prevent multiple "Processing" messages
-user_ls_state = {}  # Store LS command state
-user_mode = {}  # Store user mode (file or caption)
-user_seq_mode = {}  # Store user sequence mode (per_ep or group)
+
+
+async def get_user_mode(user_id):
+    """Get user mode from database"""
+    try:
+        mode = await codeflixbots.get_mode(user_id)
+        return "caption" if mode == "caption_mode" else "file"
+    except:
+        return "file"  # Default
+
+async def set_user_mode(user_id, mode):
+    """Save user mode to database"""
+    try:
+        mode_value = f"{mode}_mode"
+        await codeflixbots.set_mode(user_id, mode_value)
+        return True
+    except:
+        return False
 
 # =====================================================
 # SEQUENCE PARSING ENGINE
@@ -206,24 +215,26 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
 # =====================================================
 # SEQUENCE COMMANDS
 # =====================================================
-
 @Client.on_message(filters.private & filters.command("sequence"))
 async def start_sequence(client, message):
     """Start a new sequence session"""
     user_id = message.from_user.id
     
     # Check verification
-    from plugins import is_user_verified, send_verification
-    if not await is_user_verified(user_id):
-        await send_verification(client, message)
-        return
+    try:
+        from plugins.__init__ import is_user_verified, send_verification
+        if not await is_user_verified(user_id):
+            await send_verification(client, message)
+            return
+    except ImportError:
+        pass  # Skip verification if module not available
     
     user_sequences[user_id] = []
     if user_id in user_notification_msg:
         del user_notification_msg[user_id]
     
-    # Get current mode
-    current_mode = user_mode.get(user_id, "file")
+    # Get current mode from database
+    current_mode = await get_user_mode(user_id)
     mode_text = "File mode (using filename)" if current_mode == "file" else "Caption mode (using file caption)"
     seq_mode = user_seq_mode.get(user_id, "per_ep")
     seq_text = "Episode Flow" if seq_mode == "per_ep" else "Quality Flow"
@@ -243,7 +254,9 @@ async def store_file(client, message):
     # Check if we are currently in a sequence session
     if user_id in user_sequences:
         file_obj = message.document or message.video or message.audio
-        current_mode = user_mode.get(user_id, "file")
+        
+        # Get mode from database
+        current_mode = await get_user_mode(user_id)
         
         if current_mode == "caption":
             # Caption mode: Use caption text or ask to switch mode
@@ -272,9 +285,7 @@ async def store_file(client, message):
             "info": info
         })
         
-        # Get current count
-        current_count = len(user_sequences[user_id])
-
+        
         # Send "Processing" notification if 20+ files are added
         if user_id not in user_notification_msg and user_id not in processing_users and current_count >= 20:
             processing_users.add(user_id)  # Lock the user
@@ -387,25 +398,26 @@ async def send_sequence_files(client, message, user_id):
 # =====================================================
 # /sf COMMAND - Switch between File and Caption Mode
 # =====================================================
-
 @Client.on_message(filters.private & filters.command("sf"))
 async def switch_mode_cmd(client, message):
     """Handle /sf command to switch between File mode and Caption mode"""
     user_id = message.from_user.id
-    current_mode = user_mode.get(user_id, "file")
+    
+    # Use database instead of global dict
+    current_mode = await get_user_mode(user_id)
     
     # Create buttons based on current mode
     if current_mode == "file":
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+            [InlineKeyboardButton("✅ File Mode", callback_data="seq_mode_file")],  # Changed callback
+            [InlineKeyboardButton("Caption Mode", callback_data="seq_mode_caption")],  # Changed callback
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]  # Changed callback
         ])
     else:
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("✅ Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+            [InlineKeyboardButton("File Mode", callback_data="seq_mode_file")],  # Changed callback
+            [InlineKeyboardButton("✅ Caption Mode", callback_data="seq_mode_caption")],  # Changed callback
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]  # Changed callback
         ])
     
     text = (
@@ -586,19 +598,18 @@ async def handle_ls_links(client, message):
 # =====================================================
 # CALLBACK QUERY HANDLERS
 # =====================================================
-
-@Client.on_callback_query(filters.regex(r'^mode_(file|caption)$|^close_mode$'))
-async def mode_callback_handler(client, query):
-    """Handle mode switching callbacks"""
+@Client.on_callback_query(filters.regex(r'^seq_mode_(file|caption)$|^seq_close_mode$'))  # Changed prefix
+async def seq_mode_callback_handler(client, query):
+    """Handle sequence mode switching callbacks"""
     data = query.data
     user_id = query.from_user.id
     
-    if data == "mode_file":
-        user_mode[user_id] = "file"
+    if data == "seq_mode_file":
+        await set_user_mode(user_id, "file")
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+            [InlineKeyboardButton("✅ File Mode", callback_data="seq_mode_file")],
+            [InlineKeyboardButton("Caption Mode", callback_data="seq_mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]
         ])
         text = (
             "<b>🔄 Sequence Mode Settings</b>\n\n"
@@ -611,12 +622,12 @@ async def mode_callback_handler(client, query):
         await query.message.edit_text(text, reply_markup=buttons)
         await query.answer("Switched to File Mode!", show_alert=True)
         
-    elif data == "mode_caption":
-        user_mode[user_id] = "caption"
+    elif data == "seq_mode_caption":
+        await set_user_mode(user_id, "caption")
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("File Mode", callback_data="mode_file")],
-            [InlineKeyboardButton("✅ Caption Mode", callback_data="mode_caption")],
-            [InlineKeyboardButton("❌ Close", callback_data="close_mode")]
+            [InlineKeyboardButton("File Mode", callback_data="seq_mode_file")],
+            [InlineKeyboardButton("✅ Caption Mode", callback_data="seq_mode_caption")],
+            [InlineKeyboardButton("❌ Close", callback_data="seq_close_mode")]
         ])
         text = (
             "<b>🔄 Sequence Mode Settings</b>\n\n"
@@ -629,7 +640,7 @@ async def mode_callback_handler(client, query):
         await query.message.edit_text(text, reply_markup=buttons)
         await query.answer("Switched to Caption Mode!", show_alert=True)
         
-    elif data == "close_mode":
+    elif data == "seq_close_mode":
         await query.message.delete()
         await query.answer("Closed mode settings", show_alert=False)
 
