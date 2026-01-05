@@ -26,9 +26,9 @@ async def start(client, message: Message):
     # Initial interactive text and sticker sequence
     # Simple welcome animation
     m = await message.reply_text("ꜱᴛᴀʀᴛɪɴɢ...")
-    await asyncio.sleep(0.4)
-    await m.edit_text("⚡")
     await asyncio.sleep(0.5)
+    await m.edit_text("⚡")
+    await asyncio.sleep(0.6)
     await m.delete()
     
     # Define buttons for the start message
