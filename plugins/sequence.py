@@ -206,16 +206,19 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
 # =====================================================
 # CALLBACK QUERY HANDLERS - MOVED TO TOP
 # =====================================================
-@Client.on_callback_query(filters.regex("^set_mode_(per_ep|group)$"))
-async def set_seq_mode_callback(client, query):
+
+@Client.on_callback_query(filters.regex("^fileseq_(per_ep|group)$"))
+async def fileseq_callback(client, query):
+    """Handle /fileseq callback for sequence flow selection"""
     user_id = query.from_user.id
-    selection = query.data.replace("set_mode_", "")
+    selection = query.data.replace("fileseq_", "")
 
     await codeflixbots.set_sequence_mode(user_id, selection)
     user_seq_mode[user_id] = selection
 
+    flow_name = "Episode Flow" if selection == "per_ep" else "Quality Flow"
     await query.answer(
-        "Episode Flow enabled ✅" if selection == "per_ep" else "Quality Flow enabled ✅",
+        f"✅ {flow_name} enabled!",
         show_alert=True
     )
 
@@ -747,7 +750,7 @@ async def switch_mode_cmd(client, message):
 # =====================================================
 
 @Client.on_message(filters.private & filters.command("fileseq"))
-async def quality_mode_cmd(client, message):
+async def fileseq_command(client, message):
     """Handle /fileseq command to choose sequence flow"""
     user_id = message.from_user.id
     
@@ -780,8 +783,8 @@ async def quality_mode_cmd(client, message):
     )
     
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📺 Episode Flow", callback_data='set_mode_per_ep')],
-        [InlineKeyboardButton("🎬 Quality Flow", callback_data='set_mode_group')]
+        [InlineKeyboardButton("📺 Episode Flow", callback_data='fileseq_per_ep')],
+        [InlineKeyboardButton("🎬 Quality Flow", callback_data='fileseq_group')]
     ])
     
     await message.reply_text(text, reply_markup=buttons)
@@ -967,4 +970,3 @@ SEQUENCE_HELP_TEXT = """
 
 <b>🔗 LS Mode:</b>
 Send two Telegram message links from the same channel to sequence files between them.</blockquote>
-"""
