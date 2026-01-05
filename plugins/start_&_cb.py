@@ -66,7 +66,7 @@ async def start(client, message: Message):
         )
 
 # Update the callback regex pattern to include mode-related callbacks:
-@Client.on_callback_query(filters.regex(r'^(home|caption|help|meta|donate|file_names|thumbnail|metadatax|source|premiumx|plans|about|close|setmedia_|on_metadata|off_metadata|metainfo|back_to_welcome|premium_page|close_message|set_mode_|close_mode)$'))
+@Client.on_callback_query(filters.regex(r'^(home|caption|help|meta|donate|file_names|thumbnail|metadatax|source|premiumx|plans|about|close|setmedia_|on_metadata|off_metadata|metainfo|back_to_welcome|premium_page|close_message|set_mode_|close_mode|send_sequence|cancel_sequence|set_mode_per_ep|set_mode_group)$'))
 async def cb_handler(client, query: CallbackQuery):
     data = query.data
     user_id = query.from_user.id
