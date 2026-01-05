@@ -182,12 +182,16 @@ async def info_command(client, message):
 
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=0)
 async def info_mode_file_handler(client, message):
+    """Handle files when user is in info mode (group 0 to run BEFORE auto-rename)"""
     user_id = message.from_user.id
     
     # Only process if user is in info mode
     if user_id in info_mode_users:
         await process_file_for_info(client, message)
-    # If not in info mode, do nothing - let file_rename.py handle i
+        return  # Return after processing to prevent auto-rename
+    
+    # If not in info mode, do nothing - let file_rename.py handle it
+    await message.continue_propagation()
 
 async def process_file_for_info(client, message):
     user_id = message.from_user.id
