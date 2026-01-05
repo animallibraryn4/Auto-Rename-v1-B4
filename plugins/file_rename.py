@@ -560,9 +560,12 @@ async def process_rename(client: Client, message: Message):
                 '-metadata', f'author={author}',
 
                 # Stream titles
-                '-metadata:s:v', f'title={video_title}',
-                '-metadata:s:a', f'title={audio_title}',
-                '-metadata:s:s', f'title={subtitle_title}',
+                '-metadata:s:v', 
+              f'title={video_title}',
+                '-metadata:s:a', 
+              f'title={audio_title}',
+                '-metadata:s:s', 
+              f'title={subtitle_title}',
 
                 # Map and copy everything safely
                 '-map', '0',
