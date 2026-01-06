@@ -667,12 +667,12 @@ async def process_rename(client: Client, message: Message):
                 '-loglevel', 'error',
                 '-y',
                 metadata_path
-             ]
+            ]
         
-             process = await asyncio.create_subprocess_exec(
-                 *copy_command,
-                 stdout=asyncio.subprocess.PIPE,
-                 stderr=asyncio.subprocess.PIPE
+            process = await asyncio.create_subprocess_exec(
+                *copy_command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
         
