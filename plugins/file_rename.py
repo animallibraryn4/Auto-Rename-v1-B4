@@ -573,113 +573,113 @@ async def process_rename(client: Client, message: Message):
             ffprobe_cmd = shutil.which('ffprobe')
             if ffprobe_cmd:
                 check_command = [
-                ffprobe_cmd,
-                '-v', 'error',
-                '-select_streams', 'v:0',
-                '-show_entries', 'stream=codec_name',
-                '-of', 'default=noprint_wrappers=1:nokey=1',
-                path
-            ]
-            
-            process = await asyncio.create_subprocess_exec(
-                *check_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                # File is corrupted or invalid, try to fix it first
-                logger.warning(f"File validation failed: {stderr.decode()}")
-                
-                # Try to remux the file to fix it
-                fixed_path = f"{path}.fixed.mkv"
-                fix_command = [
-                    'ffmpeg',
-                    '-i', path,
-                    '-c', 'copy',
-                    '-loglevel', 'error',
-                    '-y',
-                    fixed_path
+                    ffprobe_cmd,
+                    '-v', 'error',
+                    '-select_streams', 'v:0',
+                    '-show_entries', 'stream=codec_name',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    path
                 ]
-                
+            
                 process = await asyncio.create_subprocess_exec(
-                    *fix_command,
+                    *check_command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
                 stdout, stderr = await process.communicate()
+            
+                if process.returncode != 0:
+                    # File is corrupted or invalid, try to fix it first
+                    logger.warning(f"File validation failed: {stderr.decode()}")
                 
-                if process.returncode == 0 and os.path.exists(fixed_path):
-                    os.remove(path)
-                    os.rename(fixed_path, path)
-                    logger.info("Successfully fixed corrupted MKV file")
-                else:
-                    logger.error(f"Failed to fix corrupted file: {stderr.decode()}")
-                    await download_msg.edit(f"**File Error:** The downloaded file appears to be corrupted or incomplete.")
-                    return
+                    # Try to remux the file to fix it
+                    fixed_path = f"{path}.fixed.mkv"
+                    fix_command = [
+                        'ffmpeg',
+                        '-i', path,
+                        '-c', 'copy',
+                        '-loglevel', 'error',
+                        '-y',
+                        fixed_path
+                    ]
+                
+                    process = await asyncio.create_subprocess_exec(
+                        *fix_command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await process.communicate()
+                
+                    if process.returncode == 0 and os.path.exists(fixed_path):
+                        os.remove(path)
+                        os.rename(fixed_path, path)
+                        logger.info("Successfully fixed corrupted MKV file")
+                    else:
+                        logger.error(f"Failed to fix corrupted file: {stderr.decode()}")
+                        await download_msg.edit(f"**File Error:** The downloaded file appears to be corrupted or incomplete.")
+                        return
                     
-    except Exception as e:
-        logger.error(f"File validation error: {e}")
+        except Exception as e:
+            logger.error(f"File validation error: {e}")
 
-    # Unified metadata command - safely copies all streams including subtitles
-    metadata_command = [
-        'ffmpeg',
-        '-i', path,
-
-        # Global metadata
-        '-metadata', f'title={file_title}',
-        '-metadata', f'artist={artist}',
-        '-metadata', f'author={author}',
-
-        # Stream titles
-        '-metadata:s:v', f'title={video_title}',
-        '-metadata:s:a', f'title={audio_title}',
-        '-metadata:s:s', f'title={subtitle_title}',
-
-        # Map and copy everything safely
-        '-map', '0',
-        '-c', 'copy',
-
-        '-loglevel', 'error',
-        '-y',  # overwrite
-        metadata_path
-    ]
-
-    process = await asyncio.create_subprocess_exec(
-        *metadata_command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-
-    if process.returncode != 0:
-        error_message = stderr.decode()
-        
-        # If metadata application fails, try without metadata
-        logger.warning(f"Metadata application failed, copying file without metadata: {error_message}")
-        
-        # Simple copy without metadata
-        copy_command = [
+        # Unified metadata command - safely copies all streams including subtitles
+        metadata_command = [
             'ffmpeg',
             '-i', path,
+
+            # Global metadata
+            '-metadata', f'title={file_title}',
+            '-metadata', f'artist={artist}',
+            '-metadata', f'author={author}',
+
+            # Stream titles
+            '-metadata:s:v', f'title={video_title}',
+            '-metadata:s:a', f'title={audio_title}',
+            '-metadata:s:s', f'title={subtitle_title}',
+
+            # Map and copy everything safely
+            '-map', '0',
             '-c', 'copy',
+
             '-loglevel', 'error',
-            '-y',
+            '-y',  # overwrite
             metadata_path
         ]
-        
+
         process = await asyncio.create_subprocess_exec(
-            *copy_command,
+            *metadata_command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
-        
+
         if process.returncode != 0:
-            # If even simple copy fails, use the original file
-            logger.error(f"File copy also failed: {stderr.decode()}")
-            metadata_path = path  # Use original file
+            error_message = stderr.decode()
+        
+            # If metadata application fails, try without metadata
+            logger.warning(f"Metadata application failed, copying file without metadata: {error_message}")
+        
+            # Simple copy without metadata
+            copy_command = [
+                'ffmpeg',
+                '-i', path,
+                '-c', 'copy',
+                '-loglevel', 'error',
+                '-y',
+                metadata_path
+             ]
+        
+             process = await asyncio.create_subprocess_exec(
+                 *copy_command,
+                 stdout=asyncio.subprocess.PIPE,
+                 stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+        
+            if process.returncode != 0:
+                # If even simple copy fails, use the original file
+                logger.error(f"File copy also failed: {stderr.decode()}")
+                metadata_path = path  # Use original file
     
     
 
