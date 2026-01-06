@@ -534,45 +534,45 @@ async def process_rename(client: Client, message: Message):
     await download_msg.edit("**__Processing File...__**")
 
     try:
-    # ===== RESTORED FROM OLD FILE: MKV Conversion Logic =====
-    need_mkv_conversion = False
-    if media_type == "document":
-        need_mkv_conversion = True
-    elif media_type == "video" and path.lower().endswith('.mp4'):
-        need_mkv_conversion = True
+        # ===== RESTORED FROM OLD FILE: MKV Conversion Logic =====
+        need_mkv_conversion = False
+        if media_type == "document":
+            need_mkv_conversion = True
+        elif media_type == "video" and path.lower().endswith('.mp4'):
+            need_mkv_conversion = True
 
-    # Convert to MKV if needed
-    if need_mkv_conversion and not path.lower().endswith('.mkv'):
-        temp_mkv_path = f"{path}.temp.mkv"
+        # Convert to MKV if needed
+        if need_mkv_conversion and not path.lower().endswith('.mkv'):
+            temp_mkv_path = f"{path}.temp.mkv"
+            try:
+                await convert_to_mkv(path, temp_mkv_path)
+                os.remove(path)
+                os.rename(temp_mkv_path, path)
+                renamed_file_name = f"{format_template}.mkv"
+                metadata_path = f"Metadata/{message.id}_{renamed_file_name}"
+            except Exception as e:
+                # If MKV conversion fails, try to proceed with the original file
+                logger.error(f"MKV conversion failed, using original file: {e}")
+                # Clean up temp file if it exists
+                if os.path.exists(temp_mkv_path):
+                    os.remove(temp_mkv_path)
+                # Don't change the file extension if conversion failed
+                pass  # Continue with the original file
+
+        # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
+        # Get all metadata from database
+        file_title = await codeflixbots.get_title(user_id)
+        artist = await codeflixbots.get_artist(user_id)
+        author = await codeflixbots.get_author(user_id)
+        video_title = await codeflixbots.get_video(user_id)
+        audio_title = await codeflixbots.get_audio(user_id)
+        subtitle_title = await codeflixbots.get_subtitle(user_id)
+
+        # First, check if the file is valid with ffprobe
         try:
-            await convert_to_mkv(path, temp_mkv_path)
-            os.remove(path)
-            os.rename(temp_mkv_path, path)
-            renamed_file_name = f"{format_template}.mkv"
-            metadata_path = f"Metadata/{message.id}_{renamed_file_name}"
-        except Exception as e:
-            # If MKV conversion fails, try to proceed with the original file
-            logger.error(f"MKV conversion failed, using original file: {e}")
-            # Clean up temp file if it exists
-            if os.path.exists(temp_mkv_path):
-                os.remove(temp_mkv_path)
-            # Don't change the file extension if conversion failed
-            pass  # Continue with the original file
-
-    # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
-    # Get all metadata from database
-    file_title = await codeflixbots.get_title(user_id)
-    artist = await codeflixbots.get_artist(user_id)
-    author = await codeflixbots.get_author(user_id)
-    video_title = await codeflixbots.get_video(user_id)
-    audio_title = await codeflixbots.get_audio(user_id)
-    subtitle_title = await codeflixbots.get_subtitle(user_id)
-
-    # First, check if the file is valid with ffprobe
-    try:
-        ffprobe_cmd = shutil.which('ffprobe')
-        if ffprobe_cmd:
-            check_command = [
+            ffprobe_cmd = shutil.which('ffprobe')
+            if ffprobe_cmd:
+                check_command = [
                 ffprobe_cmd,
                 '-v', 'error',
                 '-select_streams', 'v:0',
