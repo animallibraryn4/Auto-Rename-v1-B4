@@ -90,7 +90,7 @@ pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
 pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
 async def user_worker(user_id, client):
-    """Worker to process files for a specific user"""
+    """Worker to process files for a specific user in correct sequence order"""
     queue = user_queues[user_id]["queue"]
     
     # Create a dictionary to store pending messages in order
@@ -99,7 +99,7 @@ async def user_worker(user_id, client):
     
     while True:
         try:
-            # Wait for next message
+            # Wait for next message (with timeout to prevent hanging)
             data = await asyncio.wait_for(queue.get(), timeout=300)
             sequence_num, message = data
             
@@ -118,18 +118,35 @@ async def user_worker(user_id, client):
                 next_expected_sequence += 1
                 
         except asyncio.TimeoutError:
-            # Clean up if inactive
+            # Clean up if inactive for 5 minutes
             if user_id in user_queues:
-                del user_queues[user_id]
-            if user_id in user_sequence_counter:
-                del user_sequence_counter[user_id]
+                # Process any remaining messages in order
+                while pending_messages:
+                    # Get the next sequence in order
+                    keys = sorted(pending_messages.keys())
+                    for seq in keys:
+                        if seq >= next_expected_sequence:
+                            message_to_process = pending_messages.pop(seq)
+                            async with global_semaphore:
+                                await process_rename(client, message_to_process)
+                            queue.task_done()
+                            next_expected_sequence = seq + 1
+                            break
+                
+                # Clean up user queue
+                if user_queues[user_id]["queue"].empty():
+                    del user_queues[user_id]
+                if user_id in user_sequence_counter:
+                    del user_sequence_counter[user_id]
             break
+            
         except Exception as e:
             logger.error(f"Error in user_worker for user {user_id}: {e}")
             try: 
                 queue.task_done()
             except: 
                 pass
+
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
