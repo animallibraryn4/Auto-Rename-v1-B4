@@ -504,7 +504,10 @@ async def process_rename(client: Client, message: Message):
     os.makedirs("downloads", exist_ok=True)
     os.makedirs("Metadata", exist_ok=True)
 
-    download_msg = await message.reply_text("**__Downloading...__**")
+    download_msg = await message.reply_text(
+    "**__Downloading...__**",
+    disable_notification=True
+    )
     
     try:
         path = await client.download_media(
