@@ -556,15 +556,13 @@ async def start_sequence(client, message):
         f"Send your files now. I'll sequence them in the configured order.</blockquote>"
     )
 
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=1)
 async def store_file(client, message):
-    """Store files for sequencing"""
+    """Process file for sequence mode"""
     user_id = message.from_user.id
     
-    # First check if user is in info mode
-    from plugins.auto_rename import info_mode_users
-    if user_id in info_mode_users:
-        return  # Let info mode handle it
+    # Only process if in sequence mode
+    if user_id not in user_sequences:
+        return  # This should never happen with router, but safety check
     
     # Check if we are currently in a sequence session
     if user_id in user_sequences:
