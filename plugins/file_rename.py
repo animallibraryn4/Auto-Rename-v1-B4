@@ -745,9 +745,9 @@ async def auto_rename_files(client, message):
 
     # 3. Queue Initialization
     if user_id not in user_queues:
-    user_queues[user_id] = {
-        "queue": asyncio.Queue(),
-        "task": asyncio.create_task(user_worker(user_id, client))
-    }
+        user_queues[user_id] = {
+            "queue": asyncio.Queue(),
+            "task": asyncio.create_task(user_worker(user_id, client))
+        }
 
-await user_queues[user_id]["queue"].put(message)
+    await user_queues[user_id]["queue"].put(message)
