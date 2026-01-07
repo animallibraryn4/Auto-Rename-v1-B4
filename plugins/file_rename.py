@@ -710,10 +710,10 @@ async def auto_rename_files(client, message):
     
     # ✅ Ensure queue manager has client
     queue_manager.set_client(client)
-    
+   
     # ✅ Add message to user's queue
     await queue_manager.add_to_queue(user_id, message)
-    
-    # Send acknowledgment message
-    
+
+    # ❌ Queue confirmation message removed
     logger.info(f"File from user {user_id} added to queue. Active users: {queue_manager.get_active_users()}")
+    # ✅ Add message to user's queue
