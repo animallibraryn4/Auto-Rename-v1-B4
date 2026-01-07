@@ -753,4 +753,7 @@ async def auto_rename_files(client, message):
             "task": asyncio.create_task(user_worker(user_id, client))
         }
 
-    await user_queues[user_id]["queue"]
+    user_sequence_counter[user_id] += 1
+    seq = user_sequence_counter[user_id]
+
+    await user_queues[user_id]["queue"].put((seq, message))
