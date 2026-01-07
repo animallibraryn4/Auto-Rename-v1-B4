@@ -58,7 +58,7 @@ class Bot(Client):
                     photo=Config.START_PIC,
                     caption=(
                         f"**{me.first_name} Is Restarted Again!**\n\n"
-                        f"System uptime`{uptime_string}`."
+                        f"System Uptime`{uptime_string}`."
                     ),
                     reply_markup=InlineKeyboardMarkup(
                         [[
