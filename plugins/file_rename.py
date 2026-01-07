@@ -33,6 +33,11 @@ class UserQueueManager:
         self.user_sequence_counters = {}  # user_id -> sequence counter
         self.max_concurrent_per_user = 1  # Process 1 file at a time per user
         self.user_semaphores = {}  # user_id -> semaphore
+        self.client = None  # Will be set when bot starts
+        
+    def set_client(self, client):
+        """Set the client instance for processing"""
+        self.client = client
         
     async def add_to_queue(self, user_id, message):
         """Add a message to user's queue and ensure worker is running"""
@@ -46,7 +51,7 @@ class UserQueueManager:
             
             # Start worker for this user
             self.user_workers[user_id] = asyncio.create_task(
-                self.user_worker(user_id)
+                self.user_worker(user_id, self.client)
             )
             logger.info(f"Started worker for user {user_id}")
         
@@ -57,7 +62,7 @@ class UserQueueManager:
         await self.user_queues[user_id].put((sequence_num, message))
         logger.info(f"Added message to queue for user {user_id}, position: {sequence_num}")
         
-    async def user_worker(self, user_id):
+    async def user_worker(self, user_id, client):
         """Worker that processes files for a specific user"""
         queue = self.user_queues.get(user_id)
         if not queue:
@@ -81,7 +86,8 @@ class UserQueueManager:
                     
                     # Process with user's semaphore (ensures only 1 file at a time per user)
                     async with self.user_semaphores[user_id]:
-                        await process_rename(Client, message_to_process)
+                        # Use the actual processing function with client
+                        await process_rename(client, message_to_process)
                     
                     queue.task_done()
                     next_expected_sequence += 1
@@ -702,8 +708,12 @@ async def auto_rename_files(client, message):
         await send_verification(client, message)
         return
     
+    # ✅ Ensure queue manager has client
+    queue_manager.set_client(client)
+    
     # ✅ Add message to user's queue
     await queue_manager.add_to_queue(user_id, message)
     
-    # Send acknowledgment message (optional)
+    # Send acknowledgment message
+    await message.reply_text("✅ File added to queue. Processing will start soon...")
     logger.info(f"File from user {user_id} added to queue. Active users: {queue_manager.get_active_users()}")
