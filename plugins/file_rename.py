@@ -19,14 +19,64 @@ from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
 # Add priority queue support
+# Add at the top of file_rename.py
 import heapq
 
 class PriorityQueue:
     def __init__(self):
         self.queue = []
         
-    async def add_task(self, priority, task):
-        heapq.heappush(self.queue, (priority, task))
+    async def put(self, item):
+        heapq.heappush(self.queue, item)
+        
+    async def get(self):
+        return heapq.heappop(self.queue)
+        
+    def empty(self):
+        return len(self.queue) == 0
+        
+    def task_done(self):
+        pass
+
+# Then modify the user_queues initialization
+user_queues = {}  # user_id → {"queue": PriorityQueue(), "task": task}
+
+# And modify auto_rename_files handler:
+async def auto_rename_files(client, message):
+    user_id = message.from_user.id
+    
+    # ✅ Check if user is in info mode
+    if user_id in info_mode_users:
+        return
+    
+    # ✅ Check if user is in sequence mode
+    if user_id in user_sequences:
+        return
+    
+    # Check verification
+    if not await is_user_verified(user_id):
+        curr = time.time()
+        if curr - recent_verification_checks.get(user_id, 0) > 2:
+            recent_verification_checks[user_id] = curr
+            await send_verification(client, message)
+        return
+    
+    # Queue management
+    if user_id not in user_queues:
+        user_queues[user_id] = {
+            "queue": PriorityQueue(), 
+            "task": asyncio.create_task(user_worker(user_id, client))
+        }
+    
+    # Track sequence number for this file
+    if user_id not in user_sequence_counter:
+        user_sequence_counter[user_id] = 0
+    
+    sequence_num = user_sequence_counter[user_id] + 1
+    user_sequence_counter[user_id] = sequence_num
+    
+    # Put message in queue with sequence number as priority
+    await user_queues[user_id]["queue"].put((sequence_num, message))
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +85,6 @@ logger = logging.getLogger(__name__)
 # ===== Global + Per-User Queue System =====
 MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
-user_queues = {}
 user_sequence_counter = {}  # Track sequence numbers per user
 
 # Global dictionary to prevent duplicate operations
