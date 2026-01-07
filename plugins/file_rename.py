@@ -18,56 +18,37 @@ from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
+# Add priority queue support
+import heapq
+
+class PriorityQueue:
+    def __init__(self):
+        self.queue = []
+        
+    async def add_task(self, priority, task):
+        heapq.heappush(self.queue, (priority, task))
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ===== SIMPLE SEQUENTIAL QUEUE SYSTEM =====
-# Each user has their own queue that processes files one by one
-user_queues = {}  # user_id -> asyncio.Queue
-user_queue_tasks = {}  # user_id -> task
-user_processing = {}  # user_id -> bool (is processing)
-user_file_counter = {}  # user_id -> counter for order
-user_last_message = {}  # user_id -> last message object
+# ===== Global + Per-User Queue System =====
+MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
+global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+user_queues = {}
+user_sequence_counter = {}  # Track sequence numbers per user
 
-# Simple queue processor
-async def process_user_queue(user_id, client):
-    """Process files for a user in strict order"""
-    while True:
-        try:
-            if user_id not in user_queues:
-                break
-                
-            queue = user_queues[user_id]
-            
-            # Wait for a file
-            message = await queue.get()
-            
-            # Mark as processing
-            user_processing[user_id] = True
-            
-            try:
-                # Process the file
-                await process_rename(client, message)
-            except Exception as e:
-                logger.error(f"Error processing file for user {user_id}: {e}")
-            finally:
-                # Mark task as done
-                queue.task_done()
-                user_processing[user_id] = False
-                
-        except Exception as e:
-            logger.error(f"Queue processor error for user {user_id}: {e}")
-            break
-    
-    # Clean up when done
-    clean_up_user(user_id)
+# Global dictionary to prevent duplicate operations
+renaming_operations = {}
+recent_verification_checks = {}
 
-def clean_up_user(user_id):
-    """Clean up user resources"""
-    for dict_name in [user_queues, user_queue_tasks, user_processing, user_file_counter, user_last_message]:
-        dict_name.pop(user_id, None)
+# Cleanup function for user state
+def cleanup_user_state(user_id):
+    """Clean up user state if queue is empty"""
+    if (user_id in user_queues and 
+        user_queues[user_id]["queue"].empty() and 
+        user_id in user_sequence_counter):
+        del user_sequence_counter[user_id]
 
 # ===== Enhanced Patterns for Caption Mode =====
 # These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
@@ -107,6 +88,54 @@ pattern8 = re.compile(r'[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b', re.IGNORECASE)
 pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
 pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
 pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
+
+async def user_worker(user_id, client):
+    """Worker to process files for a specific user strictly in sequence"""
+    user_data = user_queues.get(user_id)
+    if not user_data:
+        return
+
+    queue = user_data["queue"]
+    pending_buffer = {}  # Buffer for out-of-order files
+    next_expected = 1    # The sequence number we are waiting for
+
+    while True:
+        try:
+            # Wait for any new item in the queue
+            # Increased timeout to 10 minutes for large batches
+            data = await asyncio.wait_for(queue.get(), timeout=600)
+            seq_num, message = data
+            
+            # Add the newly arrived message to our buffer
+            pending_buffer[seq_num] = message
+            
+            # Check if we have the next expected file (and any subsequent ones)
+            while next_expected in pending_buffer:
+                msg_to_process = pending_buffer.pop(next_expected)
+                
+                try:
+                    # Process one by one using the semaphore
+                    async with global_semaphore:
+                        await process_rename(client, msg_to_process)
+                except Exception as e:
+                    logger.error(f"Error processing file {next_expected} for {user_id}: {e}")
+                finally:
+                    queue.task_done()
+                    next_expected += 1
+                
+        except asyncio.TimeoutError:
+            # Clean up if no files sent for 10 minutes
+            logger.info(f"User worker {user_id} timed out. Cleaning up.")
+            break
+        except Exception as e:
+            logger.error(f"Critical Worker Error for {user_id}: {e}")
+            break
+
+    # Cleanup state on exit
+    if user_id in user_queues:
+        del user_queues[user_id]
+    if user_id in user_sequence_counter:
+        del user_sequence_counter[user_id]
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -393,7 +422,6 @@ async def extract_info_from_source(message, user_mode):
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
 
-# ===== ORIGINAL PROCESS_RENAME FUNCTION =====
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
@@ -441,8 +469,6 @@ async def process_rename(client: Client, message: Message):
     if await check_anti_nsfw(check_text, message):
         return await message.reply_text("NSFW content detected. File upload rejected.")
 
-    # Global dictionary to prevent duplicate operations
-    renaming_operations = {}
     # Check for duplicate operations
     if file_id in renaming_operations:
         elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
@@ -714,49 +740,39 @@ async def process_rename(client: Client, message: Message):
         # Remove from operations tracking
         if file_id in renaming_operations:
             del renaming_operations[file_id]
+        
+        # Clean up user state if queue is empty
+        cleanup_user_state(user_id)
 
-# ===== FIXED AUTO_RENAME_FILES HANDLER =====
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
     
-    # Check if user is in info mode
-    if user_id in info_mode_users:
-        return
+    # 1. Verification & Mode Checks
+    if user_id in info_mode_users or user_id in user_sequences:
+        return 
     
-    # Check if user is in sequence mode
-    if user_id in user_sequences:
-        return
-    
-    # Check verification
     if not await is_user_verified(user_id):
-        # Simple cooldown check
-        last_check = user_last_message.get(user_id, 0)
-        if time.time() - last_check > 2:
-            user_last_message[user_id] = time.time()
+        curr = time.time()
+        if curr - recent_verification_checks.get(user_id, 0) > 2:
+            recent_verification_checks[user_id] = curr
             await send_verification(client, message)
         return
+
+    # 2. Sequence Counter Management
+    if user_id not in user_sequence_counter:
+        user_sequence_counter[user_id] = 0
     
-    # Initialize user queue if not exists
+    user_sequence_counter[user_id] += 1
+    current_seq = user_sequence_counter[user_id]
+
+    # 3. Queue Initialization
     if user_id not in user_queues:
-        user_queues[user_id] = asyncio.Queue()
-        user_file_counter[user_id] = 0
-        
-        # Start queue processor for this user
-        task = asyncio.create_task(process_user_queue(user_id, client))
-        user_queue_tasks[user_id] = task
+        user_queues[user_id] = {
+            "queue": asyncio.Queue(),
+            "task": asyncio.create_task(user_worker(user_id, client))
+        }
     
-    # Get current position in queue
-    user_file_counter[user_id] += 1
-    position = user_file_counter[user_id]
-    
-    # Add to queue
-    await user_queues[user_id].put(message)
-    
-    # Log silently
-    logger.info(f"User {user_id}: File #{position} added to queue (Queue size: {user_queues[user_id].qsize()})")
-    
-    # If this is the first file and not processing, we're already processing
-    # The queue processor will handle it automatically
-    
-    return  # Silent return - no messages to user
+    # 4. Add to Queue
+    # We pass the sequence number so the worker knows the correct order
+    await user_queues[user_id]["queue"].put((current_seq, message))
