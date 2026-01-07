@@ -57,8 +57,8 @@ class Bot(Client):
                     chat_id=chat_id,
                     photo=Config.START_PIC,
                     caption=(
-                        "**ᴀɴʏᴀ ɪs ʀᴇsᴛᴀʀᴛᴇᴅ ᴀɢᴀɪɴ !**\n\n"
-                        f"ɪ ᴅɪᴅɴ'ᴛ sʟᴇᴇᴘ sɪɴᴄᴇ: `{uptime_string}`"
+                        f"**{me.first_name} Is Restarted Again!**\n\n"
+                        f"I’ve been awake for `{uptime_string}` now."
                     ),
                     reply_markup=InlineKeyboardMarkup(
                         [[
