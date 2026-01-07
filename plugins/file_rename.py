@@ -138,8 +138,7 @@ class UserQueueManager:
 # Global queue manager
 queue_manager = UserQueueManager()
 
-# ===== PATTERNS (keep existing) =====
-# ... [Keep all your existing patterns and helper functions as they are] ...
+# ===== PATTERNS =====
 pattern_caption_season_verbose = re.compile(
     r'(?:season|saison|sezon|сезон|temporada|сезона|temporada)\s*[:=-]?\s*(\d+)', 
     re.IGNORECASE
@@ -171,7 +170,7 @@ pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
 pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
 pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
-# ===== HELPER FUNCTIONS (keep existing) =====
+# ===== HELPER FUNCTIONS =====
 def standardize_quality_name(quality):
     """Standardize quality names for consistent storage"""
     if not quality or quality == "Unknown":
