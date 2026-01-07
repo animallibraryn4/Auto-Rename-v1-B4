@@ -50,17 +50,6 @@ user_queues = {}
 renaming_operations = {}
 recent_verification_checks = {}
 
-# Cleanup function for user state
-def cleanup_user_state(user_id):
-    """Clean up user state if queue is empty"""
-    if user_id in user_queues and user_queues[user_id]["queue"].empty():
-        if user_id in user_sequence_counter:
-            del user_sequence_counter[user_id]
-        if user_id in user_next_expected:
-            del user_next_expected[user_id]
-        if user_id in pending_buffers:
-            del pending_buffers[user_id]
-
 # ===== Enhanced Patterns for Caption Mode =====
 # These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
 pattern_caption_season_verbose = re.compile(
