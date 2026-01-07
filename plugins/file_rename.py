@@ -33,7 +33,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===== Global + Per-User Queue System =====
-MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
+MAX_CONCURRENT_TASKS = 3  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
 # Global dictionaries for state management
