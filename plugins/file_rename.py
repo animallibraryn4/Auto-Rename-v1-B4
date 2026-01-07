@@ -38,10 +38,6 @@ global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
 # Global dictionaries for state management
 user_queues = {}
-user_sequence_counter = {} 
-# Store these outside worker to prevent reset on worker restart
-user_next_expected = {} 
-pending_buffers = {}
 
 # Global dictionary to prevent duplicate operations
 renaming_operations = {}
@@ -98,51 +94,25 @@ pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
 pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
 async def user_worker(user_id, client):
-    """Worker to process files for a specific user strictly in sequence"""
-    # Initialize user state if not exists
-    if user_id not in user_next_expected:
-        user_next_expected[user_id] = 1
-    if user_id not in pending_buffers:
-        pending_buffers[user_id] = {}
-
     queue = user_queues[user_id]["queue"]
 
-    while True:
-        try:
-            # Queue se naya message uthayein
-            data = await asyncio.wait_for(queue.get(), timeout=600)
-            seq_num, message = data
-            
-            # Buffer mein dalein
-            pending_buffers[user_id][seq_num] = message
-            
-            # Jab tak buffer mein 'next expected' file maujood hai, process karte rahein
-            while user_next_expected[user_id] in pending_buffers[user_id]:
-                current_seq = user_next_expected[user_id]
-                msg_to_process = pending_buffers[user_id].pop(current_seq)
-                
-                try:
-                    # Global semaphore taaki system load na ho
-                    async with global_semaphore:
-                        await process_rename(client, msg_to_process)
-                except Exception as e:
-                    logger.error(f"Error in process_rename for {user_id}: {e}")
-                finally:
-                    user_next_expected[user_id] += 1
-                    queue.task_done()
-                
-        except asyncio.TimeoutError:
-            logger.info(f"Worker timeout for user {user_id}. Cleaning up.")
-            break
-        except Exception as e:
-            logger.error(f"Worker error for {user_id}: {e}")
-            break
+    try:
+        while True:
+            message = await asyncio.wait_for(queue.get(), timeout=600)
 
-    # Cleanup
-    user_queues.pop(user_id, None)
-    user_sequence_counter.pop(user_id, None)
-    user_next_expected.pop(user_id, None)
-    pending_buffers.pop(user_id, None)
+            async with global_semaphore:
+                try:
+                    await process_rename(client, message)
+                except Exception as e:
+                    logger.error(f"Rename error for user {user_id}: {e}")
+                finally:
+                    queue.task_done()
+
+    except asyncio.TimeoutError:
+        logger.info(f"Worker timeout for user {user_id}")
+
+    finally:
+        user_queues.pop(user_id, None)
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -775,11 +745,9 @@ async def auto_rename_files(client, message):
 
     # 3. Queue Initialization
     if user_id not in user_queues:
-        user_queues[user_id] = {
-            "queue": asyncio.Queue(),
-            "task": asyncio.create_task(user_worker(user_id, client))
-        }
-    
-    # 4. Add to Queue
-    # We pass the sequence number so the worker knows the correct order
-    await user_queues[user_id]["queue"].put((current_seq, message))
+    user_queues[user_id] = {
+        "queue": asyncio.Queue(),
+        "task": asyncio.create_task(user_worker(user_id, client))
+    }
+
+await user_queues[user_id]["queue"].put(message)
