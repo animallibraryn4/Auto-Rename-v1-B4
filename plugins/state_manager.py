@@ -1,4 +1,4 @@
-# Create a state_manager.py
+# 
 class UserState:
     def __init__(self):
         self.info_mode = {}
@@ -14,3 +14,6 @@ class UserState:
             return "sequence"
         else:
             return "auto_rename"
+
+# Global state manager
+user_state_manager = UserState()
