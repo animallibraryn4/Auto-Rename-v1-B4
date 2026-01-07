@@ -47,6 +47,7 @@ MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
 from collections import defaultdict
+import asyncio
 
 user_queues = defaultdict(asyncio.Queue)
 
