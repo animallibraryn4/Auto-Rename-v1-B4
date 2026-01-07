@@ -712,7 +712,6 @@ async def process_rename(client: Client, message: Message):
                     pass
 
 # ===== IMPROVED MESSAGE HANDLER WITH DUPLICATE PREVENTION =====
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=3)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
     
