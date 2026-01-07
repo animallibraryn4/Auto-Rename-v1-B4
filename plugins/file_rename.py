@@ -18,31 +18,95 @@ from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
-import collections
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ===== FIXED SILENT QUEUE SYSTEM =====
-# Global dictionaries for queue management
+# ===== SIMPLE SEQUENTIAL QUEUE SYSTEM =====
+# Each user has their own queue that processes files one by one
 user_queues = {}  # user_id -> asyncio.Queue
-user_workers = {}  # user_id -> worker task
-user_file_order = {}  # user_id -> [file_ids in order]
-user_currently_processing = {}  # user_id -> bool
-user_lock = {}  # user_id -> asyncio.Lock
-user_processing_lock = {}  # user_id -> asyncio.Lock
+user_queue_tasks = {}  # user_id -> task
+user_processing = {}  # user_id -> bool (is processing)
+user_file_counter = {}  # user_id -> counter for order
+user_last_message = {}  # user_id -> last message object
 
-# Cleanup old queue system variables
-if 'renaming_operations' in globals():
-    del renaming_operations
-if 'recent_verification_checks' in globals():
-    recent_verification_checks = {}
-else:
-    recent_verification_checks = {}
+# Simple queue processor
+async def process_user_queue(user_id, client):
+    """Process files for a user in strict order"""
+    while True:
+        try:
+            if user_id not in user_queues:
+                break
+                
+            queue = user_queues[user_id]
+            
+            # Wait for a file
+            message = await queue.get()
+            
+            # Mark as processing
+            user_processing[user_id] = True
+            
+            try:
+                # Process the file
+                await process_rename(client, message)
+            except Exception as e:
+                logger.error(f"Error processing file for user {user_id}: {e}")
+            finally:
+                # Mark task as done
+                queue.task_done()
+                user_processing[user_id] = False
+                
+        except Exception as e:
+            logger.error(f"Queue processor error for user {user_id}: {e}")
+            break
+    
+    # Clean up when done
+    clean_up_user(user_id)
 
-# ===== ORIGINAL FUNCTIONS (Keep all your existing functions) =====
-# Make sure these are included from your original file:
+def clean_up_user(user_id):
+    """Clean up user resources"""
+    for dict_name in [user_queues, user_queue_tasks, user_processing, user_file_counter, user_last_message]:
+        dict_name.pop(user_id, None)
+
+# ===== Enhanced Patterns for Caption Mode =====
+# These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
+pattern_caption_season_verbose = re.compile(
+    r'(?:season|saison|sezon|сезон|temporada|сезона|temporada)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
+pattern_caption_episode_verbose = re.compile(
+    r'(?:episode|ep|eps|эпизод|cap[íi]tulo|серия|episodio)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
+pattern_caption_season_episode_combined = re.compile(
+    r'(?:season|s)\s*[:=-]?\s*(\d+)\s*(?:episode|ep)\s*[:=-]?\s*(\d+)', 
+    re.IGNORECASE
+)
+
+# Special pattern for formats like "Season 10 Episode 01" without punctuation
+pattern_caption_simple = re.compile(
+    r'(?:season|s)\s*(\d+)\s*(?:episode|ep)\s*(\d+)', 
+    re.IGNORECASE
+)
+
+# Enhanced pattern for any number pairs that might be season/episode
+pattern_caption_number_pair = re.compile(r'(\d+)\s*(?:[-~]|and|&|,)\s*(\d+)', re.IGNORECASE)
+
+# Original patterns for backward compatibility
+pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
+pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
+pattern3 = re.compile(r'(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)')
+pattern3_2 = re.compile(r'(?:\s*-\s*(\d+)\s*)')
+pattern4 = re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE)
+patternX = re.compile(r'(\d+)')
+pattern5 = re.compile(r'\b(?:.*?(\d{3,4}[^\dp]*p).*?|.*?(\d{3,4}p))\b', re.IGNORECASE)
+pattern6 = re.compile(r'[([<{]?\s*4k\s*[)\]>}]?', re.IGNORECASE)
+pattern7 = re.compile(r'[([<{]?\s*2k\s*[)\]>}]?', re.IGNORECASE)
+pattern8 = re.compile(r'[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b', re.IGNORECASE)
+pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
+pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
+pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -65,8 +129,12 @@ def standardize_quality_name(quality):
     
     return quality.capitalize()
 
+# ===== RESTORED FROM OLD FILE: ASS Subtitle Conversion =====
 async def convert_ass_subtitles(input_path, output_path):
-    """Convert ASS subtitles to mov_text format for MP4 compatibility"""
+    """
+    Convert ASS subtitles to mov_text format for MP4 compatibility
+    (Restored from old file)
+    """
     ffmpeg_cmd = shutil.which('ffmpeg')
     if ffmpeg_cmd is None:
         raise Exception("FFmpeg not found")
@@ -76,10 +144,10 @@ async def convert_ass_subtitles(input_path, output_path):
         '-i', input_path,
         '-c:v', 'copy',
         '-c:a', 'copy',
-        '-c:s', 'mov_text',
+        '-c:s', 'mov_text',  # Convert subtitles to mov_text format
         '-map', '0',
         '-loglevel', 'error',
-        '-y',
+        '-y',  # Overwrite output file
         output_path
     ]
     
@@ -95,7 +163,10 @@ async def convert_ass_subtitles(input_path, output_path):
         raise Exception(f"Subtitle conversion failed: {error_message}")
 
 async def convert_to_mkv(input_path, output_path):
-    """Convert any video file to MKV format without re-encoding"""
+    """
+    Convert any video file to MKV format without re-encoding, preserving all streams
+    (Restored from old file)
+    """
     ffmpeg_cmd = shutil.which('ffmpeg')
     if ffmpeg_cmd is None:
         raise Exception("FFmpeg not found")
@@ -103,10 +174,10 @@ async def convert_to_mkv(input_path, output_path):
     command = [
         ffmpeg_cmd,
         '-i', input_path,
-        '-map', '0',
-        '-c', 'copy',
+        '-map', '0',          # Map all streams from input
+        '-c', 'copy',         # Copy all streams without re-encoding
         '-loglevel', 'error',
-        '-y',
+        '-y',  # Overwrite output file
         output_path
     ]
     
@@ -140,13 +211,6 @@ def extract_quality(text):
             return quality(match) if callable(quality) else quality
     
     # Then try standard patterns
-    pattern5 = re.compile(r'\b(?:.*?(\d{3,4}[^\dp]*p).*?|.*?(\d{3,4}p))\b', re.IGNORECASE)
-    pattern6 = re.compile(r'[([<{]?\s*4k\s*[)\]>}]?', re.IGNORECASE)
-    pattern7 = re.compile(r'[([<{]?\s*2k\s*[)\]>}]?', re.IGNORECASE)
-    pattern8 = re.compile(r'[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b', re.IGNORECASE)
-    pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
-    pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
-    
     for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
                             (pattern6, "4k"), 
                             (pattern7, "2k"), 
@@ -158,60 +222,38 @@ def extract_quality(text):
             return quality(match) if callable(quality) else quality
     return "Unknown"
 
-# ===== ENHANCED PATTERNS FOR CAPTION MODE =====
-pattern_caption_season_verbose = re.compile(
-    r'(?:season|saison|sezon|сезон|temporada|сезона|temporada)\s*[:=-]?\s*(\d+)', 
-    re.IGNORECASE
-)
-pattern_caption_episode_verbose = re.compile(
-    r'(?:episode|ep|eps|эпизод|cap[íi]tulo|серия|episodio)\s*[:=-]?\s*(\d+)', 
-    re.IGNORECASE
-)
-pattern_caption_season_episode_combined = re.compile(
-    r'(?:season|s)\s*[:=-]?\s*(\d+)\s*(?:episode|ep)\s*[:=-]?\s*(\d+)', 
-    re.IGNORECASE
-)
-pattern_caption_simple = re.compile(
-    r'(?:season|s)\s*(\d+)\s*(?:episode|ep)\s*(\d+)', 
-    re.IGNORECASE
-)
-pattern_caption_number_pair = re.compile(r'(\d+)\s*(?:[-~]|and|&|,)\s*(\d+)', re.IGNORECASE)
-
-# Original patterns for backward compatibility
-pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
-pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
-pattern3 = re.compile(r'(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)')
-pattern3_2 = re.compile(r'(?:\s*-\s*(\d+)\s*)')
-pattern4 = re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE)
-patternX = re.compile(r'(\d+)')
-pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
-
 def extract_season_number(text, is_caption_mode=False):
     """Extract season number from text with enhanced caption support"""
     if not text:
         return None
     
     if is_caption_mode:
+        # Clean the text first
         clean_text = re.sub(r'\s+', ' ', text.strip())
         
+        # Try verbose caption patterns first
         match = pattern_caption_season_verbose.search(clean_text)
         if match:
             return match.group(1)
         
+        # Try combined pattern
         match = pattern_caption_season_episode_combined.search(clean_text)
         if match:
             return match.group(1)
         
+        # Try simple pattern
         match = pattern_caption_simple.search(clean_text)
         if match:
             return match.group(1)
         
+        # Try number pair pattern (first number as season)
         match = pattern_caption_number_pair.search(clean_text)
         if match:
+            # If we have two numbers and context suggests season/episode
             if any(keyword in clean_text.lower() for keyword in ['season', 'episode', 'ep', 's', 'e']):
                 return match.group(1)
     
-    # Fall back to original patterns
+    # Fall back to original patterns for file mode or as backup
     for pattern in [pattern1, pattern4]:
         match = pattern.search(text)
         if match: 
@@ -225,26 +267,32 @@ def extract_episode_number(text, is_caption_mode=False):
         return None
     
     if is_caption_mode:
+        # Clean the text first
         clean_text = re.sub(r'\s+', ' ', text.strip())
         
+        # Try verbose caption patterns first
         match = pattern_caption_episode_verbose.search(clean_text)
         if match:
             return match.group(1)
         
+        # Try combined pattern
         match = pattern_caption_season_episode_combined.search(clean_text)
         if match:
             return match.group(2)
         
+        # Try simple pattern
         match = pattern_caption_simple.search(clean_text)
         if match:
             return match.group(2)
         
+        # Try number pair pattern (second number as episode)
         match = pattern_caption_number_pair.search(clean_text)
         if match:
+            # If we have two numbers and context suggests season/episode
             if any(keyword in clean_text.lower() for keyword in ['season', 'episode', 'ep', 's', 'e']):
                 return match.group(2)
     
-    # Fall back to original patterns
+    # Fall back to original patterns for file mode or as backup
     for pattern in [pattern1, pattern2, pattern3, pattern3_2, pattern4, patternX]:
         match = pattern.search(text)
         if match: 
@@ -296,7 +344,7 @@ async def extract_info_from_source(message, user_mode):
     is_caption_mode = user_mode == "caption_mode"
     
     if user_mode == "file_mode":
-        # Extract from file name
+        # Extract from file name (existing logic)
         if message.document:
             source_text = message.document.file_name
         elif message.video:
@@ -321,6 +369,8 @@ async def extract_info_from_source(message, user_mode):
     
     # Special handling for common caption patterns
     if is_caption_mode and not episode_number and season_number:
+        # If we have season but no episode, check if season was mis-extracted as episode
+        # Look for episode pattern again with different approach
         episode_patterns = [
             r'episode\s*[:=-]?\s*(\d+)',
             r'ep\s*[:=-]?\s*(\d+)',
@@ -334,7 +384,7 @@ async def extract_info_from_source(message, user_mode):
                 episode_number = match.group(1)
                 break
     
-    # Extract quality
+    # Extract quality (enhanced for caption mode)
     extracted_quality = extract_quality(source_text)
     standard_quality = standardize_quality_name(extracted_quality) if extracted_quality != "Unknown" else None
     
@@ -343,8 +393,8 @@ async def extract_info_from_source(message, user_mode):
     
     return season_number, episode_number, standard_quality, volume_number, chapter_number
 
+# ===== ORIGINAL PROCESS_RENAME FUNCTION =====
 async def process_rename(client: Client, message: Message):
-    """Main file processing function - KEEP YOUR EXISTING CODE"""
     ph_path = None
     
     user_id = message.from_user.id
@@ -358,7 +408,7 @@ async def process_rename(client: Client, message: Message):
     media_preference = await codeflixbots.get_media_preference(user_id)
     
     if not format_template:
-        return  # Silent return - no message
+        return await message.reply_text("Please Set An Auto Rename Format First Using /autorename")
 
     # Determine file type and get basic info
     if message.document:
@@ -380,7 +430,7 @@ async def process_rename(client: Client, message: Message):
         media_type = media_preference or "audio"
         is_pdf = False
     else:
-        return
+        return await message.reply_text("Unsupported File Type")
 
     # Check for NSFW based on mode
     if user_mode == "file_mode":
@@ -389,10 +439,27 @@ async def process_rename(client: Client, message: Message):
         check_text = message.caption or ""
     
     if await check_anti_nsfw(check_text, message):
-        return  # Silent return
+        return await message.reply_text("NSFW content detected. File upload rejected.")
+
+    # Global dictionary to prevent duplicate operations
+    renaming_operations = {}
+    # Check for duplicate operations
+    if file_id in renaming_operations:
+        elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
+        if elapsed_time < 10:
+            return
+
+    renaming_operations[file_id] = datetime.now()
 
     # Extract information based on mode
     season_number, episode_number, standard_quality, volume_number, chapter_number = await extract_info_from_source(message, user_mode)
+    
+    # DEBUG: Log what was extracted
+    source_text = message.caption if user_mode == "caption_mode" else file_name
+    logger.info(f"User Mode: {user_mode}")
+    logger.info(f"Source Text: {source_text}")
+    logger.info(f"Extracted - Season: {season_number}, Episode: {episode_number}, Quality: {standard_quality}")
+
     
     # Apply extracted information to format template
     if episode_number:
@@ -441,14 +508,13 @@ async def process_rename(client: Client, message: Message):
             progress_args=("Download Started...", download_msg, time.time()),
         )
     except Exception as e:
-        logger.error(f"Download Error: {e}")
-        await download_msg.delete()
-        return
+        del renaming_operations[file_id]
+        return await download_msg.edit(f"**Download Error:** {e}")
 
     await download_msg.edit("**__Processing File...__**")
 
     try:
-        # MKV Conversion Logic
+        # ===== RESTORED FROM OLD FILE: MKV Conversion Logic =====
         need_mkv_conversion = False
         if media_type == "document":
             need_mkv_conversion = True
@@ -468,7 +534,8 @@ async def process_rename(client: Client, message: Message):
                 await download_msg.edit(f"**MKV Conversion Error:** {e}")
                 return
 
-        # SAFE METADATA APPLY
+        # ===== SAFE METADATA APPLY (NO SUBTITLE CONVERSION) =====
+        # Get all metadata from database
         file_title = await codeflixbots.get_title(user_id)
         artist = await codeflixbots.get_artist(user_id)
         author = await codeflixbots.get_author(user_id)
@@ -476,19 +543,27 @@ async def process_rename(client: Client, message: Message):
         audio_title = await codeflixbots.get_audio(user_id)
         subtitle_title = await codeflixbots.get_subtitle(user_id)
 
+        # Unified metadata command - safely copies all streams including subtitles
         metadata_command = [
             'ffmpeg',
             '-i', path,
+
+            # Global metadata
             '-metadata', f'title={file_title}',
             '-metadata', f'artist={artist}',
             '-metadata', f'author={author}',
+
+            # Stream titles
             '-metadata:s:v', f'title={video_title}',
             '-metadata:s:a', f'title={audio_title}',
             '-metadata:s:s', f'title={subtitle_title}',
+
+            # Map and copy everything safely
             '-map', '0',
             '-c', 'copy',
+
             '-loglevel', 'error',
-            '-y',
+            '-y',  # overwrite
             metadata_path
         ]
 
@@ -508,20 +583,26 @@ async def process_rename(client: Client, message: Message):
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
-        # Quality-Based Thumbnail Selection
+        # ===== RESTORED FROM OLD FILE: Quality-Based Thumbnail Selection =====
         c_caption = await codeflixbots.get_caption(message.chat.id)
+
+        # Try to get quality-specific thumbnail first
         c_thumb = None
         is_global_enabled = await codeflixbots.is_global_thumb_enabled(user_id)
  
         if is_global_enabled:
             c_thumb = await codeflixbots.get_global_thumb(user_id)
         else:
-            if standard_quality:
-                c_thumb = await codeflixbots.get_quality_thumbnail(user_id, standard_quality)
+             # Use the already-extracted quality (based on user's mode)
+             # standard_quality was already extracted in extract_info_from_source()
+             if standard_quality:
+                 c_thumb = await codeflixbots.get_quality_thumbnail(user_id, standard_quality)
     
-            if not c_thumb:
-                c_thumb = await codeflixbots.get_thumbnail(user_id)
+             # Fall back to default thumbnail if no quality-specific one exists
+             if not c_thumb:
+                 c_thumb = await codeflixbots.get_thumbnail(user_id)
 
+        # If still no thumbnail, check for video thumbnails
         if not c_thumb and media_type == "video" and message.video.thumbs:
             c_thumb = message.video.thumbs[0].file_id
  
@@ -542,13 +623,16 @@ async def process_rename(client: Client, message: Message):
                 try:
                     img = Image.open(ph_path).convert("RGB")
                     
+                    # Only crop to square if media preference is "document"
                     if media_type == "document":
+                        # Square crop for documents (center crop)
                         width, height = img.size
                         min_dim = min(width, height)
                         left, top = (width - min_dim) // 2, (height - min_dim) // 2
                         right, bottom = (width + min_dim) // 2, (height + min_dim) // 2
                         img = img.crop((left, top, right, bottom)).resize((320, 320), Image.LANCZOS)
                     else:
+                        # For videos/audio, just resize while maintaining aspect ratio
                         img.thumbnail((320, 320), Image.LANCZOS)
                     
                     img.save(ph_path, "JPEG", quality=95)
@@ -608,7 +692,7 @@ async def process_rename(client: Client, message: Message):
 
     except Exception as e:
         logger.error(f"Process Error: {e}")
-        await download_msg.delete()
+        await download_msg.edit(f"Error: {e}")
     finally:
         # Clean up files
         for file_path in [download_path, metadata_path, path, ph_path]:
@@ -618,7 +702,7 @@ async def process_rename(client: Client, message: Message):
                 except Exception as e:
                     logger.warning(f"Error removing file {file_path}: {e}")
         
-        # Clean up temporary files
+        # Clean up temporary files from subtitle conversion
         temp_files = [f"{download_path}.temp.mkv"]
         for temp_file in temp_files:
             if os.path.exists(temp_file):
@@ -626,102 +710,53 @@ async def process_rename(client: Client, message: Message):
                     os.remove(temp_file)
                 except:
                     pass
+        
+        # Remove from operations tracking
+        if file_id in renaming_operations:
+            del renaming_operations[file_id]
 
-# ===== FIXED SILENT QUEUE WORKER =====
-async def user_queue_worker(user_id, client):
-    """Worker that processes files in strict FIFO order"""
-    try:
-        while True:
-            # Get the next message from queue
-            message = await user_queues[user_id].get()
-            
-            try:
-                # Mark as processing
-                user_currently_processing[user_id] = True
-                
-                # Process the file
-                await process_rename(client, message)
-                
-            except Exception as e:
-                logger.error(f"Error processing file for user {user_id}: {e}")
-            finally:
-                # Mark as done
-                user_currently_processing[user_id] = False
-                user_queues[user_id].task_done()
-                
-                # Check if queue is empty and cleanup
-                await asyncio.sleep(1)  # Small delay
-                if user_id in user_queues and user_queues[user_id].empty():
-                    # Wait a bit more to see if new files arrive
-                    await asyncio.sleep(5)
-                    if user_id in user_queues and user_queues[user_id].empty():
-                        # Cleanup
-                        if user_id in user_queues:
-                            del user_queues[user_id]
-                        if user_id in user_workers:
-                            del user_workers[user_id]
-                        if user_id in user_currently_processing:
-                            del user_currently_processing[user_id]
-                        if user_id in user_lock:
-                            del user_lock[user_id]
-                        break
-                        
-    except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        logger.error(f"Worker error for user {user_id}: {e}")
-    finally:
-        # Cleanup on exit
-        for key in [user_queues, user_workers, user_currently_processing, user_lock]:
-            key.pop(user_id, None)
-            
-
+# ===== FIXED AUTO_RENAME_FILES HANDLER =====
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
     
-    # Check modes
-    if user_id in info_mode_users or user_id in user_sequences:
+    # Check if user is in info mode
+    if user_id in info_mode_users:
+        return
+    
+    # Check if user is in sequence mode
+    if user_id in user_sequences:
         return
     
     # Check verification
     if not await is_user_verified(user_id):
-        await send_verification(client, message)
+        # Simple cooldown check
+        last_check = user_last_message.get(user_id, 0)
+        if time.time() - last_check > 2:
+            user_last_message[user_id] = time.time()
+            await send_verification(client, message)
         return
     
-    # Initialize lock for user
-    if user_id not in user_processing_lock:
-        user_processing_lock[user_id] = asyncio.Lock()
-    
-    # Initialize queue if not exists
+    # Initialize user queue if not exists
     if user_id not in user_queues:
         user_queues[user_id] = asyncio.Queue()
+        user_file_counter[user_id] = 0
+        
+        # Start queue processor for this user
+        task = asyncio.create_task(process_user_queue(user_id, client))
+        user_queue_tasks[user_id] = task
     
-    # Start worker if not running
-    if user_id not in user_workers:
-        user_workers[user_id] = asyncio.create_task(
-            user_queue_worker(user_id, client)
-        )
+    # Get current position in queue
+    user_file_counter[user_id] += 1
+    position = user_file_counter[user_id]
     
-    # Track file order
-    if user_id not in user_file_order:
-        user_file_order[user_id] = []
-    
-    # Get file ID for tracking
-    if message.document:
-        file_id = message.document.file_id
-    elif message.video:
-        file_id = message.video.file_id
-    elif message.audio:
-        file_id = message.audio.file_id
-    else:
-        return
-    
-    user_file_order[user_id].append(file_id)
-    
-    # Put message in queue (FIFO - First In First Out)
+    # Add to queue
     await user_queues[user_id].put(message)
     
-    # Log queue status (silent - no user message)
-    queue_size = user_queues[user_id].qsize()
-    logger.info(f"User {user_id}: File added to queue. Queue size: {queue_size}")
+    # Log silently
+    logger.info(f"User {user_id}: File #{position} added to queue (Queue size: {user_queues[user_id].qsize()})")
+    
+    # If this is the first file and not processing, we're already processing
+    # The queue processor will handle it automatically
+    
+    return  # Silent return - no messages to user
