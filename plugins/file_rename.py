@@ -19,6 +19,7 @@ from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
 
+processing_messages = set()
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -429,6 +430,12 @@ async def process_rename(client: Client, message: Message):
     user_id = message.from_user.id
     if not await is_user_verified(user_id): 
         return
+
+    if message.id in processing_messages:
+        logger.warning(f"Duplicate processing blocked for message {message.id}")
+        return
+
+    processing_messages.add(message.id)
 
     user_mode = await codeflixbots.get_mode(user_id)
     format_template = await codeflixbots.get_format_template(user_id)
