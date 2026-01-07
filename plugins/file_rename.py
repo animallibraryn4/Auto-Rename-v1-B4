@@ -26,6 +26,9 @@ user_sequence_counter = defaultdict(int)
 user_next_expected = defaultdict(int)
 pending_buffers = defaultdict(dict)
 
+# ===== USER WORKERS (REQUIRED) =====
+user_workers = {}
+
 import heapq
 
 class PriorityQueue:
