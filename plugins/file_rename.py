@@ -756,7 +756,7 @@ async def process_rename(client: Client, message: Message):
         cleanup_user_state(user_id)
 
 # Then in the auto_rename_files handler:
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
     
