@@ -35,8 +35,13 @@ logger = logging.getLogger(__name__)
 # ===== Global + Per-User Queue System =====
 MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
+# Global dictionaries for state management
 user_queues = {}
-user_sequence_counter = {}  # Track sequence numbers per user
+user_sequence_counter = {} 
+# Store these outside worker to prevent reset on worker restart
+user_next_expected = {} 
+pending_buffers = {}
 
 # Global dictionary to prevent duplicate operations
 renaming_operations = {}
@@ -45,10 +50,13 @@ recent_verification_checks = {}
 # Cleanup function for user state
 def cleanup_user_state(user_id):
     """Clean up user state if queue is empty"""
-    if (user_id in user_queues and 
-        user_queues[user_id]["queue"].empty() and 
-        user_id in user_sequence_counter):
-        del user_sequence_counter[user_id]
+    if user_id in user_queues and user_queues[user_id]["queue"].empty():
+        if user_id in user_sequence_counter:
+            del user_sequence_counter[user_id]
+        if user_id in user_next_expected:
+            del user_next_expected[user_id]
+        if user_id in pending_buffers:
+            del pending_buffers[user_id]
 
 # ===== Enhanced Patterns for Caption Mode =====
 # These patterns handle verbose caption formats like "SEASON :- 10 Episode :- 01"
@@ -91,51 +99,50 @@ pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
 async def user_worker(user_id, client):
     """Worker to process files for a specific user strictly in sequence"""
-    user_data = user_queues.get(user_id)
-    if not user_data:
-        return
+    # Initialize user state if not exists
+    if user_id not in user_next_expected:
+        user_next_expected[user_id] = 1
+    if user_id not in pending_buffers:
+        pending_buffers[user_id] = {}
 
-    queue = user_data["queue"]
-    pending_buffer = {}  # Buffer for out-of-order files
-    next_expected = 1    # The sequence number we are waiting for
+    queue = user_queues[user_id]["queue"]
 
     while True:
         try:
-            # Wait for any new item in the queue
-            # Increased timeout to 10 minutes for large batches
+            # Queue se naya message uthayein
             data = await asyncio.wait_for(queue.get(), timeout=600)
             seq_num, message = data
             
-            # Add the newly arrived message to our buffer
-            pending_buffer[seq_num] = message
+            # Buffer mein dalein
+            pending_buffers[user_id][seq_num] = message
             
-            # Check if we have the next expected file (and any subsequent ones)
-            while next_expected in pending_buffer:
-                msg_to_process = pending_buffer.pop(next_expected)
+            # Jab tak buffer mein 'next expected' file maujood hai, process karte rahein
+            while user_next_expected[user_id] in pending_buffers[user_id]:
+                current_seq = user_next_expected[user_id]
+                msg_to_process = pending_buffers[user_id].pop(current_seq)
                 
                 try:
-                    # Process one by one using the semaphore
+                    # Global semaphore taaki system load na ho
                     async with global_semaphore:
                         await process_rename(client, msg_to_process)
                 except Exception as e:
-                    logger.error(f"Error processing file {next_expected} for {user_id}: {e}")
+                    logger.error(f"Error in process_rename for {user_id}: {e}")
                 finally:
+                    user_next_expected[user_id] += 1
                     queue.task_done()
-                    next_expected += 1
                 
         except asyncio.TimeoutError:
-            # Clean up if no files sent for 10 minutes
-            logger.info(f"User worker {user_id} timed out. Cleaning up.")
+            logger.info(f"Worker timeout for user {user_id}. Cleaning up.")
             break
         except Exception as e:
-            logger.error(f"Critical Worker Error for {user_id}: {e}")
+            logger.error(f"Worker error for {user_id}: {e}")
             break
 
-    # Cleanup state on exit
-    if user_id in user_queues:
-        del user_queues[user_id]
-    if user_id in user_sequence_counter:
-        del user_sequence_counter[user_id]
+    # Cleanup
+    user_queues.pop(user_id, None)
+    user_sequence_counter.pop(user_id, None)
+    user_next_expected.pop(user_id, None)
+    pending_buffers.pop(user_id, None)
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
