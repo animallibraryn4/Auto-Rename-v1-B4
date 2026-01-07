@@ -715,5 +715,5 @@ async def auto_rename_files(client, message):
     await queue_manager.add_to_queue(user_id, message)
     
     # Send acknowledgment message
-    await message.reply_text("✅ File added to queue. Processing will start soon...")
+    
     logger.info(f"File from user {user_id} added to queue. Active users: {queue_manager.get_active_users()}")
