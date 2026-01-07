@@ -736,13 +736,6 @@ async def auto_rename_files(client, message):
             await send_verification(client, message)
         return
 
-    # 2. Sequence Counter Management
-    if user_id not in user_sequence_counter:
-        user_sequence_counter[user_id] = 0
-    
-    user_sequence_counter[user_id] += 1
-    current_seq = user_sequence_counter[user_id]
-
     # 3. Queue Initialization
     if user_id not in user_queues:
         user_queues[user_id] = {
