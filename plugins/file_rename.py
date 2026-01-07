@@ -31,6 +31,7 @@ user_workers = {}  # user_id -> worker task
 user_file_order = {}  # user_id -> [file_ids in order]
 user_currently_processing = {}  # user_id -> bool
 user_lock = {}  # user_id -> asyncio.Lock
+user_processing_lock = {}  # user_id -> asyncio.Lock
 
 # Cleanup old queue system variables
 if 'renaming_operations' in globals():
@@ -673,36 +674,29 @@ async def user_queue_worker(user_id, client):
         # Cleanup on exit
         for key in [user_queues, user_workers, user_currently_processing, user_lock]:
             key.pop(user_id, None)
+            
 
-# ===== MAIN FILE HANDLER =====
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=-1)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
     
-    # ✅ Check if user is in info mode
-    if user_id in info_mode_users:
-        return
-    
-    # ✅ Check if user is in sequence mode
-    if user_id in user_sequences:
+    # Check modes
+    if user_id in info_mode_users or user_id in user_sequences:
         return
     
     # Check verification
     if not await is_user_verified(user_id):
-        curr = time.time()
-        if curr - recent_verification_checks.get(user_id, 0) > 2:
-            recent_verification_checks[user_id] = curr
-            await send_verification(client, message)
+        await send_verification(client, message)
         return
     
-    # Initialize user lock if not exists
-    if user_id not in user_lock:
-        user_lock[user_id] = asyncio.Lock()
+    # Initialize lock for user
+    if user_id not in user_processing_lock:
+        user_processing_lock[user_id] = asyncio.Lock()
     
-    async with user_lock[user_id]:
-        # Initialize queue if not exists
-        if user_id not in user_queues:
-            user_queues[user_id] = asyncio.Queue()
+    # Use lock to ensure sequential processing
+    async with user_processing_lock[user_id]:
+        await process_rename(client, message)
+
         
         # Start worker if not running
         if user_id not in user_workers:
