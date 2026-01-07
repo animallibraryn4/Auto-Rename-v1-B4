@@ -34,6 +34,7 @@ class UserQueueManager:
         self.max_concurrent_per_user = 1  # Process 1 file at a time per user
         self.user_semaphores = {}  # user_id -> semaphore
         self.client = None  # Will be set when bot starts
+        self.processing_messages = {}  # user_id -> set of message IDs being processed
         
     def set_client(self, client):
         """Set the client instance for processing"""
@@ -41,6 +42,18 @@ class UserQueueManager:
         
     async def add_to_queue(self, user_id, message):
         """Add a message to user's queue and ensure worker is running"""
+        # Initialize message tracking for user
+        if user_id not in self.processing_messages:
+            self.processing_messages[user_id] = set()
+        
+        # Check if message is already being processed
+        if message.id in self.processing_messages[user_id]:
+            logger.warning(f"Message {message.id} for user {user_id} is already in queue, skipping")
+            return
+            
+        # Mark message as being processed
+        self.processing_messages[user_id].add(message.id)
+        
         # Create queue for user if not exists
         if user_id not in self.user_queues:
             self.user_queues[user_id] = asyncio.Queue()
@@ -89,6 +102,10 @@ class UserQueueManager:
                         # Use the actual processing function with client
                         await process_rename(client, message_to_process)
                     
+                    # Remove message from tracking after processing
+                    if user_id in self.processing_messages and message_to_process.id in self.processing_messages[user_id]:
+                        self.processing_messages[user_id].remove(message_to_process.id)
+                    
                     queue.task_done()
                     next_expected_sequence += 1
                     
@@ -104,6 +121,10 @@ class UserQueueManager:
                     queue.task_done()
                 except:
                     pass
+                
+                # Remove message from tracking on error
+                if user_id in self.processing_messages and message.id in self.processing_messages[user_id]:
+                    self.processing_messages[user_id].remove(message.id)
                     
                 # Don't break on individual errors, continue processing
                 continue
@@ -126,6 +147,8 @@ class UserQueueManager:
                 del self.user_semaphores[user_id]
                 if user_id in self.user_sequence_counters:
                     del self.user_sequence_counters[user_id]
+                if user_id in self.processing_messages:
+                    del self.processing_messages[user_id]
                     
                 logger.info(f"Cleaned up user {user_id}")
             except Exception as e:
@@ -688,7 +711,7 @@ async def process_rename(client: Client, message: Message):
                 except:
                     pass
 
-# ===== IMPROVED MESSAGE HANDLER =====
+# ===== IMPROVED MESSAGE HANDLER WITH DUPLICATE PREVENTION =====
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio), group=0)
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
@@ -706,6 +729,26 @@ async def auto_rename_files(client, message):
     if not await is_user_verified(user_id):
         await send_verification(client, message)
         return
+    
+    # ✅ IMPORTANT: Check if message is already being processed
+    # Track processed message IDs to prevent duplicates
+    if not hasattr(auto_rename_files, "processed_messages"):
+        auto_rename_files.processed_messages = set()
+    
+    message_id = f"{user_id}_{message.id}"
+    if message_id in auto_rename_files.processed_messages:
+        logger.info(f"Message {message.id} from user {user_id} already being processed, skipping")
+        return
+    
+    # Mark message as being processed
+    auto_rename_files.processed_messages.add(message_id)
+    
+    # ✅ Clean up old processed messages to prevent memory leak
+    # Keep only last 1000 processed messages
+    if len(auto_rename_files.processed_messages) > 1000:
+        # Convert to list, remove oldest
+        msg_list = list(auto_rename_files.processed_messages)
+        auto_rename_files.processed_messages = set(msg_list[-500:])
     
     # ✅ Ensure queue manager has client
     queue_manager.set_client(client)
