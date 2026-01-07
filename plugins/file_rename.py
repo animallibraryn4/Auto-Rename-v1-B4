@@ -33,7 +33,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===== Global + Per-User Queue System =====
-MAX_CONCURRENT_TASKS = 3  # Process only one file at a time per user
+MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
 # Global dictionaries for state management
@@ -98,21 +98,31 @@ async def user_worker(user_id, client):
 
     try:
         while True:
-            message = await asyncio.wait_for(queue.get(), timeout=600)
+            seq, message = await asyncio.wait_for(queue.get(), timeout=600)
 
-            async with global_semaphore:
-                try:
-                    await process_rename(client, message)
-                except Exception as e:
-                    logger.error(f"Rename error for user {user_id}: {e}")
-                finally:
-                    queue.task_done()
+            # Store message in buffer
+            pending_buffers[user_id][seq] = message
+
+            # Process ONLY when expected sequence is available
+            while user_next_expected[user_id] + 1 in pending_buffers[user_id]:
+                user_next_expected[user_id] += 1
+                msg = pending_buffers[user_id].pop(user_next_expected[user_id])
+
+                async with global_semaphore:
+                    try:
+                        await process_rename(client, msg)
+                    except Exception as e:
+                        logger.error(f"Rename error for user {user_id}: {e}")
+
+            queue.task_done()
 
     except asyncio.TimeoutError:
-        logger.info(f"Worker timeout for user {user_id}")
-
+        pass
     finally:
         user_queues.pop(user_id, None)
+        user_sequence_counter.pop(user_id, None)
+        user_next_expected.pop(user_id, None)
+        pending_buffers.pop(user_id, None)
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -743,4 +753,4 @@ async def auto_rename_files(client, message):
             "task": asyncio.create_task(user_worker(user_id, client))
         }
 
-    await user_queues[user_id]["queue"].put(message)
+    await user_queues[user_id]["queue"]
