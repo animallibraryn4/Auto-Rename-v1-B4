@@ -46,8 +46,9 @@ logger = logging.getLogger(__name__)
 MAX_CONCURRENT_TASKS = 1  # Process only one file at a time per user
 global_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
-# Global dictionaries for state management
-user_queues = {}
+from collections import defaultdict
+
+user_queues = defaultdict(asyncio.Queue)
 
 # Global dictionary to prevent duplicate operations
 renaming_operations = {}
