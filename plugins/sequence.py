@@ -561,6 +561,11 @@ async def store_file(client, message):
     """Store files for sequencing"""
     user_id = message.from_user.id
     
+    # First check if user is in info mode
+    from plugins.auto_rename import info_mode_users
+    if user_id in info_mode_users:
+        return  # Let info mode handle it
+    
     # Check if we are currently in a sequence session
     if user_id in user_sequences:
         file_obj = message.document or message.video or message.audio
@@ -616,6 +621,11 @@ async def store_file(client, message):
             if update_tasks[user_id]:
                 update_tasks[user_id].cancel()
         update_tasks[user_id] = asyncio.create_task(update_notification(client, user_id, message.chat.id))
+    else:
+        # If not in sequence mode, let auto_rename handle it
+        # We need to call auto_rename_files manually
+        from plugins.file_rename import auto_rename_files
+        await auto_rename_files(client, message)
 
 async def update_notification(client, user_id, chat_id):
     """Update notification message with file count"""
