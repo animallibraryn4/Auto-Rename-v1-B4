@@ -90,35 +90,17 @@ pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)]>}]?', re.IGNORECASE)
 pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 
 async def user_worker(user_id, client):
-    queue = user_queues[user_id]["queue"]
+    queue = user_queues[user_id]
 
-    try:
-        while True:
-            seq, message = await asyncio.wait_for(queue.get(), timeout=600)
+    while True:
+        seq, message = await queue.get()
 
-            # Store message in buffer
-            pending_buffers[user_id][seq] = message
-
-            # Process ONLY when expected sequence is available
-            while user_next_expected[user_id] + 1 in pending_buffers[user_id]:
-                user_next_expected[user_id] += 1
-                msg = pending_buffers[user_id].pop(user_next_expected[user_id])
-
-                async with global_semaphore:
-                    try:
-                        await process_rename(client, msg)
-                    except Exception as e:
-                        logger.error(f"Rename error for user {user_id}: {e}")
-
+        try:
+            await process_rename(client, message)
+        except Exception as e:
+            logger.error(f"Rename error for {user_id}: {e}")
+        finally:
             queue.task_done()
-
-    except asyncio.TimeoutError:
-        pass
-    finally:
-        user_queues.pop(user_id, None)
-        user_sequence_counter.pop(user_id, None)
-        user_next_expected.pop(user_id, None)
-        pending_buffers.pop(user_id, None)
 
 def standardize_quality_name(quality):
     """Restored and Improved: Standardize quality names for consistent storage"""
@@ -743,13 +725,12 @@ async def auto_rename_files(client, message):
         return
 
     # 3. Queue Initialization
-    if user_id not in user_queues:
-        user_queues[user_id] = {
-            "queue": asyncio.Queue(),
-            "task": asyncio.create_task(user_worker(user_id, client))
-        }
+    if user_id not in user_workers:
+        user_workers[user_id] = asyncio.create_task(
+            user_worker(user_id, client)
+        )
 
     user_sequence_counter[user_id] += 1
     seq = user_sequence_counter[user_id]
 
-    await user_queues[user_id]["queue"].put((seq, message))
+    await user_queues[user_id].put((seq, message))
