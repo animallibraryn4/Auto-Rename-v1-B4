@@ -19,6 +19,13 @@ from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
 # Add priority queue support
+from collections import defaultdict
+
+# ===== SEQUENTIAL QUEUE STATE (REQUIRED) =====
+user_sequence_counter = defaultdict(int)
+user_next_expected = defaultdict(int)
+pending_buffers = defaultdict(dict)
+
 import heapq
 
 class PriorityQueue:
