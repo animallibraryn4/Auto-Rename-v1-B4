@@ -29,15 +29,6 @@ pending_buffers = defaultdict(dict)
 # ===== USER WORKERS (REQUIRED) =====
 user_workers = {}
 
-import heapq
-
-class PriorityQueue:
-    def __init__(self):
-        self.queue = []
-        
-    async def add_task(self, priority, task):
-        heapq.heappush(self.queue, (priority, task))
-
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
