@@ -1,8 +1,4 @@
-"""
-Integration module to coordinate between auto-rename and sequence features
-"""
-
-from helper.database import codeflixbots
+from helper.database import N4BOTS
 from plugins.sequence import user_sequences, user_mode, user_seq_mode
 
 async def get_user_operation_mode(user_id):
