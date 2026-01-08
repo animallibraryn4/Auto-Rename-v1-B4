@@ -415,17 +415,17 @@ class Database:
         except Exception as e:
             logging.error(f"Error checking ban status for user {user_id}: {e}")
             return False
-
+ 
     async def get_banned_users(self):
-        """Get all banned users"""
-        try:
-            banned_users = await self.col.find(
-                {"ban_status.is_banned": True}
-             ).to_list(length=None)
-             return banned_users
-         except Exception as e:
-             logging.error(f"Error getting banned users: {e}")
-             return []
+    """Get all banned users"""
+    try:
+        banned_users = await self.col.find(
+            {"ban_status.is_banned": True}
+        ).to_list(length=None)
+        return banned_users  # This line was previously misaligned
+    except Exception as e:
+        logging.error(f"Error getting banned users: {e}")
+        return []
 
     async def get_ban_info(self, user_id):
         """Get ban information for a user"""
