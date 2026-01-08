@@ -1,7 +1,8 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import StopPropagation
 from helper.database import codeflixbots
-from config import Config
+from config import Config, Txt
 import datetime
 
 # =====================================================
@@ -253,25 +254,7 @@ async def banlist_command(client: Client, message: Message):
         await message.reply_text(f"❌ Error fetching ban list: {str(e)}")
 
 # =====================================================
-# BAN CHECK FOR ALL MESSAGES
-# =====================================================
-
-@Client.on_message(filters.private)
-async def check_ban_on_message(client: Client, message: Message):
-    """Check ban status for every message"""
-    # Skip if message is from admin
-    if message.from_user.id in Config.ADMIN:
-        return
-    
-    # Check if user is banned
-    is_banned = await check_ban_middleware(client, message)
-    
-    if is_banned:
-        # Stop further processing for banned users
-        raise StopPropagation
-
-# =====================================================
-# EXCEPTION FOR START COMMAND (FOR BANNED USERS)
+# BAN CHECK FOR START COMMAND
 # =====================================================
 
 @Client.on_message(filters.private & filters.command("start"))
@@ -296,6 +279,34 @@ async def start_with_ban_check(client: Client, message: Message):
         return
     
     # If not banned, proceed with normal start
-    # Call the existing start handler
-    from plugins.start_cb import start
-    await start(client, message)
+    # Forward to the existing start handler
+    await message.reply_text(
+        Txt.START_TXT.format(message.from_user.mention),
+        disable_web_page_preview=True,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')],
+            [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Animelibraryn4')],
+            [
+                InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
+                InlineKeyboardButton('sᴏᴜʀᴄᴇ', callback_data='source')
+            ]
+        ])
+    )
+
+# =====================================================
+# BAN CHECK FOR ALL MESSAGES (EXCEPT START)
+# =====================================================
+
+@Client.on_message(filters.private & ~filters.command("start"))
+async def check_ban_on_message(client: Client, message: Message):
+    """Check ban status for every message except start"""
+    # Skip if message is from admin
+    if message.from_user.id in Config.ADMIN:
+        return
+    
+    # Check if user is banned
+    is_banned = await check_ban_middleware(client, message)
+    
+    if is_banned:
+        # Stop further processing for banned users
+        raise StopPropagation
