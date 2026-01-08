@@ -28,8 +28,8 @@ async def quality_menu(client, message):
 @Client.on_callback_query(filters.regex(r'^quality_global$'))
 async def global_thumb_menu(client, callback):
     user_id = callback.from_user.id
-    has_thumb = await N4BOTS.get_global_thumb(user_id)
-    is_enabled = await N4BOTS.is_global_thumb_enabled(user_id)
+    has_thumb = await n4bots.get_global_thumb(user_id)
+    is_enabled = await n4bots.is_global_thumb_enabled(user_id)
     
     buttons = [
         [InlineKeyboardButton("👀 View Global Thumb", "view_global")],
