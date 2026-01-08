@@ -562,7 +562,7 @@ async def start_sequence(client, message):
         f"<blockquote>📝 <b>Current Mode:</b> {mode_text}\n"
         f"🔄 <b>Sequence Order:</b> {seq_text}\n\n"
         f"Send your files now. I'll sequence them in the configured order.</blockquote>",
-        parse_mode= "HTML"
+        parse_mode= "html"
     )
 
 async def store_file(client, message):
