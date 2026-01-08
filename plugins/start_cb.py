@@ -11,8 +11,7 @@ from config import Config
 
 
 # Start Command Handler
-@Client.on_message(filters.private & filters.command("start"))
-async def start(client, message: Message):
+
     # Check if user is banned first
     user_id = message.from_user.id
     is_banned = await codeflixbots.is_user_banned(user_id)
