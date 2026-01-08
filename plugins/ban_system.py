@@ -297,5 +297,5 @@ async def start_with_ban_check(client: Client, message: Message):
     
     # If not banned, proceed with normal start
     # Call the existing start handler
-    from plugins.start_&_cb import start
+    from plugins.start_cb import start
     await start(client, message)
