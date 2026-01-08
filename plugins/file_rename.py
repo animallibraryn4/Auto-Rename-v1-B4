@@ -13,7 +13,7 @@ from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 from plugins.antinsfw import check_anti_nsfw
 from helper.utils import progress_for_pyrogram, humanbytes, convert
-from helper.database import N4BOTS
+from helper.database import n4bots
 from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
@@ -452,9 +452,9 @@ async def process_rename(client: Client, message: Message):
     if not await is_user_verified(user_id): 
         return
 
-    user_mode = await N4BOTS.get_mode(user_id)
-    format_template = await N4BOTS.get_format_template(user_id)
-    media_preference = await N4BOTS.get_media_preference(user_id)
+    user_mode = await n4bots.get_mode(user_id)
+    format_template = await n4bots.get_format_template(user_id)
+    media_preference = await n4bots.get_media_preference(user_id)
     
     if not format_template:
         return await message.reply_text("Please Set An Auto Rename Format First Using /autorename")
@@ -559,12 +559,12 @@ async def process_rename(client: Client, message: Message):
                 await download_msg.edit(f"**MKV Conversion Error:** {e}")
                 return
 
-        file_title = await N4BOTS.get_title(user_id)
-        artist = await N4BOTS.get_artist(user_id)
-        author = await N4BOTS.get_author(user_id)
-        video_title = await N4BOTS.get_video(user_id)
-        audio_title = await N4BOTS.get_audio(user_id)
-        subtitle_title = await N4BOTS.get_subtitle(user_id)
+        file_title = await n4bots.get_title(user_id)
+        artist = await n4bots.get_artist(user_id)
+        author = await n4bots.get_author(user_id)
+        video_title = await n4bots.get_video(user_id)
+        audio_title = await n4bots.get_audio(user_id)
+        subtitle_title = await n4bots.get_subtitle(user_id)
 
         metadata_command = [
             'ffmpeg',
@@ -598,18 +598,18 @@ async def process_rename(client: Client, message: Message):
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
-        c_caption = await N4BOTS.get_caption(message.chat.id)
+        c_caption = await n4bots.get_caption(message.chat.id)
         c_thumb = None
-        is_global_enabled = await N4BOTS.is_global_thumb_enabled(user_id)
+        is_global_enabled = await n4bots.is_global_thumb_enabled(user_id)
 
         if is_global_enabled:
-            c_thumb = await N4BOTS.get_global_thumb(user_id)
+            c_thumb = await n4bots.get_global_thumb(user_id)
         else:
             if standard_quality:
-                c_thumb = await N4BOTS.get_quality_thumbnail(user_id, standard_quality)
+                c_thumb = await n4bots.get_quality_thumbnail(user_id, standard_quality)
             
             if not c_thumb:
-                c_thumb = await N4BOTS.get_thumbnail(user_id)
+                c_thumb = await n4bots.get_thumbnail(user_id)
 
         if not c_thumb and media_type == "video" and message.video.thumbs:
             c_thumb = message.video.thumbs[0].file_id
