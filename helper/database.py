@@ -370,6 +370,73 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting sequence mode for user {user_id}: {e}")
             return "per_ep"
+
+    # Ban methods
+    async def ban_user(self, user_id, ban_reason="No reason provided"):
+        """Ban a user"""
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {
+                    "ban_status.is_banned": True,
+                    "ban_status.banned_on": datetime.date.today().isoformat(),
+                    "ban_status.ban_reason": ban_reason
+                }},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error banning user {user_id}: {e}")
+            return False
+
+    async def unban_user(self, user_id):
+        """Unban a user"""
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {
+                    "ban_status.is_banned": False,
+                    "ban_status.ban_reason": '',
+                    "ban_status.banned_on": datetime.date.max.isoformat()
+                }}
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error unbanning user {user_id}: {e}")
+            return False
+
+    async def is_user_banned(self, user_id):
+        """Check if user is banned"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+        if user and "ban_status" in user:
+            return user["ban_status"].get("is_banned", False)
+        return False
+    except Exception as e:
+        logging.error(f"Error checking ban status for user {user_id}: {e}")
+        return False
+
+async def get_banned_users(self):
+    """Get all banned users"""
+    try:
+        banned_users = await self.col.find(
+            {"ban_status.is_banned": True}
+        ).to_list(length=None)
+        return banned_users
+    except Exception as e:
+        logging.error(f"Error getting banned users: {e}")
+        return []
+
+async def get_ban_info(self, user_id):
+    """Get ban information for a user"""
+    try:
+        user = await self.col.find_one({"_id": int(user_id)})
+        if user and "ban_status" in user:
+            return user["ban_status"]
+        return None
+    except Exception as e:
+        logging.error(f"Error getting ban info for user {user_id}: {e}")
+        return None
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
