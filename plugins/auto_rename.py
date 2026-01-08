@@ -7,7 +7,7 @@ from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
-from helper.database import N4BOTS
+from helper.database import n4bots
 
 # Dictionary to track users in /info mode
 info_mode_users = {}
@@ -15,7 +15,7 @@ info_mode_users = {}
 @Client.on_message(filters.private & filters.command("autorename"))
 async def auto_rename_command(client, message):
     user_id = message.from_user.id
-    current_mode = await N4BOTS.get_mode(user_id)
+    current_mode = await n4bots.get_mode(user_id)
     
     command_parts = message.text.split(maxsplit=1)
     if len(command_parts) < 2 or not command_parts[1].strip():
@@ -39,7 +39,7 @@ async def auto_rename_command(client, message):
         return
 
     format_template = command_parts[1].strip()
-    await N4BOTS.set_format_template(user_id, format_template)
+    await n4bots.set_format_template(user_id, format_template)
 
     await message.reply_text(
         f"**🌟 Fantastic! You're ready to auto-rename your files.**\n\n"
@@ -61,7 +61,7 @@ async def set_media_command(client, message):
 async def handle_media_selection(client, callback_query):
     user_id = callback_query.from_user.id
     media_type = callback_query.data.split("_", 1)[1]
-    await N4BOTS.set_media_preference(user_id, media_type)
+    await n4bots.set_media_preference(user_id, media_type)
     await callback_query.answer(f"Media preference set to: {media_type.title()}")
     await callback_query.message.edit_text(f"✅ **Media preference set to:** `{media_type.title()}`")
 
