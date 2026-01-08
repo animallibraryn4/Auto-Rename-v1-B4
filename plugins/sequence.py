@@ -562,8 +562,7 @@ async def start_sequence(client, message):
         f"<b>📂 File Sequence Mode Started!</b>\n\n"
         f"<blockquote>📝 <b>Current Mode:</b> {mode_text}\n"
         f"🔄 <b>Sequence Order:</b> {seq_text}\n\n"
-        f"Send your files now. I'll sequence them in the configured order.</blockquote>",
-        parse_mode=ParseMode.MARKDOWN
+        f"Send your files now. I'll sequence them in the configured order.</blockquote>"   
     )
 
 async def store_file(client, message):
