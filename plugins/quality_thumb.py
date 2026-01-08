@@ -48,7 +48,7 @@ async def global_thumb_menu(client, callback):
 @Client.on_callback_query(filters.regex(r'^toggle_global_mode$'))
 async def toggle_global_mode(client, callback):
     user_id = callback.from_user.id
-    new_status = not await N4BOTS.is_global_thumb_enabled(user_id)
+    new_status = not await n4bots.is_global_thumb_enabled(user_id)
     await n4bots.toggle_global_thumb(user_id, new_status)
     await global_thumb_menu(client, callback)
     await callback.answer(f"Global Mode {'Enabled' if new_status else 'Disabled'}")
@@ -265,7 +265,7 @@ async def view_thumbnail(client, callback):
     
     if quality == "global":
         thumb = await n4bots.get_global_thumb(user_id)
-    elif await N4BOTS.is_global_thumb_enabled(user_id):
+    elif await n4bots.is_global_thumb_enabled(user_id):
         thumb = await n4bots.get_global_thumb(user_id)
     else:
         thumb = await n4bots.get_quality_thumbnail(user_id, quality)
@@ -274,7 +274,7 @@ async def view_thumbnail(client, callback):
         await client.send_photo(
             callback.message.chat.id,
             photo=thumb,
-            caption=f"📸 {quality.upper()} Thumbnail{' (Global)' if await N4BOTS.is_global_thumb_enabled(user_id) else ''}"
+            caption=f"📸 {quality.upper()} Thumbnail{' (Global)' if await n4bots.is_global_thumb_enabled(user_id) else ''}"
         )
     else:
         await callback.answer("No thumbnail set!", show_alert=True)
