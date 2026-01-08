@@ -1,13 +1,13 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
-from helper.database import N4BOTS
+from helper.database import n4bots
 from config import Txt
 
 @Client.on_message(filters.private & filters.command("mode"))
 async def mode_command(client, message: Message):
     """Handle /mode command to switch between File Mode and Caption Mode"""
     user_id = message.from_user.id
-    current_mode = await N4BOTS.get_mode(user_id)
+    current_mode = await n4bots.get_mode(user_id)
     
     text = f"""
 📊 **Current Mode:** `{current_mode.replace('_', ' ').title()}`
@@ -57,7 +57,7 @@ async def set_mode_callback(client, query: CallbackQuery):
     
     if mode in ["file", "caption"]:
         mode_value = f"{mode}_mode"
-        await N4BOTS.set_mode(user_id, mode_value)
+        await n4bots.set_mode(user_id, mode_value)
         
         # Update the message with new mode
         text = f"""
@@ -102,5 +102,5 @@ async def get_user_mode(user_id):
         return f"sequence_{mode_type}"
     
     # Otherwise get from database
-    db_mode = await N4BOTS.get_mode(user_id)
+    db_mode = await n4bots.get_mode(user_id)
     return db_mode if db_mode else "file_mode"
