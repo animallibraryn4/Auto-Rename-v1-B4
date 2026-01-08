@@ -13,8 +13,8 @@ class Database:
         except Exception as e:
             logging.error(f"Failed to connect to MongoDB: {e}")
             raise e
-        self.N4BOTS = self._client[database_name]
-        self.col = self.N4BOTS.user
+        self.n4bots = self._client[database_name]
+        self.col = self.n4bots.user
 
     def new_user(self, id):
         return dict(
@@ -372,6 +372,6 @@ class Database:
             return "per_ep"
         
 # Initialize database connection
-N4BOTS = Database(Config.DB_URL, Config.DB_NAME)
+n4bots = Database(Config.DB_URL, Config.DB_NAME)
 
 
