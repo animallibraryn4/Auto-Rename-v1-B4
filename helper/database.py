@@ -152,6 +152,26 @@ class Database:
     async def set_metadata(self, user_id, metadata):
         await self.col.update_one({'_id': int(user_id)}, {'$set': {'metadata': metadata}})
 
+    async def set_editing_mode(self, id, mode, value=None):
+        """Set user editing mode for metadata"""
+        try:
+            if mode:
+                update_data = {"editing_metadata": True}
+                if value:
+                    update_data["pending_metadata"] = value
+                await self.col.update_one(
+                    {"_id": int(id)},
+                    {"$set": update_data},
+                    upsert=True
+                )
+            else:
+                await self.col.update_one(
+                    {"_id": int(id)},
+                    {"$unset": {"editing_metadata": "", "pending_metadata": ""}}
+                )
+        except Exception as e:
+            logging.error(f"Error setting edit mode for user {id}: {e}")
+
     async def get_title(self, user_id):
         user = await self.col.find_one({'_id': int(user_id)})
         return user.get('title', 'Encoded by @Animelibraryn4')
