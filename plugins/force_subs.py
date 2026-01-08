@@ -70,7 +70,7 @@ async def check_subscription(client, callback_query: CallbackQuery):
             await callback_query.message.edit_caption(
                 caption=new_text,
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("• ɴᴏᴡ ᴄʟɪᴄᴋ ʜᴇʀᴇ •", callback_data='help')]
+                    [InlineKeyboardButton("ɴᴏᴡ ᴄʟɪᴄᴋ ʜᴇʀᴇ", callback_data='help')]
                 ])
             )
     else:
