@@ -7,7 +7,7 @@ from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
-from helper.database import codeflixbots
+from helper.database import N4BOTS
 
 # Dictionary to track users in /info mode
 info_mode_users = {}
