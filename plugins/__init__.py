@@ -10,7 +10,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from cloudscraper import create_scraper
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config, Txt
-from helper.database import N4BOTS  
+from helper.database import n4bots  
 
 # =====================================================
 # MEMORY (SIMPLE & STABLE)
@@ -271,7 +271,7 @@ async def validate_token(client, message, data):
             last_verify_message.pop(user_id, None)
 
             # Save verification status in main database
-            await codeflixbots.set_verify_status(user_id, int(time()))
+            await n4bots.set_verify_status(user_id, int(time()))
             
             # Delete all previous verification messages
             await delete_verification_messages(client, user_id)
