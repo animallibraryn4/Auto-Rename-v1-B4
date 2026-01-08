@@ -7,7 +7,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import UserNotParticipant, FloodWait, ChatAdminRequired, ChannelPrivate
 from config import Config, Txt
-from helper.database import N4BOTS
+from helper.database import n4bots
 import pyrogram
 print(pyrogram.__version__)  # Version check karo
 
@@ -222,7 +222,7 @@ async def fileseq_callback(client, query):
     user_id = query.from_user.id
     selection = query.data.replace("fileseq_", "")
 
-    await N4BOTS.set_sequence_mode(user_id, selection)
+    await n4bots.set_sequence_mode(user_id, selection)
     user_seq_mode[user_id] = selection
 
     flow_name = "Episode Flow" if selection == "per_ep" else "Quality Flow"
@@ -274,7 +274,7 @@ async def mode_callback_handler(client, query):
     elif data == "mode_caption":
         user_mode[user_id] = "caption"
         # Save to database
-        await N4BOTS.set_mode(user_id, "caption_mode")
+        await n4bots.set_mode(user_id, "caption_mode")
         
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("File Mode", callback_data="mode_file")],
@@ -545,11 +545,11 @@ async def start_sequence(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await N4BOTS.get_mode(user_id)
+        db_mode = await n4bots.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     if user_id not in user_seq_mode:
-        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
+        db_seq_mode = await n4bots.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get current mode
@@ -608,8 +608,8 @@ async def store_file(client, message):
         # Get current count
         current_count = len(user_sequences[user_id])
 
-        # Send "Processing" notification if 20+ files are added
-        if user_id not in user_notification_msg and user_id not in processing_users and current_count >= 20:
+        # Send "Processing" notification if 10+ files are added
+        if user_id not in user_notification_msg and user_id not in processing_users and current_count >= 10:
             processing_users.add(user_id)  # Lock the user
             try:
                 msg = await client.send_message(
@@ -733,7 +733,7 @@ async def switch_mode_cmd(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await N4BOTS.get_mode(user_id)
+        db_mode = await n4bots.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     current_mode = user_mode.get(user_id, "file")
@@ -773,7 +773,7 @@ async def fileseq_command(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_seq_mode:
-        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
+        db_seq_mode = await n4bots.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get current mode for display
@@ -818,11 +818,11 @@ async def ls_command(client, message):
     
     # Get user's current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await N4BOTS.get_mode(user_id)
+        db_mode = await n4bots.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     if user_id not in user_seq_mode:
-        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
+        db_seq_mode = await n4bots.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get user's current mode
