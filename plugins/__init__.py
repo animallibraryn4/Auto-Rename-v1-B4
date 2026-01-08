@@ -10,7 +10,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from cloudscraper import create_scraper
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config, Txt
-from helper.database import codeflixbots  # Import main database
+from helper.database import N4BOTS  # Import main database
 
 # =====================================================
 # MEMORY (SIMPLE & STABLE)
