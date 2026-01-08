@@ -13,7 +13,7 @@ from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 from plugins.antinsfw import check_anti_nsfw
 from helper.utils import progress_for_pyrogram, humanbytes, convert
-from helper.database import N4BOTS
+from helper.database import n4bots
 from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
