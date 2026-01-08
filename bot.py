@@ -23,7 +23,7 @@ class Bot(Client):
 
     def __init__(self):
         super().__init__(
-            name="codeflixbots",
+            name="N4_BOTS",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
             bot_token=Config.BOT_TOKEN,
@@ -59,7 +59,7 @@ class Bot(Client):
                     photo=Config.START_PIC,
                     caption=(
                         f"**{me.first_name} Is Restarted Again!**\n\n"
-                        f"System Uptime`{uptime_string}`."
+                        f"System Uptime` {uptime_string}`."
                     ),
                     reply_markup=InlineKeyboardMarkup(
                         [[
