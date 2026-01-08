@@ -206,21 +206,3 @@ Pʀɪᴄɪɴɢ:
     
     QR_TXT = "👋 Hey {},\n\nPay the amount according to your membership price!\n\n📸 <b>QR Code:</b> <a href='https://t.me/Animelibraryn4'>Click here to scan</a>\n\n‼️ You must send a screenshot after payment."
 
-# Add to config.py in Txt class
-WATERMARK_TXT = """<b><pre>»Watermark Feature</pre></b>
-
-Add your custom watermark to all renamed files automatically.
-
-<b>Commands:</b>
-➲ /setname [text] - Set watermark text
-➲ /delname - Remove watermark
-➲ /viewname - View current watermark
-➲ /watermark - Show watermark help
-
-<b>Example:</b>
-<code>/setname @Animelibraryn4</code>
-
-📁 File without watermark: Naruto S01E01.mkv
-📁 File with watermark: Naruto S01E01 @Animelibraryn4.mkv
-"""
-
