@@ -31,7 +31,7 @@ async def restart_bot(b, m):
 @Client.on_message(filters.private & filters.command("tutorial"))
 async def tutorial(bot: Client, message: Message):
     user_id = message.from_user.id
-    format_template = await codeflixbots.get_format_template(user_id)
+    format_template = await N4BOTS.get_format_template(user_id)
     await message.reply_text(
         text=Txt.FILE_NAME_TXT.format(format_template=format_template),
         disable_web_page_preview=True,
@@ -44,7 +44,7 @@ async def tutorial(bot: Client, message: Message):
 
 @Client.on_message(filters.command(["stats", "status"]) & filters.user(Config.ADMIN))
 async def get_stats(bot, message):
-    total_users = await codeflixbots.total_users_count()
+    total_users = await N4BOTS.total_users_count()
     # Simple uptime - calculate from when bot started
     if hasattr(bot, 'start_time'):
         uptime = time.strftime("%Hh%Mm%Ss", time.gmtime(time.time() - bot.start_time))
@@ -73,8 +73,8 @@ async def broadcast_handler(bot: Client, m: Message):
     broadcast_msg = m.reply_to_message
     
     # Get all users
-    all_users = await codeflixbots.get_all_users()
-    total_users = await codeflixbots.total_users_count()
+    all_users = await N4BOTS.get_all_users()
+    total_users = await N4BOTS.total_users_count()
     
     # Start message
     sts_msg = await m.reply_text(f"📢 **Starting Broadcast...**\nTotal Users: {total_users}\nStatus: Preparing...")
@@ -112,7 +112,7 @@ async def broadcast_handler(bot: Client, m: Message):
             except (InputUserDeactivated, UserIsBlocked):
                 # User blocked or deleted account
                 deleted += 1
-                await codeflixbots.delete_user(user_id)
+                await N4BOTS.delete_user(user_id)
                 
             except PeerIdInvalid:
                 # Invalid user ID
