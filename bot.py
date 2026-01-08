@@ -12,8 +12,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
 import plugins.sequence
-from plugins.ban_system import check_ban_on_message
-from plugins.start_cb import start
+from plugins.ban_system import check_ban_on_message, start_with_ban_check
 
 pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
