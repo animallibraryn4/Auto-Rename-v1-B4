@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
-from helper.database import codeflixbots
+from helper.database import N4BOTS
 from config import Txt
 
 @Client.on_message(filters.private & filters.command("mode"))
