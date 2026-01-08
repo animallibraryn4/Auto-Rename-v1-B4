@@ -409,36 +409,34 @@ class Database:
         """Check if user is banned"""
         try:
             user = await self.col.find_one({"_id": int(user_id)})
-        if user and "ban_status" in user:
-            return user["ban_status"].get("is_banned", False)
-        return False
-    except Exception as e:
-        logging.error(f"Error checking ban status for user {user_id}: {e}")
-        return False
+            if user and "ban_status" in user:
+                return user["ban_status"].get("is_banned", False)
+            return False
+        except Exception as e:
+            logging.error(f"Error checking ban status for user {user_id}: {e}")
+            return False
 
-async def get_banned_users(self):
-    """Get all banned users"""
-    try:
-        banned_users = await self.col.find(
-            {"ban_status.is_banned": True}
-        ).to_list(length=None)
-        return banned_users
-    except Exception as e:
-        logging.error(f"Error getting banned users: {e}")
-        return []
+    async def get_banned_users(self):
+        """Get all banned users"""
+        try:
+            banned_users = await self.col.find(
+                {"ban_status.is_banned": True}
+             ).to_list(length=None)
+             return banned_users
+         except Exception as e:
+             logging.error(f"Error getting banned users: {e}")
+             return []
 
-async def get_ban_info(self, user_id):
-    """Get ban information for a user"""
-    try:
-        user = await self.col.find_one({"_id": int(user_id)})
-        if user and "ban_status" in user:
-            return user["ban_status"]
-        return None
-    except Exception as e:
-        logging.error(f"Error getting ban info for user {user_id}: {e}")
-        return None
+    async def get_ban_info(self, user_id):
+        """Get ban information for a user"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            if user and "ban_status" in user:
+                return user["ban_status"]
+            return None
+        except Exception as e:
+            logging.error(f"Error getting ban info for user {user_id}: {e}")
+            return None
         
 # Initialize database connection
 codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
-
-
