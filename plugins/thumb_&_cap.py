@@ -1,5 +1,5 @@
 from pyrogram import Client, filters 
-from helper.database import codeflixbots
+from helper.database import N4BOTS
 
 @Client.on_message(filters.private & filters.command('set_caption'))
 async def add_caption(client, message):
