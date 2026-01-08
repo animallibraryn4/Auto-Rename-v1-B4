@@ -4,7 +4,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 
-from helper.database import N4BOTS
+from helper.database import n4bots
 from config import *
 from config import Config
 
@@ -18,7 +18,7 @@ async def start(client, message: Message):
            return
     
     user = message.from_user
-    await N4BOTS.add_user(client, message)
+    await n4bots.add_user(client, message)
 
     # Simple welcome animation
     m = await message.reply_text("ꜱᴛᴀʀᴛɪɴɢ...")
@@ -209,7 +209,7 @@ async def cb_handler(client, query: CallbackQuery):
     elif data.startswith("setmedia_"):
         user_id = query.from_user.id
         media_type = data.split("_", 1)[1]
-        await N4BOTS.set_media_preference(user_id, media_type)
+        await n4bots.set_media_preference(user_id, media_type)
         await query.answer(f"Media preference set to: {media_type} ✅")
         await query.message.edit_text(f"**Media preference set to:** {media_type} ✅")
 
