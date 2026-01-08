@@ -253,7 +253,7 @@ async def mode_callback_handler(client, query):
     if data == "mode_file":
         user_mode[user_id] = "file"
         # Save to database
-        await N4BOTS.set_mode(user_id, "file_mode")
+        await n4bots.set_mode(user_id, "file_mode")   
         
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
