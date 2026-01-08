@@ -8,9 +8,28 @@ from helper.database import codeflixbots
 from config import *
 from config import Config
 
+
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message: Message):
+    # Check if user is banned first
+    user_id = message.from_user.id
+    is_banned = await codeflixbots.is_user_banned(user_id)
+    
+    if is_banned:
+        ban_info = await codeflixbots.get_ban_info(user_id)
+        ban_reason = ban_info.get('ban_reason', 'No reason provided') if ban_info else 'No reason provided'
+        banned_date = ban_info.get('banned_on', 'Unknown') if ban_info else 'Unknown'
+        
+        await message.reply_text(
+            f"🚫 **You are banned from using this bot.**\n\n"
+            f"**Reason:** {ban_reason}\n"
+            f"**Date:** {banned_date}\n\n"
+            f"You are not allowed to use this bot anymore."
+        )
+        return
+    
+    # Rest of the existing start code...
     if hasattr(message, 'command') and len(message.command) == 2: 
        data = message.command[1]
        if data.split("-")[0] == 'verify':
@@ -19,9 +38,6 @@ async def start(client, message: Message):
     
     user = message.from_user
     await codeflixbots.add_user(client, message)
-
-    # REMOVED VERIFICATION CHECK HERE - Normal /start should not ask for verification
-    # Only file uploads will ask for verification (handled in file_rename.py)
 
     # Initial interactive text and sticker sequence
     # Simple welcome animation
