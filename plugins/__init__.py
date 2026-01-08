@@ -151,6 +151,16 @@ async def send_verification(client, message_or_query):
         mention = message_or_query.from_user.mention
         message_obj = None
 
+    # Check if user is banned
+    from helper.database import codeflixbots
+    is_banned = await codeflixbots.is_user_banned(user_id)
+    if is_banned:
+        if message_obj:
+            await message_obj.edit_text("🚫 You are banned and cannot use this bot.")
+        else:
+            await client.send_message(chat_id, "🚫 You are banned and cannot use this bot.")
+        return
+
     if await is_user_verified(user_id):
         return
 
