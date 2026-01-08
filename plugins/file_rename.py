@@ -448,6 +448,12 @@ async def extract_info_from_source(message, user_mode):
 async def process_rename(client: Client, message: Message):
     ph_path = None
     
+    # Check if user is banned
+    is_banned = await codeflixbots.is_user_banned(user_id)
+    if is_banned:
+        await message.reply_text("🚫 You are banned. You are not allowed to use this bot anymore.")
+        return
+        
     user_id = message.from_user.id
     if not await is_user_verified(user_id): 
         return
@@ -714,6 +720,12 @@ async def process_rename(client: Client, message: Message):
 # ===== IMPROVED MESSAGE HANDLER WITH DUPLICATE PREVENTION =====
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
+    
+    # ✅ Check if user is banned
+    is_banned = await codeflixbots.is_user_banned(user_id)
+    if is_banned:
+        await message.reply_text("🚫 You are banned. You are not allowed to use this bot anymore.")
+        return
     
     # ✅ Check if user is in info mode
     if user_id in info_mode_users:
