@@ -1,4 +1,4 @@
-from helper.database import N4BOTS as db
+from helper.database import n4bots as db
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import Txt
