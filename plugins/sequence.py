@@ -550,11 +550,11 @@ async def start_sequence(client, message):
     seq_text = "Episode Flow" if seq_mode == "per_ep" else "Quality Flow"
     
     await message.reply_text(
-        """f"<b>📂 File Sequence Mode Started!</b>\n\n"
+        f"<b>📂 File Sequence Mode Started!</b>\n\n"
         f"<blockquote>📝 <b>Current Mode:</b> {mode_text}\n"
         f"🔄 <b>Sequence Order:</b> {seq_text}\n\n"
-        f"Send your files now. I'll sequence them in the configured order.</blockquote>"
-        parse_mode="HTML"""
+        f"Send your files now. I'll sequence them in the configured order.</blockquote>",
+        parse_mode= "HTML"
     )
 
 async def store_file(client, message):
