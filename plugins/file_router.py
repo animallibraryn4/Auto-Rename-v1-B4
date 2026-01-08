@@ -1,6 +1,3 @@
-"""
-Centralized File Router - Routes files to appropriate handlers
-"""
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
