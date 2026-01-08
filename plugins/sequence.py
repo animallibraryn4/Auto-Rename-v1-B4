@@ -6,7 +6,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import UserNotParticipant, FloodWait, ChatAdminRequired, ChannelPrivate
 from config import Config, Txt
-from helper.database import codeflixbots
+from helper.database import N4BOTS
 
 # Global dictionaries for sequence management
 user_sequences = {}  # user_id -> list of file data
@@ -213,7 +213,7 @@ async def fileseq_callback(client, query):
     user_id = query.from_user.id
     selection = query.data.replace("fileseq_", "")
 
-    await codeflixbots.set_sequence_mode(user_id, selection)
+    await N4BOTS.set_sequence_mode(user_id, selection)
     user_seq_mode[user_id] = selection
 
     flow_name = "Episode Flow" if selection == "per_ep" else "Quality Flow"
@@ -244,7 +244,7 @@ async def mode_callback_handler(client, query):
     if data == "mode_file":
         user_mode[user_id] = "file"
         # Save to database
-        await codeflixbots.set_mode(user_id, "file_mode")
+        await N4BOTS.set_mode(user_id, "file_mode")
         
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ File Mode", callback_data="mode_file")],
@@ -265,7 +265,7 @@ async def mode_callback_handler(client, query):
     elif data == "mode_caption":
         user_mode[user_id] = "caption"
         # Save to database
-        await codeflixbots.set_mode(user_id, "caption_mode")
+        await N4BOTS.set_mode(user_id, "caption_mode")
         
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("File Mode", callback_data="mode_file")],
@@ -536,11 +536,11 @@ async def start_sequence(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await codeflixbots.get_mode(user_id)
+        db_mode = await N4BOTS.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     if user_id not in user_seq_mode:
-        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get current mode
@@ -724,7 +724,7 @@ async def switch_mode_cmd(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await codeflixbots.get_mode(user_id)
+        db_mode = await N4BOTS.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     current_mode = user_mode.get(user_id, "file")
@@ -764,7 +764,7 @@ async def fileseq_command(client, message):
     
     # Get current mode from database if not in local state
     if user_id not in user_seq_mode:
-        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get current mode for display
@@ -809,11 +809,11 @@ async def ls_command(client, message):
     
     # Get user's current mode from database if not in local state
     if user_id not in user_mode:
-        db_mode = await codeflixbots.get_mode(user_id)
+        db_mode = await N4BOTS.get_mode(user_id)
         user_mode[user_id] = "file" if "file" in db_mode else "caption"
     
     if user_id not in user_seq_mode:
-        db_seq_mode = await codeflixbots.get_sequence_mode(user_id)
+        db_seq_mode = await N4BOTS.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
     # Get user's current mode
