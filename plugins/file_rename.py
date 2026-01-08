@@ -452,9 +452,9 @@ async def process_rename(client: Client, message: Message):
     if not await is_user_verified(user_id): 
         return
 
-    user_mode = await codeflixbots.get_mode(user_id)
-    format_template = await codeflixbots.get_format_template(user_id)
-    media_preference = await codeflixbots.get_media_preference(user_id)
+    user_mode = await N4BOTS.get_mode(user_id)
+    format_template = await N4BOTS.get_format_template(user_id)
+    media_preference = await N4BOTS.get_media_preference(user_id)
     
     if not format_template:
         return await message.reply_text("Please Set An Auto Rename Format First Using /autorename")
