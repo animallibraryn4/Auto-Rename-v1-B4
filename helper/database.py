@@ -372,6 +372,6 @@ class Database:
             return "per_ep"
         
 # Initialize database connection
-codeflixbots = Database(Config.DB_URL, Config.DB_NAME)
+N4BOTS = Database(Config.DB_URL, Config.DB_NAME)
 
 
