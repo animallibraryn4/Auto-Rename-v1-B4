@@ -559,12 +559,12 @@ async def process_rename(client: Client, message: Message):
                 await download_msg.edit(f"**MKV Conversion Error:** {e}")
                 return
 
-        file_title = await codeflixbots.get_title(user_id)
-        artist = await codeflixbots.get_artist(user_id)
-        author = await codeflixbots.get_author(user_id)
-        video_title = await codeflixbots.get_video(user_id)
-        audio_title = await codeflixbots.get_audio(user_id)
-        subtitle_title = await codeflixbots.get_subtitle(user_id)
+        file_title = await N4BOTS.get_title(user_id)
+        artist = await N4BOTS.get_artist(user_id)
+        author = await N4BOTS.get_author(user_id)
+        video_title = await N4BOTS.get_video(user_id)
+        audio_title = await N4BOTS.get_audio(user_id)
+        subtitle_title = await N4BOTS.get_subtitle(user_id)
 
         metadata_command = [
             'ffmpeg',
@@ -598,18 +598,18 @@ async def process_rename(client: Client, message: Message):
 
         upload_msg = await download_msg.edit("**__Uploading...__**")
 
-        c_caption = await codeflixbots.get_caption(message.chat.id)
+        c_caption = await N4BOTS.get_caption(message.chat.id)
         c_thumb = None
-        is_global_enabled = await codeflixbots.is_global_thumb_enabled(user_id)
+        is_global_enabled = await N4BOTS.is_global_thumb_enabled(user_id)
 
         if is_global_enabled:
-            c_thumb = await codeflixbots.get_global_thumb(user_id)
+            c_thumb = await N4BOTS.get_global_thumb(user_id)
         else:
             if standard_quality:
-                c_thumb = await codeflixbots.get_quality_thumbnail(user_id, standard_quality)
+                c_thumb = await N4BOTS.get_quality_thumbnail(user_id, standard_quality)
             
             if not c_thumb:
-                c_thumb = await codeflixbots.get_thumbnail(user_id)
+                c_thumb = await N4BOTS.get_thumbnail(user_id)
 
         if not c_thumb and media_type == "video" and message.video.thumbs:
             c_thumb = message.video.thumbs[0].file_id
