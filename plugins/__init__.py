@@ -58,7 +58,7 @@ async def is_user_verified(user_id):
         return True
     
     # Get verification status from main database
-    last = await codeflixbots.get_verify_status(user_id)
+    last = await N4BOTS.get_verify_status(user_id)
     
     # If last is 0 or None, user is not verified
     if not last:
