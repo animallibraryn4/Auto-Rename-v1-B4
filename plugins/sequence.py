@@ -1,3 +1,4 @@
+from pyrogram.enums import ParseMode
 import asyncio
 import re
 import time
@@ -562,7 +563,7 @@ async def start_sequence(client, message):
         f"<blockquote>📝 <b>Current Mode:</b> {mode_text}\n"
         f"🔄 <b>Sequence Order:</b> {seq_text}\n\n"
         f"Send your files now. I'll sequence them in the configured order.</blockquote>",
-        parse_mode= "html"
+        parse_mode=ParseMode.HTML
     )
 
 async def store_file(client, message):
