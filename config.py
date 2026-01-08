@@ -206,3 +206,31 @@ Pʀɪᴄɪɴɢ:
     
     QR_TXT = "👋 Hey {},\n\nPay the amount according to your membership price!\n\n📸 <b>QR Code:</b> <a href='https://t.me/Animelibraryn4'>Click here to scan</a>\n\n‼️ You must send a screenshot after payment."
 
+
+    META_TXT = """
+**🎯 Complete Metadata Management System**
+
+**📋 All metadata can now be managed through `/metadata` command:**
+
+**Features:**
+• **Single interface** for all metadata settings
+• **Edit all values** at once in a simple format
+• **No need for multiple commands** like /settitle, /setauthor, etc.
+
+**How to use:**
+1. Use **`/metadata`** to open the metadata manager
+2. **Toggle ON/OFF** as needed
+3. Click **"Edit Metadata"** to modify all values
+4. Enter values in this format:
+
+**Supported Metadata Fields:**
+• **ᴛɪᴛʟᴇ** – Descriptive title of the media
+• **ᴀᴜᴛʜᴏʀ** – The creator or owner
+• **ᴀʀᴛɪꜱᴛ** – The artist associated
+• **ᴀᴜᴅɪᴏ** – Title of audio content
+• **ꜱᴜʙᴛɪᴛʟᴇ** – Title of subtitle content
+• **ᴠɪᴅᴇᴏ** – Title of video content
+
+**Example:**
+**ᴜꜱᴇ /metadata ᴛᴏ ʙᴇɢɪɴ ᴍᴀɴᴀɢɪɴɢ ʏᴏᴜʀ ᴍᴇᴛᴀᴅᴀᴛᴀ!**
+"""
