@@ -28,7 +28,7 @@ class Bot(Client):
             api_hash=Config.API_HASH,
             bot_token=Config.BOT_TOKEN,
 
-            # 🔥 FINAL FIX (NO SQLITE, NO SESSION FILE)
+            # FINAL FIX (NO SQLITE, NO SESSION FILE)
             in_memory=True,
 
             workers=50,
@@ -42,7 +42,7 @@ class Bot(Client):
         await super().start()
 
         me = await self.get_me()
-        print(f"{me.first_name} Is Started.....✨️")
+        print(f"{me.first_name} Is Started.....🎉")
         # Initialize queue manager with client
         queue_manager.set_client(self)
         print("Queue manager initialized")
