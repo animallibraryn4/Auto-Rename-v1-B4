@@ -23,14 +23,11 @@ class Config(object):
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
     
-    # Season Extraction Configuration (New)
-    # Agar aap season extraction ke liye koi custom placeholder ya default value set karna chahte hain,
-    # to yahan add kar sakte hain.
-    SEASON_PLACEHOLDER = "{season}"  # Yeh placeholder aapke auto rename format mein replace hoga.
-
+    
+    SEASON_PLACEHOLDER = "{season}"  
 
 class Txt(object):
-    # part of text configuration
+    
         
     START_TXT = """👋 ʜᴇʏ, {}!  
 
@@ -50,9 +47,9 @@ class Txt(object):
 ➲ S[SE.NUM] - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ꜱᴇᴀꜱᴏɴ ɴᴜᴍʙᴇʀ  
 ➲ [QUALITY] - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ǫᴜᴀʟɪᴛʏ
 
-<b>‣ ꜰᴏʀ ᴇx:- </b> <code>  /autorename [S[SE.NUM]-E[EP.NUM]] Pokemon [[QUALITY]] [Dual] @Animelibraryn4 | @onlyfans_n4</code>
+<b>‣ ꜰᴏʀ ᴇx:- </b> <code>  /autorename [S[SE.NUM]-E[EP.NUM]] Pokemon [[QUALITY]] [Dual] @Animelibraryn4 | @HAnimeN4</code>
 
-<b>‣ /Autorename: ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇs ʙʏ ɪɴᴄʟᴜᴅɪɴɢ 'ᴇᴘɪꜱᴏᴅᴇ', 'ꜱᴇᴀꜱᴏɴ' ᴀɴᴅ 'ǫᴜᴀʟɪᴛʏ' ᴠᴀʀɪᴀʙʟᴇꜱ ɪɴ ʏᴏᴜʀ ᴛᴇxᴛ, ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴇᴘɪꜱᴏᴅᴇ, ꜱᴇᴀꜱᴏɴ ᴀɴᴅ ǫᴜᴀʟɪᴛʏ ᴘʀᴇꜱᴇɴᴛ ɪɴ ᴛʜᴇ ᴏʀɪɢɪɴᴀʟ ꜰɪʟᴇɴᴀᴍᴇ. """
+‣ /Autorename: ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇs ʙʏ ɪɴᴄʟᴜᴅɪɴɢ 'ᴇᴘɪꜱᴏᴅᴇ', 'ꜱᴇᴀꜱᴏɴ' ᴀɴᴅ 'ǫᴜᴀʟɪᴛʏ' ᴠᴀʀɪᴀʙʟᴇꜱ ɪɴ ʏᴏᴜʀ ᴛᴇxᴛ, ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴇᴘɪꜱᴏᴅᴇ, ꜱᴇᴀꜱᴏɴ ᴀɴᴅ ǫᴜᴀʟɪᴛʏ ᴘʀᴇꜱᴇɴᴛ ɪɴ ᴛʜᴇ ᴏʀɪɢɪɴᴀʟ ꜰɪʟᴇɴᴀᴍᴇ. """
     
     ABOUT_TXT = f"""<b>❍ ᴍʏ ɴᴀᴍᴇ : <a href="https://t.me/animelibraryn4">ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ</a>
 ❍ ᴅᴇᴠᴇʟᴏᴩᴇʀ : <a href="https://t.me/animelibraryn4">ᴀɴɪᴍᴇ ʟɪʙʀᴀʀʏ ɴ4</a>
@@ -207,30 +204,4 @@ Pʀɪᴄɪɴɢ:
     QR_TXT = "👋 Hey {},\n\nPay the amount according to your membership price!\n\n📸 <b>QR Code:</b> <a href='https://t.me/Animelibraryn4'>Click here to scan</a>\n\n‼️ You must send a screenshot after payment."
 
 
-    META_TXT = """
-**🎯 Complete Metadata Management System**
-
-**📋 All metadata can now be managed through `/metadata` command:**
-
-**Features:**
-• **Single interface** for all metadata settings
-• **Edit all values** at once in a simple format
-• **No need for multiple commands** like /settitle, /setauthor, etc.
-
-**How to use:**
-1. Use **`/metadata`** to open the metadata manager
-2. **Toggle ON/OFF** as needed
-3. Click **"Edit Metadata"** to modify all values
-4. Enter values in this format:
-
-**Supported Metadata Fields:**
-• **ᴛɪᴛʟᴇ** – Descriptive title of the media
-• **ᴀᴜᴛʜᴏʀ** – The creator or owner
-• **ᴀʀᴛɪꜱᴛ** – The artist associated
-• **ᴀᴜᴅɪᴏ** – Title of audio content
-• **ꜱᴜʙᴛɪᴛʟᴇ** – Title of subtitle content
-• **ᴠɪᴅᴇᴏ** – Title of video content
-
-**Example:**
-**ᴜꜱᴇ /metadata ᴛᴏ ʙᴇɢɪɴ ᴍᴀɴᴀɢɪɴɢ ʏᴏᴜʀ ᴍᴇᴛᴀᴅᴀᴛᴀ!**
-"""
+    
