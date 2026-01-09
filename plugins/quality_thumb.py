@@ -26,10 +26,11 @@ async def generate_main_menu_buttons(user_id):
         [InlineKeyboardButton("❌ Close", "quality_close")]
     ])
     return buttons
-
+    
 @Client.on_message(filters.private & filters.command('smart_thumb'))
 async def quality_menu(client, message):
-    print(f"smart_thumb command received from {message.from_user.id}")
+    print(f"DEBUG: /smart_thumb command received from user {message.from_user.id}")  # Add this
+    
     buttons = await generate_main_menu_buttons(message.from_user.id)
     await message.reply_text(
         "🎬 Thumbnail Manager",
