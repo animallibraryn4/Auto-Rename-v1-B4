@@ -17,12 +17,22 @@ is_restarting = False
 ban_waiting_for_user_id = {}
 
 # Ban check middleware
-async def check_ban_status(bot: Client, message: Message):
+# Ban check middleware
+async def check_ban_status(bot: Client, message: Message, command_name: str = None):
     """Check if user is banned before processing any command"""
     user_id = message.from_user.id
     
     # Skip check for admin
     if user_id == ADMIN_USER_ID:
+        return False
+    
+    # List of commands that should bypass ban check
+    ALLOWED_COMMANDS_WHEN_BANNED = [
+        "start", "verify", "get_token"
+    ]
+    
+    # If command is in allowed list, skip ban check
+    if command_name in ALLOWED_COMMANDS_WHEN_BANNED:
         return False
     
     try:
