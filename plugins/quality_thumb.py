@@ -1,6 +1,16 @@
-from pyrogram import Client, filters
+
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import n4bots
+# Add at the top of quality_thumb.py
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+print("quality_thumb.py is being loaded")  # Add this
+
+# Your existing imports...
+from pyrogram import Client, filters
+
 
 QUALITY_TYPES = ["360p", "480p", "720p", "1080p", "HDrip", "2160p", "4K", "2K", "4kX264", "4kx265"]
 
