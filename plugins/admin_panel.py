@@ -16,6 +16,62 @@ is_restarting = False
 # Global dictionary for state management
 ban_waiting_for_user_id = {}
 
+# Ban check middleware
+async def check_ban_status(bot: Client, message: Message):
+    """Check if user is banned before processing any command"""
+    user_id = message.from_user.id
+    
+    # Skip check for admin
+    if user_id == ADMIN_USER_ID:
+        return False
+    
+    try:
+        # Check if user exists in database
+        if await n4bots.is_user_exist(user_id):
+            ban_status = await n4bots.get_ban_status(user_id)
+            
+            if ban_status and ban_status.get("is_banned", False):
+                # Check if ban has expired (for temporary bans)
+                ban_duration = ban_status.get("ban_duration", 0)
+                
+                if ban_duration > 0:
+                    # Check if ban has expired
+                    banned_on_str = ban_status.get("banned_on")
+                    try:
+                        banned_on = datetime.date.fromisoformat(banned_on_str)
+                        today = datetime.date.today()
+                        days_banned = (today - banned_on).days
+                        
+                        if days_banned >= ban_duration:
+                            # Ban expired, unban the user
+                            await n4bots.unban_user(user_id)
+                            return False
+                    except:
+                        # If date parsing fails, keep ban active
+                        pass
+                
+                # User is banned, send ban message
+                ban_reason = ban_status.get("ban_reason", "No reason provided")
+                banned_on = ban_status.get("banned_on", "Unknown date")
+                
+                if ban_duration == 0:
+                    duration_text = "Permanent"
+                else:
+                    duration_text = f"{ban_duration} days"
+                
+                await message.reply_text(
+                    f"🚫 **You are banned from using this bot.**\n\n"
+                    f"**Reason:** {ban_reason}\n"
+                    f"**Duration:** {duration_text}\n"
+                    f"**Banned on:** {banned_on}\n\n"
+                    f"Contact @Animelibraryn4 if you believe this is a mistake."
+                )
+                return True  # Stop further processing
+    except Exception as e:
+        logger.error(f"Error checking ban status for user {user_id}: {e}")
+    
+    return False  # Continue processing
+
 # =============================
 # BAN CONTROL PANEL
 # =============================
@@ -826,3 +882,4 @@ async def send_msg(user_id, message):
     except Exception as e:
         print(f"Broadcast error for user {user_id}: {e}")
         return 500  # Other error
+    
