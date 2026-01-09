@@ -15,7 +15,7 @@ from plugins.admin_panel import check_ban_status
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message: Message):
     # ADD THIS BAN CHECK AT THE BEGINNING
-    from plugins.admin_panel import check_ban_status
+    # Don't import here again - already imported at top
     is_banned = await check_ban_status(client, message)
     if is_banned:
         return
