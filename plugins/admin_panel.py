@@ -5,6 +5,9 @@ from pyrogram import Client, filters
 from pyrogram.errors import FloodWait, InputUserDeactivated, UserIsBlocked, PeerIdInvalid
 import os, sys, time, asyncio, logging, datetime
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.handlers import MessageHandler
+from pyrogram.filters import Filter
+from pyrogram import StopPropagation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
