@@ -167,6 +167,17 @@ def get_codec_info(stream):
 @Client.on_message(filters.private & filters.command("info"))
 async def info_command(client, message):
     user_id = message.from_user.id
+
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return
+        
+    # Check verification
+    from plugins import is_user_verified, send_verification
+    if not await is_user_verified(user_id):
+        await send_verification(client, message)
+        return
     
     # Store user in info mode with timestamp
     info_mode_users[user_id] = {
@@ -183,8 +194,7 @@ async def info_command(client, message):
         "**📥 FILE INFORMATION MODE**\n\n"
         "🔹 **Now send me any media file** (video/document/audio)\n"
         "🔹 I'll extract and show detailed information\n\n"
-        "⚠️ **Note:** Auto-rename is temporarily disabled while in this mode\n"
-        "Send /cancel or any other command to exit this mode",
+        ">⚠️ **Note:** Auto-rename is temporarily disabled while in this mode\n",
         reply_markup=cancel_btn
     )
 
@@ -198,7 +208,7 @@ async def info_mode_file_handler(client, message):
 
 async def process_file_for_info(client, message):
     user_id = message.from_user.id
-    ms = await message.reply_text("**📊 Analyzing file...**\n\nPlease wait...")
+    ms = await message.reply_text("**Analyzing file...**\n\nPlease wait...")
     
     try:
         # Get file information
