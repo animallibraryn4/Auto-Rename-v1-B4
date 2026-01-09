@@ -13,6 +13,19 @@ ADMIN_USER_ID = Config.ADMIN
 # Flag to indicate if the bot is restarting
 is_restarting = False
 
+# List of commands that should bypass ban check
+EXCLUDED_COMMANDS = [
+    "start", "help", "metadata", "verify", "get_token", 
+    "autorename", "setmedia", "info", "set_caption", 
+    "del_caption", "see_caption", "view_caption", 
+    "restart", "tutorial", "stats", "status", 
+    "broadcast", "donate", "bought", "sequence", 
+    "sf", "fileseq", "ls", "plan", "smart_thumb", 
+    "mode", "caption", "meta", "file_names", 
+    "thumbnail", "metadatax", "source", "premiumx", 
+    "plans", "about", "home"
+]
+
 # Ban check middleware
 async def check_ban_status(bot: Client, message: Message):
     """Check if user is banned before processing any command"""
@@ -21,6 +34,12 @@ async def check_ban_status(bot: Client, message: Message):
     # Skip check for admin
     if user_id == ADMIN_USER_ID:
         return False
+    
+    # Check if command is in excluded list
+    if message.text and message.text.startswith("/"):
+        command = message.text.split()[0][1:].lower().split("@")[0]  # Extract command name
+        if command in EXCLUDED_COMMANDS:
+            return False
     
     try:
         # Check if user exists in database
@@ -86,6 +105,11 @@ async def restart_bot(b, m):
 
 @Client.on_message(filters.private & filters.command("tutorial"))
 async def tutorial(bot: Client, message: Message):
+    # ADD BAN CHECK HERE TOO
+    is_banned = await check_ban_status(bot, message)
+    if is_banned:
+        return
+    
     user_id = message.from_user.id
     format_template = await n4bots.get_format_template(user_id)
     await message.reply_text(
