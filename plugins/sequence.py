@@ -525,7 +525,12 @@ async def ls_callback_handlers(client, query):
 async def start_sequence(client, message):
     """Start a new sequence session"""
     user_id = message.from_user.id
-    
+
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return
+        
     # Check verification
     from plugins import is_user_verified, send_verification
     if not await is_user_verified(user_id):
@@ -808,7 +813,18 @@ async def fileseq_command(client, message):
 async def ls_command(client, message):
     """Handle /ls command for channel file sequencing"""
     user_id = message.from_user.id
-    
+
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return
+        
+    # Check verification
+    from plugins import is_user_verified, send_verification
+    if not await is_user_verified(user_id):
+        await send_verification(client, message)
+        return
+
     # Get user's current mode from database if not in local state
     if user_id not in user_mode:
         db_mode = await n4bots.get_mode(user_id)
