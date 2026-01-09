@@ -13,8 +13,6 @@ ADMIN_USER_ID = Config.ADMIN
 # Flag to indicate if the bot is restarting
 is_restarting = False
 
-# Global dictionary for state management
-ban_waiting_for_user_id = {}
 
 # Ban check middleware
 async def check_ban_status(bot: Client, message: Message):
