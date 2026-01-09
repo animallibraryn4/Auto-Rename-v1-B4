@@ -9,7 +9,7 @@ from config import *
 from config import Config
 
 # Import the check_ban_status function from admin_panel
-from plugins.ban_check import check_ban_status
+from plugins.ban_check import check_ban_status_simple
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
