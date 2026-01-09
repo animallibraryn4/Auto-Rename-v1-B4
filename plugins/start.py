@@ -8,17 +8,17 @@ from helper.database import n4bots
 from config import *
 from config import Config
 
-# Import the check_ban_status function from admin_panel
-from plugins.admin_panel import check_ban_status
+
+from plugins.ban_check import check_ban_status_simple
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message: Message):
-    # ADD THIS BAN CHECK AT THE BEGINNING
-    # Don't import here again - already imported at top
-    is_banned = await check_ban_status(client, message)
+    # Simple ban check
+    is_banned = await check_ban_status_simple(message.from_user.id)
     if is_banned:
         return
+        
         
     if hasattr(message, 'command') and len(message.command) == 2: 
        data = message.command[1]
