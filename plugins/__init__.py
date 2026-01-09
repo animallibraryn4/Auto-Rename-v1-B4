@@ -11,6 +11,7 @@ from cloudscraper import create_scraper
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config, Txt
 from helper.database import n4bots  
+from plugins import file_router
 
 # =====================================================
 # MEMORY (SIMPLE & STABLE)
