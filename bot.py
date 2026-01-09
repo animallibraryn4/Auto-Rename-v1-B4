@@ -16,12 +16,8 @@ pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
 
-# global bot instance for ban system
-bot = None
-
 class Bot(Client):
     def __init__(self):
-        global bot
         super().__init__(
             name="N4_BOTS",
             api_id=Config.API_ID,
@@ -32,7 +28,7 @@ class Bot(Client):
             plugins={"root": "plugins"},
             sleep_threshold=15,
         )
-        bot = self  # Set global bot instance
+
         self.start_time = time.time()
 
     async def start(self):
@@ -43,6 +39,11 @@ class Bot(Client):
         # Initialize queue manager with client
         queue_manager.set_client(self)
         print("Queue manager initialized")
+        
+        # Set bot instance for admin panel
+        from plugins.admin_panel import set_bot_instance
+        set_bot_instance(self)
+        print("Bot instance set for admin panel")
         
         self.start_time = time.time()
 
