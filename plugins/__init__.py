@@ -11,6 +11,26 @@ from cloudscraper import create_scraper
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config, Txt
 from helper.database import n4bots  
+# plugins/__init__.py
+import os
+import importlib
+
+# List all plugin files in the plugins directory
+plugins = []
+for file in os.listdir(os.path.dirname(__file__)):
+    if file.endswith('.py') and not file.startswith('__'):
+        plugin_name = file[:-3]  # Remove .py extension
+        plugins.append(plugin_name)
+
+print(f"Loading plugins: {plugins}")
+
+# Dynamically import all plugins
+for plugin in plugins:
+    try:
+        importlib.import_module(f'plugins.{plugin}')
+        print(f"✓ Loaded plugin: {plugin}")
+    except Exception as e:
+        print(f"✗ Failed to load plugin {plugin}: {e}")
 
 # =====================================================
 # MEMORY (SIMPLE & STABLE)
