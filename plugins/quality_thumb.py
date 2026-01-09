@@ -2,6 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import n4bots
 
+print("✅ quality_thumb.py is loading...")  # Add this line
+
 QUALITY_TYPES = ["360p", "480p", "720p", "1080p", "HDrip", "2160p", "4K", "2K", "4kX264", "4kx265"]
 
 async def generate_main_menu_buttons(user_id):
