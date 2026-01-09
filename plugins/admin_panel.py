@@ -10,6 +10,18 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 ADMIN_USER_ID = Config.ADMIN
 
+EXCLUDED_COMMANDS = [
+    "start", "help", "metadata", "verify", "get_token", 
+    "autorename", "setmedia", "info", "set_caption", 
+    "del_caption", "see_caption", "view_caption", 
+    "restart", "tutorial", "stats", "status", 
+    "broadcast", "donate", "bought", "sequence", 
+    "sf", "fileseq", "ls", "plan", "smart_thumb", 
+    "mode", "caption", "meta", "file_names", 
+    "thumbnail", "metadatax", "source", "premiumx", 
+    "plans", "about", "home"
+]
+
 # Flag to indicate if the bot is restarting
 is_restarting = False
 
