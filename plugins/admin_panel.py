@@ -6,6 +6,7 @@ from pyrogram.errors import FloodWait, InputUserDeactivated, UserIsBlocked, Peer
 from pyrogram import StopPropagation
 import os, sys, time, asyncio, logging, datetime
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import datetime  # Add this if not present
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
