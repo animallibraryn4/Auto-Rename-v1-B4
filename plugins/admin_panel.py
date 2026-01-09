@@ -10,6 +10,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 ADMIN_USER_ID = Config.ADMIN
 
+# Flag to indicate if the bot is restarting
+is_restarting = False
+
+# Global dictionary for state management
+ban_waiting_for_user_id = {}
+
+# List of commands to exclude from ban user ID processing
 EXCLUDED_COMMANDS = [
     "start", "help", "metadata", "verify", "get_token", 
     "autorename", "setmedia", "info", "set_caption", 
@@ -21,12 +28,6 @@ EXCLUDED_COMMANDS = [
     "thumbnail", "metadatax", "source", "premiumx", 
     "plans", "about", "home"
 ]
-
-# Flag to indicate if the bot is restarting
-is_restarting = False
-
-# Global dictionary for state management
-ban_waiting_for_user_id = {}
 
 # =============================
 # BAN CONTROL PANEL
@@ -83,6 +84,14 @@ async def process_ban_user_id(bot: Client, message: Message):
     
     # Check if we're waiting for user ID input
     if user_id in ban_waiting_for_user_id:
+        # Check if the message is a command (starts with /)
+        if message.text and message.text.startswith('/'):
+            # Extract command from message
+            command_parts = message.text[1:].split()
+            if command_parts and command_parts[0].lower() in EXCLUDED_COMMANDS:
+                # This is a valid command, don't process as user ID
+                return
+        
         try:
             target_user_id = int(message.text.strip())
             
