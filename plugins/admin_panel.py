@@ -173,6 +173,7 @@ async def back_to_ban_panel(client: Client, callback_query):
     )
     await callback_query.answer()
 
+# Replace the ban_user_command function with:
 @Client.on_message(filters.command("ban") & filters.user(ADMIN_USER_ID) & filters.private)
 async def ban_user_command(bot: Client, message: Message):
     """Ban a user by ID or reply"""
@@ -204,26 +205,17 @@ async def ban_user_command(bot: Client, message: Message):
             return
         
         # Check if already banned
-        user_data = await n4bots.col.find_one({"_id": user_id})
-        if user_data and user_data.get("ban_status", {}).get("is_banned", False):
+        ban_status = await n4bots.get_ban_status(user_id)
+        if ban_status and ban_status.get("is_banned", False):
             await message.reply_text(f"User `{user_id}` is already banned.")
             return
         
-        # Set ban status
-        ban_duration = 0  # 0 means permanent ban
-        banned_on = datetime.date.today().isoformat()
+        # Ban the user using helper method
+        success = await n4bots.ban_user(user_id, 0, reason)
         
-        await n4bots.col.update_one(
-            {"_id": user_id},
-            {"$set": {
-                "ban_status": {
-                    "is_banned": True,
-                    "ban_duration": ban_duration,
-                    "banned_on": banned_on,
-                    "ban_reason": reason
-                }
-            }}
-        )
+        if not success:
+            await message.reply_text("Failed to ban user. Please try again.")
+            return
         
         # Try to notify the user
         try:
@@ -232,7 +224,7 @@ async def ban_user_command(bot: Client, message: Message):
                 f"🚫 **You have been banned from using this bot.**\n\n"
                 f"**Reason:** {reason}\n"
                 f"**Duration:** Permanent\n"
-                f"**Date:** {banned_on}\n\n"
+                f"**Date:** {datetime.date.today().isoformat()}\n\n"
                 f"Contact @Animelibraryn4 if you believe this is a mistake."
             )
         except:
@@ -244,7 +236,7 @@ async def ban_user_command(bot: Client, message: Message):
             f"**User ID:** `{user_id}`\n"
             f"**Reason:** {reason}\n"
             f"**Duration:** Permanent\n"
-            f"**Date:** {banned_on}"
+            f"**Date:** {datetime.date.today().isoformat()}"
         )
         
         # Log to log channel if configured
@@ -256,7 +248,7 @@ async def ban_user_command(bot: Client, message: Message):
                     f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
                     f"**User ID:** `{user_id}`\n"
                     f"**Reason:** {reason}\n"
-                    f"**Date:** {banned_on}"
+                    f"**Date:** {datetime.date.today().isoformat()}"
                 )
             except:
                 pass
