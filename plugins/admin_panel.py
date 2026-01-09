@@ -13,6 +13,14 @@ ADMIN_USER_ID = Config.ADMIN
 # Flag to indicate if the bot is restarting
 is_restarting = False
 
+# Global variable to store bot instance
+bot_instance = None
+
+def set_bot_instance(bot):
+    """Set the bot instance for use in ban functions"""
+    global bot_instance
+    bot_instance = bot
+
 @Client.on_message(filters.private & filters.command("restart") & filters.user(ADMIN_USER_ID))
 async def restart_bot(b, m):
     global is_restarting
@@ -219,13 +227,35 @@ async def is_user_banned(user_id):
         logger.error(f"Error checking ban status for user {user_id}: {e}")
         return False
 
+async def send_ban_message(user_id, reason, duration_days, banned_date):
+    """Send ban message to user"""
+    global bot_instance
+    if not bot_instance:
+        return
+    
+    try:
+        duration_text = "Permanent" if duration_days == 0 else f"{duration_days} days"
+        banned_on_str = banned_date if isinstance(banned_date, str) else banned_date.isoformat()
+        
+        await bot_instance.send_message(
+            int(user_id),
+            f"🚫 You are banned from using this bot.\n\n"
+            f"**Reason:** {reason}\n"
+            f"**Duration:** {duration_text}\n"
+            f"**Banned on:** {banned_on_str}\n\n"
+            f"Contact @Animelibraryn4 if you believe this is a mistake."
+        )
+    except Exception as e:
+        logger.error(f"Failed to send ban message to user {user_id}: {e}")
+
 async def ban_user(user_id, duration_days=0, reason="Banned by admin"):
     """Ban a user"""
     try:
+        banned_date = datetime.date.today()
         ban_status = {
             "is_banned": True,
             "ban_duration": duration_days,
-            "banned_on": datetime.date.today().isoformat(),
+            "banned_on": banned_date.isoformat(),
             "ban_reason": reason
         }
         
@@ -236,17 +266,7 @@ async def ban_user(user_id, duration_days=0, reason="Banned by admin"):
         )
         
         # Send ban notification to user
-        try:
-            await bot.send_message(
-                int(user_id),
-                f"🚫 You are banned from using this bot.\n\n"
-                f"**Reason:** {reason}\n"
-                f"**Duration:** {'Permanent' if duration_days == 0 else f'{duration_days} days'}\n"
-                f"**Banned on:** {datetime.date.today().isoformat()}\n\n"
-                f"Contact @Animelibraryn4 if you believe this is a mistake."
-            )
-        except Exception as e:
-            logger.error(f"Failed to send ban message to user {user_id}: {e}")
+        await send_ban_message(user_id, reason, duration_days, banned_date)
         
         return True
     except Exception as e:
@@ -270,14 +290,16 @@ async def unban_user(user_id, auto=False):
         
         # Send unban notification to user if not auto-unban
         if not auto:
-            try:
-                await bot.send_message(
-                    int(user_id),
-                    "✅ **Your ban has been lifted!**\n\n"
-                    "You can now use the bot again. Welcome back!"
-                )
-            except Exception as e:
-                logger.error(f"Failed to send unban message to user {user_id}: {e}")
+            global bot_instance
+            if bot_instance:
+                try:
+                    await bot_instance.send_message(
+                        int(user_id),
+                        "✅ **Your ban has been lifted!**\n\n"
+                        "You can now use the bot again. Welcome back!"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send unban message to user {user_id}: {e}")
         
         return True
     except Exception as e:
@@ -304,6 +326,9 @@ async def get_banned_users():
 @Client.on_message(filters.command("ban") & filters.user(Config.ADMIN))
 async def ban_command(bot: Client, message: Message):
     """Ban a user permanently or temporarily"""
+    # Set bot instance for ban functions
+    set_bot_instance(bot)
+    
     if len(message.command) < 2:
         await message.reply_text(
             "**Usage:** `/ban <user_id> <reason>`\n\n"
@@ -385,6 +410,9 @@ async def ban_command(bot: Client, message: Message):
 @Client.on_message(filters.command("tban") & filters.user(Config.ADMIN))
 async def tban_command(bot: Client, message: Message):
     """Temporary ban with minutes/hours/days specification"""
+    # Set bot instance for ban functions
+    set_bot_instance(bot)
+    
     if len(message.command) < 4:
         await message.reply_text(
             "**Usage:** `/tban <user_id> <time> <reason>`\n\n"
@@ -480,6 +508,9 @@ async def tban_command(bot: Client, message: Message):
 @Client.on_message(filters.command("unban") & filters.user(Config.ADMIN))
 async def unban_command(bot: Client, message: Message):
     """Unban a user"""
+    # Set bot instance for ban functions
+    set_bot_instance(bot)
+    
     if len(message.command) != 2:
         await message.reply_text("**Usage:** `/unban <user_id>`\n\n**Example:** `/unban 123456789`")
         return
@@ -565,9 +596,41 @@ async def banlist_command(bot: Client, message: Message):
 # BAN CHECK INTEGRATION
 # =====================================================
 
-# This function should be called before processing any user command
+async def get_user_ban_info(user_id):
+    """Get user's ban information"""
+    try:
+        user = await n4bots.col.find_one({"_id": int(user_id)})
+        if user and 'ban_status' in user:
+            ban_status = user['ban_status']
+            if ban_status.get('is_banned', False):
+                return {
+                    "banned": True,
+                    "reason": ban_status.get('ban_reason', 'Banned by admin'),
+                    "duration": ban_status.get('ban_duration', 0),
+                    "banned_on": ban_status.get('banned_on', datetime.date.today().isoformat())
+                }
+        return {"banned": False}
+    except Exception as e:
+        logger.error(f"Error getting ban info for user {user_id}: {e}")
+        return {"banned": False}
+
+async def check_and_notify_banned_user(bot, user_id):
+    """Check if user is banned and send them ban message if they are"""
+    ban_info = await get_user_ban_info(user_id)
+    if ban_info["banned"]:
+        # Send ban message to user
+        duration_text = "Permanent" if ban_info["duration"] == 0 else f"{ban_info['duration']} days"
+        await bot.send_message(
+            user_id,
+            f"🚫 You are banned from using this bot.\n\n"
+            f"**Reason:** {ban_info['reason']}\n"
+            f"**Duration:** {duration_text}\n"
+            f"**Banned on:** {ban_info['banned_on']}\n\n"
+            f"Contact @Animelibraryn4 if you believe this is a mistake."
+        )
+        return True
+    return False
+
 async def check_ban_status(user_id):
     """Check if user is banned before processing commands"""
     return await is_user_banned(user_id)
-        
-     
