@@ -110,12 +110,14 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
-@Client.on_callback_query(filters.regex(r"^on_metadata$|^off_metadata$|^set_metadata_menu$|^edit_title$|^edit_author$|^edit_artist$|^edit_audio$|^edit_subtitle$|^edit_video$|^cancel_edit_title$|^cancel_edit_author$|^cancel_edit_artist$|^cancel_edit_audio$|^cancel_edit_subtitle$|^cancel_edit_video$|^reset_all$|^metadata_home$|^meta_info$|^close_meta$|^clear_title$|^clear_author$|^clear_artist$|^clear_audio$|^clear_subtitle$|^clear_video$"))
+@Client.on_callback_query(filters.regex(r"^(on_metadata|off_metadata|set_metadata_menu|metadata_home|meta_info|close_meta|reset_all)$"))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
     
-    # Handle toggle commands - NO NOTIFICATIONS
+    print(f"📊 Metadata callback: {data}")  # Debug print
+    
+    # Handle toggle commands
     if data == "on_metadata":
         await db.set_metadata(user_id, "On")
         await show_main_panel(query, user_id)
@@ -128,7 +130,6 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     
     # Handle "Set Metadata" menu
     elif data == "set_metadata_menu":
-        # Don't edit if we're already on the set metadata menu
         if "Set Metadata Values" in query.message.text:
             return
         text = """
@@ -149,45 +150,81 @@ Click on any field to edit it.
         await query.message.edit_text(text=text, reply_markup=keyboard)
         return
     
-    # Handle edit field selection
-    elif data.startswith("edit_"):
-        field = data.split("_")[1]
-        await show_edit_field_prompt(query, user_id, field)
+    # Handle back to home
+    elif data == "metadata_home":
+        await show_main_panel(query, user_id)
         return
     
-    # Handle cancel edit operation - DELETE WITH ANIMATION
-    elif data.startswith("cancel_edit_"):
-        field = data.split("_")[2]
-        # Clear any editing state
-        await db.col.update_one(
-            {"_id": int(user_id)},
-            {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    # Handle meta info/help
+    elif data == "meta_info":
+        if Txt.META_TXT in query.message.text:
+            return
+        await query.message.edit_text(
+            text=Txt.META_TXT,
+            disable_web_page_preview=True,
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
+                    InlineKeyboardButton("✖️ Close", callback_data="close_meta")
+                ]
+            ])
         )
-        # Delete message with animation
+        return
+    
+    # Handle reset all
+    elif data == "reset_all":
+        await db.set_title(user_id, "Encoded by @Animelibraryn4")
+        await db.set_author(user_id, "@Animelibraryn4")
+        await db.set_artist(user_id, "@Animelibraryn4")
+        await db.set_audio(user_id, "By @Animelibraryn4")
+        await db.set_subtitle(user_id, "By @Animelibraryn4")
+        await db.set_video(user_id, "Encoded By @Animelibraryn4")
+        await show_set_metadata_menu(query, user_id)
+        return
+    
+    # Handle close
+    elif data == "close_meta":
         await query.message.delete()
         return
+
+# SEPARATE HANDLER for edit fields
+@Client.on_callback_query(filters.regex(r"^edit_(title|author|artist|audio|subtitle|video)$"))
+async def edit_field_handler(client, query: CallbackQuery):
+    user_id = query.from_user.id
+    field = query.data.split("_", 1)[1]
+    await show_edit_field_prompt(query, user_id, field)
+
+# SEPARATE HANDLER for cancel edit
+@Client.on_callback_query(filters.regex(r"^cancel_edit_(title|author|artist|audio|subtitle|video)$"))
+async def cancel_edit_handler(client, query: CallbackQuery):
+    field = query.data.split("_")[2]
+    await db.col.update_one(
+        {"_id": int(query.from_user.id)},
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    )
+    await query.message.delete()
+
+# SEPARATE HANDLER for clear fields
+@Client.on_callback_query(filters.regex(r"^clear_(title|author|artist|audio|subtitle|video)$"))
+async def clear_field_handler(client, query: CallbackQuery):
+    user_id = query.from_user.id
+    field = query.data.split("_")[1]
     
-    # Handle clearing field - NO NOTIFICATIONS
-    elif data.startswith("clear_"):
-        field = data.split("_")[1]
-        field_display = field.capitalize()
-        
-        # Reset to default value
-        default_values = {
-            "title": "Encoded by @Animelibraryn4",
-            "author": "@Animelibraryn4",
-            "artist": "@Animelibraryn4",
-            "audio": "By @Animelibraryn4",
-            "subtitle": "By @Animelibraryn4",
-            "video": "Encoded By @Animelibraryn4"
-        }
-        
-        if field in default_values:
-            method_name = f"set_{field}"
-            method = getattr(db, method_name, None)
-            if method:
-                await method(user_id, default_values[field])
-                await show_set_metadata_menu(query, user_id)
+    default_values = {
+        "title": "Encoded by @Animelibraryn4",
+        "author": "@Animelibraryn4",
+        "artist": "@Animelibraryn4",
+        "audio": "By @Animelibraryn4",
+        "subtitle": "By @Animelibraryn4",
+        "video": "Encoded By @Animelibraryn4"
+    }
+    
+    if field in default_values:
+        method_name = f"set_{field}"
+        method = getattr(db, method_name, None)
+        if method:
+            await method(user_id, default_values[field])
+            await show_set_metadata_menu(query, user_id)
         return
     
     # Handle reset all - NO NOTIFICATIONS
