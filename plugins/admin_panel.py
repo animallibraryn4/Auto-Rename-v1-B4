@@ -92,7 +92,7 @@ async def check_ban_status(bot: Client, message: Message):
     return False  # User is not banned
 
 # Global ban check handler - but only for non-admin, non-command messages
-@Client.on_message(filters.private & ~filters.user(ADMIN_USER_ID) & ~filters.command())
+@Client.on_message(filters.private & ~filters.user(ADMIN_USER_ID) & ~filters.command)
 async def global_ban_check(bot: Client, message: Message):
     """Global ban check for all private messages from non-admin users"""
     # Check if user is banned
