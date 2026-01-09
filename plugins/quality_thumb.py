@@ -312,3 +312,9 @@ async def delete_thumbnail(client, callback):
             [InlineKeyboardButton("🔙 Back", f"quality_{quality}")]
         ])
     )
+
+# Add this test handler in quality_thumb.py
+@Client.on_message(filters.private & filters.command('test_thumb'))
+async def test_thumb(client, message):
+    print("DEBUG: test_thumb command received")
+    await message.reply("Test thumb command is working!")
