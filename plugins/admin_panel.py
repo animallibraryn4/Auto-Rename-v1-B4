@@ -340,9 +340,20 @@ async def process_ban_user_id(bot: Client, message: Message):
     user_id = message.from_user.id
     
     # Check if we're waiting for user ID input
-    if user_id in ban_waiting_for_user_id:
-        try:
-            target_user_id = int(message.text.strip())
+    if user_id not in ban_waiting_for_user_id:
+        return  # Not waiting for user ID, let other handlers process
+    
+    # Skip if it's a command
+    if message.text and message.text.startswith('/'):
+        return  # Let command handlers process it
+    
+    # Skip if message is empty or not text
+    if not message.text or not message.text.strip():
+        return
+    
+    # Now process only numeric user IDs
+    try:
+        target_user_id = int(message.text.strip())
             
             # Remove the state
             state_data = ban_waiting_for_user_id.pop(user_id)
