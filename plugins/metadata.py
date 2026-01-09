@@ -160,9 +160,9 @@ Click on any field to edit it.
         # Clear any editing state
         await db.col.update_one(
             {"_id": int(user_id)},
-            {"$unset": {"editing_metadata_field": ""}}
+            {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
         )
-        # Delete message with animation (empty edit then delete)
+        # Delete message with animation
         await query.message.delete()
         return
     
@@ -257,10 +257,13 @@ async def show_edit_field_prompt(query, user_id, field):
     
     keyboard = get_edit_field_keyboard(field)
     
-    # Store which field we're editing
+    # Store which field we're editing and the message ID
     await db.col.update_one(
         {"_id": int(user_id)},
-        {"$set": {"editing_metadata_field": field}}
+        {"$set": {
+            "editing_metadata_field": field,
+            "editing_message_id": query.message.id
+        }}
     )
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
@@ -310,10 +313,11 @@ async def handle_metadata_value_input(client, message):
     
     # Check if user is in metadata editing mode
     user_data = await db.col.find_one({"_id": int(user_id)})
-    if not user_data or "editing_metadata_field" not in user_data:
+    if not user_data or "editing_metadata_field" not in user_data or "editing_message_id" not in user_data:
         return
     
     field = user_data["editing_metadata_field"]
+    edit_message_id = user_data["editing_message_id"]
     new_value = message.text.strip()
     
     if not new_value:
@@ -340,7 +344,7 @@ async def handle_metadata_value_input(client, message):
         # Clear editing flag
         await db.col.update_one(
             {"_id": int(user_id)},
-            {"$unset": {"editing_metadata_field": ""}}
+            {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
         )
         
         # SILENT UPDATE: Edit the original prompt message with new current value
@@ -373,19 +377,17 @@ async def handle_metadata_value_input(client, message):
         
         keyboard = get_edit_field_keyboard(field)
         
-        # Find and edit the original prompt message
-        # We'll search for the last bot message with the edit prompt
-        async for msg in client.search_messages(
-            chat_id=user_id,
-            from_user="me",
-            limit=10
-        ):
-            if "Send me the new" in msg.text and field_display in msg.text:
-                try:
-                    await msg.edit_text(text=updated_text, reply_markup=keyboard)
-                    break
-                except:
-                    pass
+        try:
+            # Edit the original message using stored message ID
+            await client.edit_message_text(
+                chat_id=user_id,
+                message_id=edit_message_id,
+                text=updated_text,
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            # If message not found or other error, just continue
+            print(f"Error editing message: {e}")
         
         # Delete the user's input message
         try:
