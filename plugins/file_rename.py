@@ -18,6 +18,7 @@ from config import Config
 from plugins import is_user_verified, send_verification
 from plugins.auto_rename import info_mode_users
 from plugins.sequence import user_sequences
+from plugins.admin_panel import check_ban_status
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -714,6 +715,10 @@ async def process_rename(client: Client, message: Message):
 # ===== IMPROVED MESSAGE HANDLER WITH DUPLICATE PREVENTION =====
 async def auto_rename_files(client, message):
     user_id = message.from_user.id
+
+    # ✅ Check if user is banned
+    if await check_ban_status(user_id):
+        return
     
     # ✅ Check if user is in info mode
     if user_id in info_mode_users:
