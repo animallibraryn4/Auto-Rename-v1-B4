@@ -10,7 +10,12 @@ from config import Config
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
-async def start(client, message: Message):
+async def start(client, message):
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(message.from_user.id):
+        return  # Don't process command for banned users
+    
     if hasattr(message, 'command') and len(message.command) == 2: 
        data = message.command[1]
        if data.split("-")[0] == 'verify':
@@ -18,9 +23,9 @@ async def start(client, message: Message):
            return
     
     user = message.from_user
-    await n4bots.add_user(client, message)
+    await n4bots.add_user(client, message) 
 
-    # Simple welcome animation
+    # welcome animation
     m = await message.reply_text("ꜱᴛᴀʀᴛɪɴɢ...")
     await asyncio.sleep(0.5)
     await m.edit_text("⚡")
