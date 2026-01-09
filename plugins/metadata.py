@@ -118,18 +118,19 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     # Handle toggle commands - NO NOTIFICATIONS
     if data == "on_metadata":
         await db.set_metadata(user_id, "On")
-        # No query.answer() to avoid notifications
         await show_main_panel(query, user_id)
         return
     
     elif data == "off_metadata":
         await db.set_metadata(user_id, "Off")
-        # No query.answer() to avoid notifications
         await show_main_panel(query, user_id)
         return
     
     # Handle "Set Metadata" menu
     elif data == "set_metadata_menu":
+        # Don't edit if we're already on the set metadata menu
+        if "Set Metadata Values" in query.message.text:
+            return
         text = """
 **⚙️ Set Metadata Values**
 
@@ -186,7 +187,6 @@ Click on any field to edit it.
             method = getattr(db, method_name, None)
             if method:
                 await method(user_id, default_values[field])
-                # No query.answer() to avoid notifications
                 await show_set_metadata_menu(query, user_id)
         return
     
@@ -199,7 +199,6 @@ Click on any field to edit it.
         await db.set_audio(user_id, "By @Animelibraryn4")
         await db.set_subtitle(user_id, "By @Animelibraryn4")
         await db.set_video(user_id, "Encoded By @Animelibraryn4")
-        # No query.answer() to avoid notifications
         await show_set_metadata_menu(query, user_id)
         return
     
@@ -210,6 +209,8 @@ Click on any field to edit it.
     
     # Handle meta info/help
     elif data == "meta_info":
+        if Txt.META_TXT in query.message.text:
+            return
         await query.message.edit_text(
             text=Txt.META_TXT,
             disable_web_page_preview=True,
@@ -285,6 +286,13 @@ async def show_main_panel(query, user_id):
 """
     
     keyboard = get_main_menu_keyboard(current_status)
+    
+    # Check if we're already showing this content to avoid MESSAGE_NOT_MODIFIED
+    current_text = query.message.text
+    if "Metadata Control Panel" in current_text and summary in current_text:
+        # Content is the same, don't edit
+        return
+    
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
 async def show_set_metadata_menu(query, user_id):
@@ -304,6 +312,11 @@ Choose which metadata field you want to configure:
 Click on any field to edit it.
 """
     keyboard = get_set_metadata_keyboard()
+    
+    # Check if we're already showing this content
+    if "Set Metadata Values" in query.message.text:
+        return
+    
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
 @Client.on_message(filters.private & ~filters.command("start") & ~filters.command("help") & ~filters.command("metadata"))
