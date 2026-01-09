@@ -1,6 +1,8 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import n4bots
+import logging
+logger = logging.getLogger(__name__)
 
 QUALITY_TYPES = ["360p", "480p", "720p", "1080p", "HDrip", "2160p", "4K", "2K", "4kX264", "4kx265"]
 
@@ -18,7 +20,14 @@ async def generate_main_menu_buttons(user_id):
         [InlineKeyboardButton("❌ Close", "quality_close")]
     ])
     return buttons
-
+    
+# Add this new handler
+@Client.on_message(filters.command(["smart_thumb", "thumb"]))
+async def debug_smart_thumb(client, message):
+    logger.info(f"📞 /smart_thumb command received from {message.from_user.id}")
+    # Call the original function
+    return await quality_menu(client, message)
+    
 @Client.on_message(filters.private & filters.command('smart_thumb'))
 async def quality_menu(client, message):
     print(f"✅ /smart_thumb command received from user {message.from_user.id}")
