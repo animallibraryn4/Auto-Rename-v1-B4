@@ -109,8 +109,7 @@ async def metadata_main(client, message):
         reply_markup=keyboard, 
         disable_web_page_preview=True
     )
-
-@Client.on_callback_query(filters.regex(r"^(on_metadata|off_metadata|set_metadata_menu|edit_|cancel_edit_|reset_all|metadata_home|meta_info|close_meta|clear_)"))
+@Client.on_callback_query(filters.regex(r"^(on_metadata|off_metadata|set_metadata_menu|edit_(title|author|artist|audio|subtitle|video)$|cancel_edit_(title|author|artist|audio|subtitle|video)$|reset_all|metadata_home|meta_info|close_meta|clear_(title|author|artist|audio|subtitle|video)$)"))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
