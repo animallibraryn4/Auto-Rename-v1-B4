@@ -3,11 +3,9 @@ from helper.database import n4bots
 from pyrogram.types import Message
 from pyrogram import Client, filters
 from pyrogram.errors import FloodWait, InputUserDeactivated, UserIsBlocked, PeerIdInvalid
+from pyrogram import StopPropagation
 import os, sys, time, asyncio, logging, datetime
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.handlers import MessageHandler
-from pyrogram.filters import Filter
-from pyrogram import StopPropagation
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -16,10 +14,13 @@ ADMIN_USER_ID = Config.ADMIN
 # Flag to indicate if the bot is restarting
 is_restarting = False
 
-# Global dictionary for state management
+# State management for ban panel
 ban_waiting_for_user_id = {}
 
-# Ban check middleware
+# =============================
+# BAN CHECK MIDDLEWARE
+# =============================
+
 async def check_ban_status(bot: Client, message: Message):
     """Check if user is banned before processing any command"""
     user_id = message.from_user.id
@@ -31,55 +32,71 @@ async def check_ban_status(bot: Client, message: Message):
     try:
         # Check if user exists in database
         if await n4bots.is_user_exist(user_id):
-            ban_status = await n4bots.get_ban_status(user_id)
+            # Get user data to check ban status
+            user_data = await n4bots.col.find_one({"_id": int(user_id)})
             
-            if ban_status and ban_status.get("is_banned", False):
-                # Check if ban has expired (for temporary bans)
-                ban_duration = ban_status.get("ban_duration", 0)
+            if user_data:
+                ban_status = user_data.get("ban_status", {})
+                is_banned = ban_status.get("is_banned", False)
                 
-                if ban_duration > 0:
-                    # Check if ban has expired
-                    banned_on_str = ban_status.get("banned_on")
-                    try:
-                        banned_on = datetime.date.fromisoformat(banned_on_str)
-                        today = datetime.date.today()
-                        days_banned = (today - banned_on).days
-                        
-                        if days_banned >= ban_duration:
-                            # Ban expired, unban the user
-                            await n4bots.unban_user(user_id)
-                            return False
-                    except:
-                        # If date parsing fails, keep ban active
-                        pass
-                
-                # User is banned, send ban message
-                ban_reason = ban_status.get("ban_reason", "No reason provided")
-                banned_on = ban_status.get("banned_on", "Unknown date")
-                
-                if ban_duration == 0:
-                    duration_text = "Permanent"
-                else:
-                    duration_text = f"{ban_duration} days"
-                
-                await message.reply_text(
-                    f"🚫 **You are banned from using this bot.**\n\n"
-                    f"**Reason:** {ban_reason}\n"
-                    f"**Duration:** {duration_text}\n"
-                    f"**Banned on:** {banned_on}\n\n"
-                    f"Contact @Animelibraryn4 if you believe this is a mistake."
-                )
-                return True  # Stop further processing
+                if is_banned:
+                    # Check if ban has expired (for temporary bans)
+                    ban_duration = ban_status.get("ban_duration", 0)
+                    
+                    if ban_duration > 0:
+                        # Check if ban has expired
+                        banned_on_str = ban_status.get("banned_on")
+                        try:
+                            banned_on = datetime.date.fromisoformat(banned_on_str)
+                            today = datetime.date.today()
+                            days_banned = (today - banned_on).days
+                            
+                            if days_banned >= ban_duration:
+                                # Ban expired, unban the user
+                                await n4bots.col.update_one(
+                                    {"_id": int(user_id)},
+                                    {"$set": {
+                                        "ban_status": {
+                                            "is_banned": False,
+                                            "ban_duration": 0,
+                                            "banned_on": datetime.date.max.isoformat(),
+                                            "ban_reason": ''
+                                        }
+                                    }}
+                                )
+                                return False
+                        except:
+                            # If date parsing fails, keep ban active
+                            pass
+                    
+                    # User is banned, send ban message
+                    ban_reason = ban_status.get("ban_reason", "No reason provided")
+                    banned_on = ban_status.get("banned_on", "Unknown date")
+                    
+                    if ban_duration == 0:
+                        duration_text = "Permanent"
+                    else:
+                        duration_text = f"{ban_duration} days"
+                    
+                    await message.reply_text(
+                        f"🚫 **You are banned from using this bot.**\n\n"
+                        f"**Reason:** {ban_reason}\n"
+                        f"**Duration:** {duration_text}\n"
+                        f"**Banned on:** {banned_on}\n\n"
+                        f"Contact @Animelibraryn4 if you believe this is a mistake."
+                    )
+                    return True  # User is banned
     except Exception as e:
         logger.error(f"Error checking ban status for user {user_id}: {e}")
     
-    return False  # Continue processing
+    return False  # User is not banned
 
-@Client.on_message(filters.private)
+# Global ban check handler - but only for non-admin, non-command messages
+@Client.on_message(filters.private & ~filters.user(ADMIN_USER_ID))
 async def global_ban_check(bot: Client, message: Message):
-    """Global ban check for all private messages"""
-    # Skip for admin
-    if message.from_user.id == ADMIN_USER_ID:
+    """Global ban check for all private messages from non-admin users"""
+    # Skip for commands (commands will have their own ban check)
+    if message.text and message.text.startswith('/'):
         return
     
     # Check if user is banned
@@ -87,653 +104,9 @@ async def global_ban_check(bot: Client, message: Message):
     if is_banned:
         # Don't process any further handlers for banned users
         raise StopPropagation
-    
-    
-# =============================
-# BAN CONTROL PANEL
-# =============================
-@Client.on_message(filters.private & filters.command("ban") & filters.user(ADMIN_USER_ID))
-async def ban_control_panel(bot: Client, message: Message):
-    """Ban Control Panel - Main Menu"""
-    # Clean up any waiting state
-    user_id = message.from_user.id
-    if user_id in ban_waiting_for_user_id:
-        del ban_waiting_for_user_id[user_id]
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚫 Ban User", callback_data="ban_user")],
-        [InlineKeyboardButton("📋 View Banned Users", callback_data="view_banned")],
-        [InlineKeyboardButton("✅ Unban User", callback_data="unban_user")],
-        [InlineKeyboardButton("❌ Close", callback_data="close_ban_panel")]
-    ])
-    
-    await message.reply_text(
-        "**🔨 Ban Control Panel**\n\n"
-        "Select an option to manage user bans:",
-        reply_markup=keyboard
-    )
-
-@Client.on_callback_query(filters.regex("^ban_user$") & filters.user(ADMIN_USER_ID))
-async def ban_user_handler(client: Client, callback_query):
-    """Initiate user banning process - ask for user ID only"""
-    user_id = callback_query.from_user.id
-    chat_id = callback_query.message.chat.id
-    message_id = callback_query.message.id
-    
-    # Store state
-    ban_waiting_for_user_id[user_id] = {
-        "chat_id": chat_id,
-        "message_id": message_id
-    }
-    
-    await callback_query.message.edit_text(
-        "**🚫 Ban User**\n\n"
-        "Please send the User ID you want to ban.\n\n"
-        "Only send the numeric user ID.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-        ])
-    )
-    await callback_query.answer()
-
-@Client.on_message(filters.private & filters.user(ADMIN_USER_ID))
-async def process_ban_user_id(bot: Client, message: Message):
-    """Process user ID input for banning"""
-    user_id = message.from_user.id
-    
-    # Check if we're waiting for user ID input
-    if user_id in ban_waiting_for_user_id:
-        try:
-            target_user_id = int(message.text.strip())
-            
-            # Remove the state
-            state_data = ban_waiting_for_user_id.pop(user_id)
-            chat_id = state_data["chat_id"]
-            message_id = state_data["message_id"]
-            
-            # Check if user exists
-            if not await n4bots.is_user_exist(target_user_id):
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=f"❌ User ID `{target_user_id}` not found in database.",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-                    ])
-                )
-                return
-            
-            # Check if already banned
-            ban_status = await n4bots.get_ban_status(target_user_id)
-            if ban_status and ban_status.get("is_banned", False):
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=f"❌ User `{target_user_id}` is already banned.",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-                    ])
-                )
-                return
-            
-            # Ban the user
-            reason = "Banned by admin"
-            success = await n4bots.ban_user(target_user_id, 0, reason)
-            
-            if not success:
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=f"❌ Failed to ban user `{target_user_id}`.",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-                    ])
-                )
-                return
-            
-            # Update the original message with success
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=f"✅ **Successfully banned the user**\n\nUser ID: `{target_user_id}`",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-                ])
-            )
-            
-            # Delete the user's ID input message
-            try:
-                await message.delete()
-            except:
-                pass
-            
-            # Try to notify the banned user
-            try:
-                await bot.send_message(
-                    target_user_id,
-                    f"🚫 **You have been banned from using this bot.**\n\n"
-                    f"**Reason:** {reason}\n"
-                    f"**Duration:** Permanent\n"
-                    f"**Date:** {datetime.date.today().isoformat()}\n\n"
-                    f"Contact @Animelibraryn4 if you believe this is a mistake."
-                )
-            except:
-                pass
-            
-            # Log to log channel if configured
-            if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
-                try:
-                    await bot.send_message(
-                        Config.LOG_CHANNEL,
-                        f"🚫 **User Banned**\n\n"
-                        f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
-                        f"**User ID:** `{target_user_id}`\n"
-                        f"**Reason:** {reason}\n"
-                        f"**Date:** {datetime.date.today().isoformat()}"
-                    )
-                except:
-                    pass
-                    
-        except ValueError:
-            await message.reply_text("❌ Invalid user ID. Please send only numeric user ID.")
-        except Exception as e:
-            logger.error(f"Error processing ban user ID: {e}")
-            await message.reply_text(f"Error: {str(e)}")
-
-@Client.on_callback_query(filters.regex("^view_banned$") & filters.user(ADMIN_USER_ID))
-async def view_banned_users(client: Client, callback_query):
-    """Display list of banned users"""
-    try:
-        # Find all banned users
-        banned_users = []
-        async for user in n4bots.col.find({"ban_status.is_banned": True}):
-            banned_users.append(user)
-        
-        if not banned_users:
-            await callback_query.message.edit_text(
-                "**📋 Banned Users List**\n\n"
-                "No users are currently banned.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-                ])
-            )
-            return
-        
-        # Create paginated view
-        items_per_page = 5
-        total_pages = (len(banned_users) + items_per_page - 1) // items_per_page
-        
-        # Get current page from callback data if available
-        page = 1
-        if callback_query.data.startswith("view_banned_"):
-            try:
-                page = int(callback_query.data.split("_")[2])
-            except:
-                page = 1
-        
-        start_idx = (page - 1) * items_per_page
-        end_idx = min(start_idx + items_per_page, len(banned_users))
-        
-        text = f"**📋 Banned Users List**\n\n"
-        text += f"**Total Banned:** {len(banned_users)}\n"
-        text += f"**Page:** {page}/{total_pages}\n\n"
-        
-        for i in range(start_idx, end_idx):
-            user = banned_users[i]
-            user_id = user.get("_id", "Unknown")
-            ban_reason = user.get("ban_status", {}).get("ban_reason", "No reason provided")
-            banned_on = user.get("ban_status", {}).get("banned_on", "Unknown date")
-            ban_duration = user.get("ban_status", {}).get("ban_duration", 0)
-            
-            # Format duration
-            if ban_duration == 0:
-                duration_text = "Permanent"
-            else:
-                duration_text = f"{ban_duration} days"
-            
-            text += f"**{i+1}. User ID:** `{user_id}`\n"
-            text += f"   **Reason:** {ban_reason}\n"
-            text += f"   **Duration:** {duration_text}\n"
-            text += f"   **Banned on:** {banned_on}\n\n"
-        
-        # Create navigation buttons
-        buttons = []
-        if total_pages > 1:
-            row = []
-            if page > 1:
-                row.append(InlineKeyboardButton("⬅️ Previous", callback_data=f"view_banned_{page-1}"))
-            row.append(InlineKeyboardButton(f"{page}/{total_pages}", callback_data="none"))
-            if page < total_pages:
-                row.append(InlineKeyboardButton("Next ➡️", callback_data=f"view_banned_{page+1}"))
-            buttons.append(row)
-        
-        buttons.append([InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")])
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
-        
-    except Exception as e:
-        logger.error(f"Error viewing banned users: {e}")
-        await callback_query.message.edit_text(
-            f"**Error:** {str(e)}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-            ])
-        )
-    
-    await callback_query.answer()
-
-@Client.on_callback_query(filters.regex("^unban_user$") & filters.user(ADMIN_USER_ID))
-async def unban_user_handler(client: Client, callback_query):
-    """Initiate user unbanning process"""
-    await callback_query.message.edit_text(
-        "**✅ Unban User**\n\n"
-        "Please reply to a banned user's message with `/unban` or send:\n"
-        "`/unban <user_id>`\n\n"
-        "**Example:**\n"
-        "`/unban 1234567890`\n\n"
-        "Or reply to any user's message with `/unban`",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
-        ])
-    )
-    await callback_query.answer()
-
-@Client.on_callback_query(filters.regex("^close_ban_panel$"))
-async def close_ban_panel(client: Client, callback_query):
-    """Close the ban control panel"""
-    await callback_query.message.delete()
-    await callback_query.answer("Ban panel closed")
-
-@Client.on_callback_query(filters.regex("^back_to_ban_panel$") & filters.user(ADMIN_USER_ID))
-async def back_to_ban_panel(client: Client, callback_query):
-    """Return to main ban panel"""
-    # Clean up any waiting state
-    user_id = callback_query.from_user.id
-    if user_id in ban_waiting_for_user_id:
-        del ban_waiting_for_user_id[user_id]
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚫 Ban User", callback_data="ban_user")],
-        [InlineKeyboardButton("📋 View Banned Users", callback_data="view_banned")],
-        [InlineKeyboardButton("✅ Unban User", callback_data="unban_user")],
-        [InlineKeyboardButton("❌ Close", callback_data="close_ban_panel")]
-    ])
-    
-    await callback_query.message.edit_text(
-        "**🔨 Ban Control Panel**\n\n"
-        "Select an option to manage user bans:",
-        reply_markup=keyboard
-    )
-    await callback_query.answer()
-
-@Client.on_message(filters.command("ban") & filters.user(ADMIN_USER_ID) & filters.private)
-async def ban_user_command(bot: Client, message: Message):
-    """Ban a user by ID or reply - Legacy command"""
-    try:
-        # Check if replying to a message
-        if message.reply_to_message:
-            user_id = message.reply_to_message.from_user.id
-            reason = " ".join(message.command[1:]) if len(message.command) > 1 else "No reason provided"
-        else:
-            # Parse from command arguments
-            if len(message.command) < 2:
-                await message.reply_text(
-                    "**Usage:**\n"
-                    "`/ban <user_id> <reason>`\n"
-                    "or reply to a message with `/ban <reason>`"
-                )
-                return
-            
-            try:
-                user_id = int(message.command[1])
-                reason = " ".join(message.command[2:]) if len(message.command) > 2 else "No reason provided"
-            except ValueError:
-                await message.reply_text("Invalid user ID. Please provide a numeric user ID.")
-                return
-        
-        # Check if user exists
-        if not await n4bots.is_user_exist(user_id):
-            await message.reply_text(f"User ID `{user_id}` not found in database.")
-            return
-        
-        # Check if already banned
-        ban_status = await n4bots.get_ban_status(user_id)
-        if ban_status and ban_status.get("is_banned", False):
-            await message.reply_text(f"User `{user_id}` is already banned.")
-            return
-        
-        # Ban the user using helper method
-        success = await n4bots.ban_user(user_id, 0, reason)
-        
-        if not success:
-            await message.reply_text("Failed to ban user. Please try again.")
-            return
-        
-        # Try to notify the user
-        try:
-            await bot.send_message(
-                user_id,
-                f"🚫 **You have been banned from using this bot.**\n\n"
-                f"**Reason:** {reason}\n"
-                f"**Duration:** Permanent\n"
-                f"**Date:** {datetime.date.today().isoformat()}\n\n"
-                f"Contact @Animelibraryn4 if you believe this is a mistake."
-            )
-        except:
-            pass  # User might have blocked the bot
-        
-        # Log to admin
-        await message.reply_text(
-            f"✅ **User banned successfully!**\n\n"
-            f"**User ID:** `{user_id}`\n"
-            f"**Reason:** {reason}\n"
-            f"**Duration:** Permanent\n"
-            f"**Date:** {datetime.date.today().isoformat()}"
-        )
-        
-        # Log to log channel if configured
-        if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
-            try:
-                await bot.send_message(
-                    Config.LOG_CHANNEL,
-                    f"🚫 **User Banned**\n\n"
-                    f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
-                    f"**User ID:** `{user_id}`\n"
-                    f"**Reason:** {reason}\n"
-                    f"**Date:** {datetime.date.today().isoformat()}"
-                )
-            except:
-                pass
-        
-    except Exception as e:
-        logger.error(f"Error banning user: {e}")
-        await message.reply_text(f"Error banning user: {str(e)}")
-
-@Client.on_message(filters.command("tempban") & filters.user(ADMIN_USER_ID) & filters.private)
-async def temp_ban_user_command(bot: Client, message: Message):
-    """Temporarily ban a user"""
-    try:
-        # Check if replying to a message
-        if message.reply_to_message:
-            user_id = message.reply_to_message.from_user.id
-            if len(message.command) < 2:
-                await message.reply_text(
-                    "**Usage:**\n"
-                    "`/tempban <days> <reason>`\n"
-                    "or reply to a message with `/tempban <days> <reason>`"
-                )
-                return
-            
-            try:
-                days = int(message.command[1])
-                reason = " ".join(message.command[2:]) if len(message.command) > 2 else "No reason provided"
-            except ValueError:
-                await message.reply_text("Invalid number of days. Please provide a valid number.")
-                return
-        else:
-            # Parse from command arguments
-            if len(message.command) < 3:
-                await message.reply_text(
-                    "**Usage:**\n"
-                    "`/tempban <user_id> <days> <reason>`\n"
-                    "or reply to a message with `/tempban <days> <reason>`"
-                )
-                return
-            
-            try:
-                user_id = int(message.command[1])
-                days = int(message.command[2])
-                reason = " ".join(message.command[3:]) if len(message.command) > 3 else "No reason provided"
-            except ValueError:
-                await message.reply_text("Invalid user ID or days. Please provide numeric values.")
-                return
-        
-        # Check if user exists
-        if not await n4bots.is_user_exist(user_id):
-            await message.reply_text(f"User ID `{user_id}` not found in database.")
-            return
-        
-        # Check if already banned
-        user_data = await n4bots.col.find_one({"_id": user_id})
-        if user_data and user_data.get("ban_status", {}).get("is_banned", False):
-            await message.reply_text(f"User `{user_id}` is already banned.")
-            return
-        
-        # Set ban status
-        banned_on = datetime.date.today().isoformat()
-        
-        await n4bots.col.update_one(
-            {"_id": user_id},
-            {"$set": {
-                "ban_status": {
-                    "is_banned": True,
-                    "ban_duration": days,
-                    "banned_on": banned_on,
-                    "ban_reason": reason
-                }
-            }}
-        )
-        
-        # Calculate unban date
-        unban_date = datetime.date.today() + datetime.timedelta(days=days)
-        
-        # Try to notify the user
-        try:
-            await bot.send_message(
-                user_id,
-                f"🚫 **You have been temporarily banned from using this bot.**\n\n"
-                f"**Reason:** {reason}\n"
-                f"**Duration:** {days} day(s)\n"
-                f"**Banned on:** {banned_on}\n"
-                f"**Will be unbanned on:** {unban_date.isoformat()}\n\n"
-                f"Contact @Animelibraryn4 if you believe this is a mistake."
-            )
-        except:
-            pass  # User might have blocked the bot
-        
-        # Log to admin
-        await message.reply_text(
-            f"✅ **User temporarily banned successfully!**\n\n"
-            f"**User ID:** `{user_id}`\n"
-            f"**Reason:** {reason}\n"
-            f"**Duration:** {days} day(s)\n"
-            f"**Banned on:** {banned_on}\n"
-            f"**Will be unbanned on:** {unban_date.isoformat()}"
-        )
-        
-        # Log to log channel if configured
-        if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
-            try:
-                await bot.send_message(
-                    Config.LOG_CHANNEL,
-                    f"🚫 **User Temporarily Banned**\n\n"
-                    f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
-                    f"**User ID:** `{user_id}`\n"
-                    f"**Reason:** {reason}\n"
-                    f"**Duration:** {days} day(s)\n"
-                    f"**Date:** {banned_on}\n"
-                    f"**Unban on:** {unban_date.isoformat()}"
-                )
-            except:
-                pass
-        
-    except Exception as e:
-        logger.error(f"Error temporarily banning user: {e}")
-        await message.reply_text(f"Error banning user: {str(e)}")
-
-@Client.on_message(filters.command("unban") & filters.user(ADMIN_USER_ID) & filters.private)
-async def unban_user_command(bot: Client, message: Message):
-    """Unban a user"""
-    try:
-        # Check if replying to a message
-        if message.reply_to_message:
-            user_id = message.reply_to_message.from_user.id
-        else:
-            # Parse from command arguments
-            if len(message.command) < 2:
-                await message.reply_text(
-                    "**Usage:**\n"
-                    "`/unban <user_id>`\n"
-                    "or reply to a message with `/unban`"
-                )
-                return
-            
-            try:
-                user_id = int(message.command[1])
-            except ValueError:
-                await message.reply_text("Invalid user ID. Please provide a numeric user ID.")
-                return
-        
-        # Check if user exists
-        if not await n4bots.is_user_exist(user_id):
-            await message.reply_text(f"User ID `{user_id}` not found in database.")
-            return
-        
-        # Check if actually banned
-        user_data = await n4bots.col.find_one({"_id": user_id})
-        if not user_data or not user_data.get("ban_status", {}).get("is_banned", False):
-            await message.reply_text(f"User `{user_id}` is not banned.")
-            return
-        
-        # Remove ban status
-        await n4bots.col.update_one(
-            {"_id": user_id},
-            {"$set": {
-                "ban_status": {
-                    "is_banned": False,
-                    "ban_duration": 0,
-                    "banned_on": datetime.date.max.isoformat(),
-                    "ban_reason": ''
-                }
-            }}
-        )
-        
-        # Try to notify the user
-        try:
-            await bot.send_message(
-                user_id,
-                "✅ **Your ban has been lifted!**\n\n"
-                "You can now use the bot again.\n\n"
-                "Thank you for your patience."
-            )
-        except:
-            pass  # User might have blocked the bot
-        
-        # Log to admin
-        await message.reply_text(
-            f"✅ **User unbanned successfully!**\n\n"
-            f"**User ID:** `{user_id}`\n"
-            f"**Previous ban reason:** {user_data.get('ban_status', {}).get('ban_reason', 'No reason')}"
-        )
-        
-        # Log to log channel if configured
-        if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
-            try:
-                await bot.send_message(
-                    Config.LOG_CHANNEL,
-                    f"✅ **User Unbanned**\n\n"
-                    f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
-                    f"**User ID:** `{user_id}`\n"
-                    f"**Previous reason:** {user_data.get('ban_status', {}).get('ban_reason', 'No reason')}\n"
-                    f"**Date:** {datetime.date.today().isoformat()}"
-                )
-            except:
-                pass
-        
-    except Exception as e:
-        logger.error(f"Error unbanning user: {e}")
-        await message.reply_text(f"Error unbanning user: {str(e)}")
-
-@Client.on_message(filters.command("baninfo") & filters.user(ADMIN_USER_ID) & filters.private)
-async def ban_info_command(bot: Client, message: Message):
-    """Get ban information for a user"""
-    try:
-        # Check if replying to a message
-        if message.reply_to_message:
-            user_id = message.reply_to_message.from_user.id
-        else:
-            # Parse from command arguments
-            if len(message.command) < 2:
-                await message.reply_text(
-                    "**Usage:**\n"
-                    "`/baninfo <user_id>`\n"
-                    "or reply to a message with `/baninfo`"
-                )
-                return
-            
-            try:
-                user_id = int(message.command[1])
-            except ValueError:
-                await message.reply_text("Invalid user ID. Please provide a numeric user ID.")
-                return
-        
-        # Get user data
-        user_data = await n4bots.col.find_one({"_id": user_id})
-        
-        if not user_data:
-            await message.reply_text(f"User ID `{user_id}` not found in database.")
-            return
-        
-        ban_status = user_data.get("ban_status", {})
-        is_banned = ban_status.get("is_banned", False)
-        
-        if not is_banned:
-            await message.reply_text(f"User `{user_id}` is not banned.")
-            return
-        
-        # Format ban information
-        ban_reason = ban_status.get("ban_reason", "No reason provided")
-        banned_on = ban_status.get("banned_on", "Unknown date")
-        ban_duration = ban_status.get("ban_duration", 0)
-        
-        if ban_duration == 0:
-            duration_text = "Permanent"
-            unban_text = "Never (permanent ban)"
-        else:
-            duration_text = f"{ban_duration} day(s)"
-            # Calculate unban date
-            try:
-                banned_date = datetime.date.fromisoformat(banned_on)
-                unban_date = banned_date + datetime.timedelta(days=ban_duration)
-                today = datetime.date.today()
-                
-                if unban_date < today:
-                    unban_text = f"Already expired (was {unban_date.isoformat()})"
-                else:
-                    days_left = (unban_date - today).days
-                    unban_text = f"{unban_date.isoformat()} ({days_left} day(s) left)"
-            except:
-                unban_text = "Unknown"
-        
-        text = f"**🔍 Ban Information for User `{user_id}`**\n\n"
-        text += f"**Status:** 🚫 Banned\n"
-        text += f"**Reason:** {ban_reason}\n"
-        text += f"**Duration:** {duration_text}\n"
-        text += f"**Banned on:** {banned_on}\n"
-        text += f"**Will be unbanned:** {unban_text}\n\n"
-        
-        # Add user info if available
-        try:
-            user = await bot.get_users(user_id)
-            text += f"**User:** {user.mention}\n"
-            text += f"**Username:** @{user.username if user.username else 'N/A'}\n"
-            text += f"**First Name:** {user.first_name or 'N/A'}\n"
-            if user.last_name:
-                text += f"**Last Name:** {user.last_name}\n"
-        except:
-            text += "**User details:** Could not fetch user info\n"
-        
-        await message.reply_text(text)
-        
-    except Exception as e:
-        logger.error(f"Error getting ban info: {e}")
-        await message.reply_text(f"Error getting ban information: {str(e)}")
 
 # =============================
-# EXISTING FUNCTIONS (KEPT AS IS)
+# EXISTING ADMIN COMMANDS (MODIFIED)
 # =============================
 
 @Client.on_message(filters.private & filters.command("restart") & filters.user(ADMIN_USER_ID))
@@ -753,6 +126,13 @@ async def restart_bot(b, m):
 
 @Client.on_message(filters.private & filters.command("tutorial"))
 async def tutorial(bot: Client, message: Message):
+    """Handle /tutorial command with ban check"""
+    # Check if user is banned (skip for admin)
+    if message.from_user.id != ADMIN_USER_ID:
+        is_banned = await check_ban_status(bot, message)
+        if is_banned:
+            return
+    
     user_id = message.from_user.id
     format_template = await n4bots.get_format_template(user_id)
     await message.reply_text(
@@ -815,6 +195,13 @@ async def broadcast_handler(bot: Client, m: Message):
     async for user in all_users:
         try:
             user_id = user['_id']
+            
+            # Check if user is banned before sending
+            user_data = await n4bots.col.find_one({"_id": int(user_id)})
+            if user_data and user_data.get("ban_status", {}).get("is_banned", False):
+                failed += 1
+                progress += 1
+                continue
             
             # Try to send message
             try:
@@ -898,3 +285,361 @@ async def send_msg(user_id, message):
     except Exception as e:
         print(f"Broadcast error for user {user_id}: {e}")
         return 500  # Other error
+
+# =============================
+# NEW BAN CONTROL PANEL
+# =============================
+
+@Client.on_message(filters.private & filters.command("ban") & filters.user(ADMIN_USER_ID))
+async def ban_control_panel(bot: Client, message: Message):
+    """Ban Control Panel - Main Menu"""
+    # Clean up any waiting state
+    user_id = message.from_user.id
+    if user_id in ban_waiting_for_user_id:
+        del ban_waiting_for_user_id[user_id]
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚫 Ban User", callback_data="ban_user")],
+        [InlineKeyboardButton("📋 View Banned Users", callback_data="view_banned")],
+        [InlineKeyboardButton("✅ Unban User", callback_data="unban_user")],
+        [InlineKeyboardButton("❌ Close", callback_data="close_ban_panel")]
+    ])
+    
+    await message.reply_text(
+        "**🔨 Ban Control Panel**\n\n"
+        "Select an option to manage user bans:",
+        reply_markup=keyboard
+    )
+
+@Client.on_callback_query(filters.regex("^ban_user$") & filters.user(ADMIN_USER_ID))
+async def ban_user_handler(client: Client, callback_query):
+    """Initiate user banning process - ask for user ID only"""
+    user_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
+    message_id = callback_query.message.id
+    
+    # Store state
+    ban_waiting_for_user_id[user_id] = {
+        "chat_id": chat_id,
+        "message_id": message_id
+    }
+    
+    await callback_query.message.edit_text(
+        "**🚫 Ban User**\n\n"
+        "Please send the User ID you want to ban.\n\n"
+        "Only send the numeric user ID.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+        ])
+    )
+    await callback_query.answer()
+
+@Client.on_message(filters.private & filters.user(ADMIN_USER_ID))
+async def process_ban_user_id(bot: Client, message: Message):
+    """Process user ID input for banning"""
+    user_id = message.from_user.id
+    
+    # Check if we're waiting for user ID input
+    if user_id in ban_waiting_for_user_id:
+        try:
+            target_user_id = int(message.text.strip())
+            
+            # Remove the state
+            state_data = ban_waiting_for_user_id.pop(user_id)
+            chat_id = state_data["chat_id"]
+            message_id = state_data["message_id"]
+            
+            # Check if user exists
+            if not await n4bots.is_user_exist(target_user_id):
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=f"❌ User ID `{target_user_id}` not found in database.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                    ])
+                )
+                return
+            
+            # Check if already banned
+            user_data = await n4bots.col.find_one({"_id": target_user_id})
+            if user_data and user_data.get("ban_status", {}).get("is_banned", False):
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=f"❌ User `{target_user_id}` is already banned.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                    ])
+                )
+                return
+            
+            # Ban the user
+            reason = "Banned by admin"
+            banned_on = datetime.date.today().isoformat()
+            
+            await n4bots.col.update_one(
+                {"_id": target_user_id},
+                {"$set": {
+                    "ban_status": {
+                        "is_banned": True,
+                        "ban_duration": 0,
+                        "banned_on": banned_on,
+                        "ban_reason": reason
+                    }
+                }}
+            )
+            
+            # Update the original message with success
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=f"✅ **Successfully banned the user**\n\nUser ID: `{target_user_id}`",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                ])
+            )
+            
+            # Delete the user's ID input message
+            try:
+                await message.delete()
+            except:
+                pass
+            
+            # Try to notify the banned user
+            try:
+                await bot.send_message(
+                    target_user_id,
+                    f"🚫 **You have been banned from using this bot.**\n\n"
+                    f"**Reason:** {reason}\n"
+                    f"**Duration:** Permanent\n"
+                    f"**Date:** {banned_on}\n\n"
+                    f"Contact @Animelibraryn4 if you believe this is a mistake."
+                )
+            except:
+                pass
+            
+            # Log to log channel if configured
+            if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
+                try:
+                    await bot.send_message(
+                        Config.LOG_CHANNEL,
+                        f"🚫 **User Banned**\n\n"
+                        f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
+                        f"**User ID:** `{target_user_id}`\n"
+                        f"**Reason:** {reason}\n"
+                        f"**Date:** {banned_on}"
+                    )
+                except:
+                    pass
+                    
+        except ValueError:
+            await message.reply_text("❌ Invalid user ID. Please send only numeric user ID.")
+        except Exception as e:
+            logger.error(f"Error processing ban user ID: {e}")
+            await message.reply_text(f"Error: {str(e)}")
+
+@Client.on_callback_query(filters.regex("^view_banned$") & filters.user(ADMIN_USER_ID))
+async def view_banned_users(client: Client, callback_query):
+    """Display all banned users"""
+    try:
+        # Find all banned users
+        banned_users = []
+        async for user in n4bots.col.find({"ban_status.is_banned": True}):
+            user_id = user.get("_id")
+            ban_reason = user.get("ban_status", {}).get("ban_reason", "No reason")
+            banned_on = user.get("ban_status", {}).get("banned_on", "Unknown")
+            ban_duration = user.get("ban_status", {}).get("ban_duration", 0)
+            
+            banned_users.append({
+                "user_id": user_id,
+                "reason": ban_reason,
+                "date": banned_on,
+                "duration": ban_duration
+            })
+        
+        if not banned_users:
+            text = "📋 **Banned Users List**\n\nNo users are currently banned."
+        else:
+            text = f"📋 **Banned Users List**\n\nTotal Banned: {len(banned_users)}\n\n"
+            for i, user in enumerate(banned_users[:50], 1):  # Limit to 50 users
+                duration_text = "Permanent" if user['duration'] == 0 else f"{user['duration']} days"
+                text += f"{i}. `{user['user_id']}`\n"
+                text += f"   Reason: {user['reason']}\n"
+                text += f"   Date: {user['date']}\n"
+                text += f"   Duration: {duration_text}\n\n"
+            
+            if len(banned_users) > 50:
+                text += f"\n... and {len(banned_users) - 50} more users."
+        
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+            ])
+        )
+    except Exception as e:
+        logger.error(f"Error viewing banned users: {e}")
+        await callback_query.message.edit_text(
+            f"❌ Error fetching banned users: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+            ])
+        )
+    await callback_query.answer()
+
+@Client.on_callback_query(filters.regex("^unban_user$") & filters.user(ADMIN_USER_ID))
+async def unban_user_handler(client: Client, callback_query):
+    """Initiate user unbanning process"""
+    user_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
+    message_id = callback_query.message.id
+    
+    # Store state for unban
+    ban_waiting_for_user_id[user_id] = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "action": "unban"
+    }
+    
+    await callback_query.message.edit_text(
+        "**✅ Unban User**\n\n"
+        "Please send the User ID you want to unban.\n\n"
+        "Only send the numeric user ID.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+        ])
+    )
+    await callback_query.answer()
+
+@Client.on_message(filters.private & filters.user(ADMIN_USER_ID))
+async def process_unban_user_id(bot: Client, message: Message):
+    """Process user ID input for unbanning"""
+    user_id = message.from_user.id
+    
+    # Check if we're waiting for unban user ID input
+    if user_id in ban_waiting_for_user_id and ban_waiting_for_user_id[user_id].get("action") == "unban":
+        try:
+            target_user_id = int(message.text.strip())
+            
+            # Remove the state
+            state_data = ban_waiting_for_user_id.pop(user_id)
+            chat_id = state_data["chat_id"]
+            message_id = state_data["message_id"]
+            
+            # Check if user exists
+            if not await n4bots.is_user_exist(target_user_id):
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=f"❌ User ID `{target_user_id}` not found in database.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                    ])
+                )
+                return
+            
+            # Check if actually banned
+            user_data = await n4bots.col.find_one({"_id": target_user_id})
+            if not user_data or not user_data.get("ban_status", {}).get("is_banned", False):
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=f"❌ User `{target_user_id}` is not banned.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                    ])
+                )
+                return
+            
+            # Unban the user
+            await n4bots.col.update_one(
+                {"_id": target_user_id},
+                {"$set": {
+                    "ban_status": {
+                        "is_banned": False,
+                        "ban_duration": 0,
+                        "banned_on": datetime.date.max.isoformat(),
+                        "ban_reason": ''
+                    }
+                }}
+            )
+            
+            # Update the original message with success
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=f"✅ **Successfully unbanned the user**\n\nUser ID: `{target_user_id}`",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_ban_panel")]
+                ])
+            )
+            
+            # Delete the user's ID input message
+            try:
+                await message.delete()
+            except:
+                pass
+            
+            # Try to notify the unbanned user
+            try:
+                await bot.send_message(
+                    target_user_id,
+                    f"✅ **Your ban has been lifted.**\n\n"
+                    f"You can now use the bot again.\n\n"
+                    f"If you have any questions, contact @Animelibraryn4."
+                )
+            except:
+                pass
+            
+            # Log to log channel if configured
+            if hasattr(Config, 'LOG_CHANNEL') and Config.LOG_CHANNEL:
+                try:
+                    await bot.send_message(
+                        Config.LOG_CHANNEL,
+                        f"✅ **User Unbanned**\n\n"
+                        f"**By:** {message.from_user.mention} ({message.from_user.id})\n"
+                        f"**User ID:** `{target_user_id}`\n"
+                        f"**Date:** {datetime.date.today().isoformat()}"
+                    )
+                except:
+                    pass
+                    
+        except ValueError:
+            await message.reply_text("❌ Invalid user ID. Please send only numeric user ID.")
+        except Exception as e:
+            logger.error(f"Error processing unban user ID: {e}")
+            await message.reply_text(f"Error: {str(e)}")
+
+@Client.on_callback_query(filters.regex("^back_to_ban_panel$") & filters.user(ADMIN_USER_ID))
+async def back_to_ban_panel(client: Client, callback_query):
+    """Return to main ban panel"""
+    # Clean up any waiting state
+    user_id = callback_query.from_user.id
+    if user_id in ban_waiting_for_user_id:
+        del ban_waiting_for_user_id[user_id]
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚫 Ban User", callback_data="ban_user")],
+        [InlineKeyboardButton("📋 View Banned Users", callback_data="view_banned")],
+        [InlineKeyboardButton("✅ Unban User", callback_data="unban_user")],
+        [InlineKeyboardButton("❌ Close", callback_data="close_ban_panel")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "**🔨 Ban Control Panel**\n\n"
+        "Select an option to manage user bans:",
+        reply_markup=keyboard
+    )
+    await callback_query.answer()
+
+@Client.on_callback_query(filters.regex("^close_ban_panel$") & filters.user(ADMIN_USER_ID))
+async def close_ban_panel(client: Client, callback_query):
+    """Close the ban control panel"""
+    # Clean up any waiting state
+    user_id = callback_query.from_user.id
+    if user_id in ban_waiting_for_user_id:
+        del ban_waiting_for_user_id[user_id]
+    
+    await callback_query.message.delete()
+    await callback_query.answer("Ban panel closed")
