@@ -3,6 +3,23 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from config import Txt
 
+# At the top of metadata.py, define excluded commands
+EXCLUDED_COMMANDS = [
+    "start", "help", "metadata", "verify", "get_token", 
+    "autorename", "setmedia", "info", "set_caption", 
+    "del_caption", "see_caption", "view_caption", 
+    "restart", "tutorial", "stats", "status", 
+    "broadcast", "donate", "bought", "sequence", 
+    "sf", "fileseq", "ls", "plan", "smart_thumb", 
+    "mode", "caption", "meta", "file_names", 
+    "thumbnail", "metadatax", "source", "premiumx", 
+    "plans", "about", "home"
+]
+
+@Client.on_message(filters.private & ~filters.command(EXCLUDED_COMMANDS))
+async def handle_metadata_value_input(client, message):
+    # ... rest of your function
+
 async def get_metadata_summary(user_id):
     """Generate a summary of all metadata settings"""
     current = await db.get_metadata(user_id)
