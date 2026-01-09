@@ -16,19 +16,14 @@ pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
 
-
 class Bot(Client):
-
     def __init__(self):
         super().__init__(
             name="N4_BOTS",
             api_id=Config.API_ID,
             api_hash=Config.API_HASH,
             bot_token=Config.BOT_TOKEN,
-
-            # FINAL FIX (NO SQLITE, NO SESSION FILE)
             in_memory=True,
-
             workers=50,
             plugins={"root": "plugins"},
             sleep_threshold=15,
