@@ -18,13 +18,7 @@ async def generate_main_menu_buttons(user_id):
     return buttons
 
 @Client.on_message(filters.private & filters.command('smart_thumb'))
-async def quality_menu(client, message):
-    # Check if user is banned
-    from plugins.admin_panel import check_ban_status
-    user_id = message.from_user.id
-    if await check_ban_status(user_id):
-        return
-        
+async def quality_menu(client, message):     
     buttons = await generate_main_menu_buttons(message.from_user.id)
     await message.reply_text(
         "🎬 Thumbnail Manager",
