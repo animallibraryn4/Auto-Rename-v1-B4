@@ -251,6 +251,12 @@ async def bought(client, message):
 
 @Client.on_message(filters.private & filters.command("help"))
 async def help_command(client, message):
+
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return
+        
     # Get bot info properly
     bot = await client.get_me()
     mention = bot.mention if hasattr(bot, 'mention') else f"@{bot.username}"
