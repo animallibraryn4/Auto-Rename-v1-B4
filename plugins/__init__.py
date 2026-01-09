@@ -54,6 +54,11 @@ def get_readable_time(seconds):
 
 async def is_user_verified(user_id):
     """Check if user is verified using main database"""
+    # First check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return False  # Banned users cannot use the bot
+    
     if not VERIFY_EXPIRE or user_id in PREMIUM_USERS:
         return True
     
