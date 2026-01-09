@@ -21,6 +21,7 @@ async def generate_main_menu_buttons(user_id):
 async def quality_menu(client, message):
     # Check if user is banned
     from plugins.admin_panel import check_ban_status
+    user_id = message.from_user.id
     if await check_ban_status(user_id):
         return
         
