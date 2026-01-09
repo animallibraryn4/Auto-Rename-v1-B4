@@ -14,9 +14,6 @@ from plugins.admin_panel import check_ban_status
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message: Message):
-    # Get the command name
-    command_name = message.command[0]
-    
     # ADD THIS BAN CHECK AT THE BEGINNING
     is_banned = await check_ban_status(client, message)
     if is_banned:
