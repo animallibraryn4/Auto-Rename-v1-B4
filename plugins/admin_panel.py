@@ -19,6 +19,9 @@ ban_waiting_for_user_id = {}
 # =============================
 # BAN CONTROL PANEL
 # =============================
+@Client.on_message(filters.private & filters.command("test"))
+async def test_handler(client, message):
+    await message.reply(f"Bot is responding! Command: {message.command}")
 
 @Client.on_message(filters.private & filters.command("ban") & filters.user(ADMIN_USER_ID))
 async def ban_control_panel(bot: Client, message: Message):
