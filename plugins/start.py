@@ -7,12 +7,15 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, 
 from helper.database import n4bots
 from config import *
 from config import Config
+
+# Import the check_ban_status function from admin_panel
 from plugins.admin_panel import check_ban_status
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message: Message):
-    is_banned = await check_ban_status(bot, message)
+    # ADD THIS BAN CHECK AT THE BEGINNING
+    is_banned = await check_ban_status(client, message)
     if is_banned:
         return
         
@@ -67,6 +70,33 @@ async def cb_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
 
     print(f"Callback data received: {data}")  # Debugging line
+
+    # ADD BAN CHECK FOR CALLBACK QUERIES TOO
+    # Check if user is banned when they click buttons
+    if user_id != Config.ADMIN:  # Skip check for admin
+        try:
+            ban_status = await n4bots.get_ban_status(user_id)
+            if ban_status and ban_status.get("is_banned", False):
+                # Check if ban has expired
+                ban_duration = ban_status.get("ban_duration", 0)
+                if ban_duration > 0:
+                    banned_on_str = ban_status.get("banned_on")
+                    try:
+                        banned_on = datetime.date.fromisoformat(banned_on_str)
+                        today = datetime.date.today()
+                        days_banned = (today - banned_on).days
+                        if days_banned >= ban_duration:
+                            await n4bots.unban_user(user_id)
+                        else:
+                            await query.answer("🚫 You are banned from using this bot.", show_alert=True)
+                            return
+                    except:
+                        pass
+                else:
+                    await query.answer("🚫 You are banned from using this bot.", show_alert=True)
+                    return
+        except Exception as e:
+            print(f"Error checking ban status in callback: {e}")
 
     if data == "home":
         await query.message.edit_text(
@@ -219,9 +249,15 @@ async def cb_handler(client, query: CallbackQuery):
         await query.message.edit_text(f"**Media preference set to:** {media_type} ✅")
 
 
-# Donation Command Handler
+# Donation Command Handler - ADD BAN CHECK HERE TOO
 @Client.on_message(filters.command("donate"))
 async def donation(client, message):
+    # Add ban check
+    if message.from_user.id != Config.ADMIN:
+        is_banned = await check_ban_status(client, message)
+        if is_banned:
+            return
+    
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data="help"), InlineKeyboardButton(text="ᴏᴡɴᴇʀ", url='https://t.me/Tanjiro_kamado_n4_bot')]
     ])
@@ -230,9 +266,15 @@ async def donation(client, message):
     await yt.delete()
     await message.delete()
 
-# Bought Command Handler
+# Bought Command Handler - ADD BAN CHECK HERE TOO
 @Client.on_message(filters.command("bought") & filters.private)
 async def bought(client, message):
+    # Add ban check
+    if message.from_user.id != Config.ADMIN:
+        is_banned = await check_ban_status(client, message)
+        if is_banned:
+            return
+    
     msg = await message.reply('Wait im checking...')
     replied = message.reply_to_message
 
@@ -251,6 +293,11 @@ async def bought(client, message):
 
 @Client.on_message(filters.private & filters.command("help"))
 async def help_command(client, message):
+    # ADD BAN CHECK
+    is_banned = await check_ban_status(client, message)
+    if is_banned:
+        return
+    
     # Get bot info properly
     bot = await client.get_me()
     mention = bot.mention if hasattr(bot, 'mention') else f"@{bot.username}"
@@ -264,4 +311,4 @@ async def help_command(client, message):
             [InlineKeyboardButton('ᴍᴇᴛᴀᴅᴀᴛᴀ', callback_data='meta'), InlineKeyboardButton('ᴅᴏɴᴀᴛᴇ', callback_data='donate')],
             [InlineKeyboardButton('ʜᴏᴍᴇ', callback_data='home')]
         ])
-    )
+        )
