@@ -311,4 +311,4 @@ async def help_command(client, message):
             [InlineKeyboardButton('ᴍᴇᴛᴀᴅᴀᴛᴀ', callback_data='meta'), InlineKeyboardButton('ᴅᴏɴᴀᴛᴇ', callback_data='donate')],
             [InlineKeyboardButton('ʜᴏᴍᴇ', callback_data='home')]
         ])
-        )
+    )
