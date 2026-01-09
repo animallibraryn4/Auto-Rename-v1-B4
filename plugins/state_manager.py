@@ -1,4 +1,3 @@
-# 
 class UserState:
     def __init__(self):
         self.info_mode = {}
