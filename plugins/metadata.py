@@ -16,10 +16,6 @@ EXCLUDED_COMMANDS = [
     "plans", "about", "home"
 ]
 
-@Client.on_message(filters.private & ~filters.command(EXCLUDED_COMMANDS))
-async def handle_metadata_value_input(client, message):
-    # ... rest of your function
-
 async def get_metadata_summary(user_id):
     """Generate a summary of all metadata settings"""
     current = await db.get_metadata(user_id)
@@ -336,7 +332,7 @@ Click on any field to edit it.
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
-@Client.on_message(filters.private & ~filters.command("start") & ~filters.command("help") & ~filters.command("metadata"))
+@Client.on_message(filters.private & ~filters.command(EXCLUDED_COMMANDS))
 async def handle_metadata_value_input(client, message):
     """Handle text input for metadata fields - SILENT UPDATE"""
     user_id = message.from_user.id
