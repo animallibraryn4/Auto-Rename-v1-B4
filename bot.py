@@ -39,10 +39,10 @@ class Bot(Client):
         await super().start()
 
         me = await self.get_me()
-        print(f"{me.first_name} Is Started.....🎉")
+        print(f"{me.first_name} Is Started.....😊")
         # Initialize queue manager with client
         queue_manager.set_client(self)
-        print("Queue manager initialized")
+        
         
         self.start_time = time.time()
 
