@@ -75,26 +75,21 @@ async def cb_handler(client, query: CallbackQuery):
     # Check if user is banned when they click buttons
     if user_id != Config.ADMIN:  # Skip check for admin
         try:
-            ban_status = await n4bots.get_ban_status(user_id)
-            if ban_status and ban_status.get("is_banned", False):
-                # Check if ban has expired
-                ban_duration = ban_status.get("ban_duration", 0)
-                if ban_duration > 0:
-                    banned_on_str = ban_status.get("banned_on")
-                    try:
-                        banned_on = datetime.date.fromisoformat(banned_on_str)
-                        today = datetime.date.today()
-                        days_banned = (today - banned_on).days
-                        if days_banned >= ban_duration:
-                            await n4bots.unban_user(user_id)
-                        else:
-                            await query.answer("🚫 You are banned from using this bot.", show_alert=True)
-                            return
-                    except:
-                        pass
-                else:
-                    await query.answer("🚫 You are banned from using this bot.", show_alert=True)
-                    return
+            # Use the check_ban_status function from admin_panel
+            from plugins.admin_panel import check_ban_status
+            
+            # Create a mock message object for check_ban_status
+            class MockMessage:
+                def __init__(self, user_id, chat_id):
+                    self.from_user = type('obj', (object,), {'id': user_id})()
+                    self.chat = type('obj', (object,), {'id': chat_id})()
+            
+            mock_msg = MockMessage(user_id, query.message.chat.id)
+            is_banned = await check_ban_status(client, mock_msg)
+            
+            if is_banned:
+                await query.answer("🚫 You are banned from using this bot.", show_alert=True)
+                return
         except Exception as e:
             print(f"Error checking ban status in callback: {e}")
 
