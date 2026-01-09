@@ -71,6 +71,20 @@ async def check_ban_status(bot: Client, message: Message):
         logger.error(f"Error checking ban status for user {user_id}: {e}")
     
     return False  # Continue processing
+
+@Client.on_message(filters.private)
+async def global_ban_check(bot: Client, message: Message):
+    """Global ban check for all private messages"""
+    # Skip for admin
+    if message.from_user.id == ADMIN_USER_ID:
+        return
+    
+    # Check if user is banned
+    is_banned = await check_ban_status(bot, message)
+    if is_banned:
+        # Don't process any further handlers for banned users
+        raise StopPropagation
+    
     
 # =============================
 # BAN CONTROL PANEL
