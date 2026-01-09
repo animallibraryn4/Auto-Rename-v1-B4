@@ -43,6 +43,8 @@ async def ban_control_panel(bot: Client, message: Message):
         "Select an option to manage user bans:",
         reply_markup=keyboard
     )
+    
+    return
 
 @Client.on_callback_query(filters.regex("^ban_user$") & filters.user(ADMIN_USER_ID))
 async def ban_user_handler(client: Client, callback_query):
