@@ -1,3 +1,6 @@
+from pyrogram.handlers import MessageHandler
+from pyrogram.filters import Filter
+from pyrogram import StopPropagation
 from plugins import validate_token 
 import random
 import asyncio
