@@ -7,6 +7,7 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, 
 from helper.database import n4bots
 from config import *
 from config import Config
+from plugins.admin_panel import check_ban_status
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
