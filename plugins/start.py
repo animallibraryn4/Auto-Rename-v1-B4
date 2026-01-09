@@ -10,11 +10,14 @@ from config import Config
 
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
-async def start(client, message):
+async def start(client, message: Message):
     # Check if user is banned
     from plugins.admin_panel import check_ban_status
     if await check_ban_status(message.from_user.id):
-        return  # Don't process command for banned users
+        # Send ban message
+        from plugins.admin_panel import check_and_notify_banned_user
+        await check_and_notify_banned_user(client, message.from_user.id)
+        return
     
     if hasattr(message, 'command') and len(message.command) == 2: 
        data = message.command[1]
@@ -23,9 +26,9 @@ async def start(client, message):
            return
     
     user = message.from_user
-    await n4bots.add_user(client, message) 
+    await n4bots.add_user(client, message)
 
-    # welcome animation
+    # Simple welcome animation
     m = await message.reply_text("ꜱᴛᴀʀᴛɪɴɢ...")
     await asyncio.sleep(0.5)
     await m.edit_text("⚡")
@@ -60,7 +63,7 @@ async def start(client, message):
             disable_web_page_preview=True
         )
 
-# Update the callback regex pattern to include mode-related callbacks:
+# The callback regex pattern to include mode-related callbacks:
 @Client.on_callback_query(filters.regex(r'^(home|caption|help|meta|donate|file_names|thumbnail|metadatax|source|premiumx|plans|about|close|setmedia_|on_metadata|off_metadata|metainfo|back_to_welcome|premium_page|close_message|set_mode_|close_mode)$'))
 async def cb_handler(client, query: CallbackQuery):
     data = query.data
