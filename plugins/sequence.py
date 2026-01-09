@@ -9,13 +9,6 @@ from pyrogram.errors import UserNotParticipant, FloodWait, ChatAdminRequired, Ch
 from config import Config, Txt
 from helper.database import n4bots
 import pyrogram
-print(pyrogram.__version__)  # Version check karo
-
-# Try these:
-# parse_mode="html" (lowercase)
-# parse_mode="HTML"
-# parse_mode=pyrogram.enums.ParseMode.HTML
-# parse_mode=None (no formatting)
 
 # Global dictionaries for sequence management
 user_sequences = {}  # user_id -> list of file data
