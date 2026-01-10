@@ -256,7 +256,6 @@ async def fileseq_callback(client, query):
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons_layout))
         await query.answer(f"✅ {current_text} enabled!", show_alert=False)
     except Exception as e:
-        print(f"Error updating fileseq UI: {e}")
         await query.answer("Mode Updated!")
         
 @Client.on_callback_query(filters.regex(r'^close_data$'))
