@@ -1,7 +1,5 @@
-
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.enums import ParseMode
 from helper.database import n4bots
 
 QUALITY_TYPES = ["360p", "480p", "720p", "1080p", "HDrip", "2160p", "4K", "2K", "4kX264", "4kx265"]
@@ -65,127 +63,81 @@ async def toggle_global_mode(client, callback):
 async def set_global_thumb(client, callback):
     user_id = callback.from_user.id
     await n4bots.set_temp_quality(user_id, "global")
-    await callback.answer("Now send me the thumbnail as photo", show_alert=False)
     await callback.message.edit_text(
-        "🖼️ **Send me the Global Thumbnail (as photo)**\n\n"
-        "Just send a photo now. I'll save it as your global thumbnail.",
+        "🖼️ Send me the Global Thumbnail (as photo)\n\nPlease send a photo (not a document) to set as global thumbnail.",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("↩️ Cancel", "quality_global")]
         ])
     )
 
-# FIXED: Enhanced photo handler with better debugging
 @Client.on_message(filters.private & filters.photo & ~filters.command(''))
-async def save_thumbnail_handler(client, message):
+async def save_thumbnail(client, message):
     user_id = message.from_user.id
-    
-    # Get the quality from temp storage
     quality = await n4bots.get_temp_quality(user_id)
     
-    # Debug log
-    print(f"[DEBUG] User {user_id} sent photo, temp_quality: {quality}")
+    print(f"Received photo from user {user_id}, quality setting: {quality}")  # Debug
     
     if not quality:
-        # Not in thumbnail setting mode
+        # User might be sending a photo for metadata or other purpose
+        # Check if user is in metadata editing mode
+        user_data = await n4bots.col.find_one({"_id": int(user_id)})
+        if user_data and "editing_metadata_field" in user_data:
+            # This might be for metadata, not thumbnail
+            return
         return
     
     try:
-        # Delete the photo message to keep chat clean
-        try:
-            await message.delete()
-        except:
-            pass
-        
         if quality == "global":
-            # Save as global thumbnail and clear all quality-specific thumbnails
-            await n4bots.set_global_thumb(user_id, message.photo.file_id)
-            
-            # Clear quality-specific thumbnails when setting global
+            # Delete all quality-specific thumbnails when setting global thumb
             await n4bots.col.update_one(
                 {"_id": user_id},
-                {"$set": {"thumbnails": {}}}
+                {"$set": {"global_thumb": message.photo.file_id}, "$unset": {"thumbnails": ""}}
             )
-            
-            reply_text = "✅ **Global thumbnail saved!**\n\nAll quality-specific thumbnails have been cleared."
-            
+            reply_text = "✅ Global thumbnail saved successfully!\n\nAll quality-specific thumbnails have been cleared."
         else:
-            # Check if global mode is enabled
             if await n4bots.is_global_thumb_enabled(user_id):
-                await client.send_message(
-                    user_id,
-                    "❌ **Global mode is active!**\n\nPlease disable global mode first to set quality-specific thumbnails.",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("⚙️ Global Settings", callback_data="quality_global")]
-                    ])
-                )
+                await message.reply_text("❌ Global mode is currently active! Please disable it first from Global Thumbnail Settings to set quality-specific thumbnails.")
                 await n4bots.clear_temp_quality(user_id)
                 return
                 
-            # Save quality-specific thumbnail
             await n4bots.set_quality_thumbnail(user_id, quality, message.photo.file_id)
-            reply_text = f"✅ **{quality.upper()} thumbnail saved!**"
+            reply_text = f"✅ {quality.upper()} thumbnail saved successfully!"
         
-        # Clear the temporary quality storage
+        # Clear temp quality after successful save
         await n4bots.clear_temp_quality(user_id)
         
-        # Send confirmation
-        confirmation_msg = await client.send_message(
-            user_id,
-            reply_text,
-            reply_markup=InlineKeyboardMarkup([
+        buttons = []
+        if quality == "global":
+            buttons = [
                 [InlineKeyboardButton("👀 View", f"view_{quality}")],
                 [InlineKeyboardButton("⚙️ Settings", f"quality_{quality}")]
-            ])
+            ]
+        else:
+            buttons = [
+                [InlineKeyboardButton("👀 View", f"view_{quality}")],
+                [InlineKeyboardButton("⚙️ Settings", f"quality_{quality}")]
+            ]
+        
+        await message.reply_text(
+            reply_text,
+            reply_markup=InlineKeyboardMarkup(buttons) if buttons else None
         )
         
-        # Auto-delete confirmation after 10 seconds
-        await asyncio.sleep(10)
-        try:
-            await confirmation_msg.delete()
-        except:
-            pass
-            
     except Exception as e:
-        print(f"[ERROR] Saving thumbnail failed: {e}")
-        await client.send_message(
-            user_id,
-            f"❌ **Error saving thumbnail:**\n`{str(e)}`"
-        )
+        print(f"Error saving thumbnail: {e}")
+        await message.reply_text(f"❌ Error saving thumbnail: {str(e)}")
+    finally:
+        # Always clear temp quality to prevent stuck states
         await n4bots.clear_temp_quality(user_id)
-
-# Additional handler for document photos (some users send as document)
-@Client.on_message(filters.private & filters.document & ~filters.command(''))
-async def save_document_thumbnail(client, message):
-    user_id = message.from_user.id
-    quality = await n4bots.get_temp_quality(user_id)
-    
-    if not quality:
-        return
-    
-    # Check if document is an image
-    if message.document and message.document.mime_type and message.document.mime_type.startswith('image/'):
-        await save_thumbnail_handler(client, message)
-    else:
-        # Notify user to send as photo
-        await message.reply_text(
-            "⚠️ **Please send as photo, not as document!**\n\n"
-            "For thumbnails, use the 'Send Photo' option in Telegram, not 'Send File'.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("↩️ Cancel", f"quality_{quality}")]
-            ])
-        )
 
 @Client.on_callback_query(filters.regex(r'^view_global$'))
 async def view_global_thumb(client, callback):
-    user_id = callback.from_user.id
-    thumb = await n4bots.get_global_thumb(user_id)
+    thumb = await n4bots.get_global_thumb(callback.from_user.id)
     if thumb:
-        await callback.answer("Sending thumbnail...", show_alert=False)
         await client.send_photo(
             callback.message.chat.id,
             photo=thumb,
-            caption="📸 **Global Thumbnail**",
-            reply_to_message_id=callback.message.id
+            caption="📸 Global Thumbnail"
         )
     else:
         await callback.answer("No global thumbnail set!", show_alert=True)
@@ -194,9 +146,8 @@ async def view_global_thumb(client, callback):
 async def delete_global_thumb(client, callback):
     user_id = callback.from_user.id
     await n4bots.set_global_thumb(user_id, None)
-    await callback.answer("Global thumbnail deleted!", show_alert=False)
     await callback.message.edit_text(
-        "🗑️ **Global thumbnail deleted!**",
+        "🗑 Global thumbnail deleted!",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", "quality_global")]
         ])
@@ -206,7 +157,7 @@ async def delete_global_thumb(client, callback):
 async def back_to_main(client, callback):
     buttons = await generate_main_menu_buttons(callback.from_user.id)
     await callback.message.edit_text(
-        "🎬 **Thumbnail Manager**",
+        "🎬 Thumbnail Manager",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -217,9 +168,8 @@ async def delete_all_thumbs(client, callback):
         {"_id": user_id},
         {"$set": {"thumbnails": {}, "global_thumb": None}}
     )
-    await callback.answer("All thumbnails deleted!", show_alert=False)
     await callback.message.edit_text(
-        "✅ **All thumbnails deleted successfully!**",
+        "✅ All thumbnails deleted successfully!",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Main Menu", "back_to_main")]
         ])
@@ -254,74 +204,10 @@ async def quality_handler(client, callback):
     
     status_text = "🌐 (Global)" if is_global else f"{'✅ Set' if has_thumb else '❌ Not Set'}"
     await callback.message.edit_text(
-        f"⚙️ **{quality.upper()} Settings**\n\nStatus: {status_text}",
+        f"⚙️ {quality.upper()} Settings\n\nStatus: {status_text}",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-@Client.on_callback_query(filters.regex(r'^set_([a-zA-Z0-9]+)$'))
-async def set_thumbnail_handler(client, callback):
-    user_id = callback.from_user.id
-    quality = callback.matches[0].group(1)
-    
-    # Set temporary quality for the user
-    await n4bots.set_temp_quality(user_id, quality)
-    
-    await callback.answer(f"Ready to save {quality.upper()} thumbnail", show_alert=False)
-    await callback.message.edit_text(
-        f"🖼️ **Send {quality.upper()} Thumbnail**\n\n"
-        "Just send me a photo now. I'll save it as your thumbnail.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("↩️ Cancel", f"quality_{quality}")]
-        ])
-    )
-
-@Client.on_callback_query(filters.regex(r'^view_([a-zA-Z0-9]+)$'))
-async def view_thumbnail(client, callback):
-    user_id = callback.from_user.id
-    quality = callback.matches[0].group(1)
-    
-    if quality == "global":
-        thumb = await n4bots.get_global_thumb(user_id)
-    elif await n4bots.is_global_thumb_enabled(user_id):
-        thumb = await n4bots.get_global_thumb(user_id)
-    else:
-        thumb = await n4bots.get_quality_thumbnail(user_id, quality)
-    
-    if thumb:
-        await callback.answer("Sending thumbnail...", show_alert=False)
-        await client.send_photo(
-            callback.message.chat.id,
-            photo=thumb,
-            caption=f"📸 **{quality.upper()} Thumbnail{' (Global)' if await n4bots.is_global_thumb_enabled(user_id) else ''}**",
-            reply_to_message_id=callback.message.id
-        )
-    else:
-        await callback.answer("No thumbnail set!", show_alert=True)
-
-@Client.on_callback_query(filters.regex(r'^delete_([a-zA-Z0-9]+)$'))
-async def delete_thumbnail(client, callback):
-    user_id = callback.from_user.id
-    quality = callback.matches[0].group(1)
-    
-    if quality == "global":
-        await n4bots.set_global_thumb(user_id, None)
-        reply_text = "🗑️ **Global thumbnail deleted!**"
-    elif await n4bots.is_global_thumb_enabled(user_id):
-        await callback.answer("Global mode is active! Disable it first.", show_alert=True)
-        return
-    else:
-        await n4bots.set_quality_thumbnail(user_id, quality, None)
-        reply_text = f"🗑️ **{quality.upper()} thumbnail deleted!**"
-    
-    await callback.answer("Thumbnail deleted!", show_alert=False)
-    await callback.message.edit_text(
-        reply_text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", f"quality_{quality}")]
-        ])
-    )
-
-# Navigation handlers (keep these as they are)
 @Client.on_callback_query(filters.regex(r'^prev_([a-zA-Z0-9]+)$'))
 async def prev_quality_handler(client, callback):
     """Navigate to previous quality"""
@@ -353,7 +239,7 @@ async def prev_quality_handler(client, callback):
     
     status_text = "🌐 (Global)" if is_global else f"{'✅ Set' if has_thumb else '❌ Not Set'}"
     await callback.message.edit_text(
-        f"⚙️ **{new_quality.upper()} Settings**\n\nStatus: {status_text}",
+        f"⚙️ {new_quality.upper()} Settings\n\nStatus: {status_text}",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -388,6 +274,70 @@ async def next_quality_handler(client, callback):
     
     status_text = "🌐 (Global)" if is_global else f"{'✅ Set' if has_thumb else '❌ Not Set'}"
     await callback.message.edit_text(
-        f"⚙️ **{new_quality.upper()} Settings**\n\nStatus: {status_text}",
+        f"⚙️ {new_quality.upper()} Settings\n\nStatus: {status_text}",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
+
+@Client.on_callback_query(filters.regex(r'^set_([a-zA-Z0-9]+)$'))
+async def set_thumbnail_handler(client, callback):
+    user_id = callback.from_user.id
+    quality = callback.matches[0].group(1)
+    await n4bots.set_temp_quality(user_id, quality)
+    
+    await callback.message.edit_text(
+        f"🖼️ Send {quality.upper()} Thumbnail\n\nPlease send a photo (not a document) to set as {quality.upper()} thumbnail.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("↩️ Cancel", f"quality_{quality}")]
+        ])
+    )
+
+@Client.on_callback_query(filters.regex(r'^view_([a-zA-Z0-9]+)$'))
+async def view_thumbnail(client, callback):
+    user_id = callback.from_user.id
+    quality = callback.matches[0].group(1)
+    
+    if quality == "global":
+        thumb = await n4bots.get_global_thumb(user_id)
+    elif await n4bots.is_global_thumb_enabled(user_id):
+        thumb = await n4bots.get_global_thumb(user_id)
+    else:
+        thumb = await n4bots.get_quality_thumbnail(user_id, quality)
+    
+    if thumb:
+        await client.send_photo(
+            callback.message.chat.id,
+            photo=thumb,
+            caption=f"📸 {quality.upper()} Thumbnail{' (Global)' if await n4bots.is_global_thumb_enabled(user_id) else ''}"
+        )
+    else:
+        await callback.answer("No thumbnail set!", show_alert=True)
+
+@Client.on_callback_query(filters.regex(r'^delete_([a-zA-Z0-9]+)$'))
+async def delete_thumbnail(client, callback):
+    user_id = callback.from_user.id
+    quality = callback.matches[0].group(1)
+    
+    if quality == "global":
+        await n4bots.set_global_thumb(user_id, None)
+        reply_text = "🗑 Global thumbnail deleted!"
+    elif await n4bots.is_global_thumb_enabled(user_id):
+        await callback.answer("Global mode is active!", show_alert=True)
+        return
+    else:
+        await n4bots.set_quality_thumbnail(user_id, quality, None)
+        reply_text = f"🗑 {quality.upper()} thumbnail deleted!"
+    
+    await callback.message.edit_text(
+        reply_text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back", f"quality_{quality}")]
+        ])
+    )
+
+# Add a handler to clear temp quality when canceling
+@Client.on_callback_query(filters.regex(r'^quality_(360p|480p|720p|1080p|HDrip|2160p|4K|2K|4kX264|4kx265)$'))
+async def quality_cancel_handler(client, callback):
+    """Clear temp quality when user navigates away from set thumbnail screen"""
+    user_id = callback.from_user.id
+    await n4bots.clear_temp_quality(user_id)
+    await quality_handler(client, callback)
