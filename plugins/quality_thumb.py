@@ -63,6 +63,13 @@ async def toggle_global_mode(client, callback):
 async def set_global_thumb(client, callback):
     user_id = callback.from_user.id
     await n4bots.set_temp_quality(user_id, "global")
+    
+    # Store the message ID for editing later
+    await n4bots.col.update_one(
+        {"_id": user_id},
+        {"$set": {"thumbnail_edit_msg_id": callback.message.id}}
+    )
+    
     await callback.message.edit_text(
         "🖼️ **Send me the Global Thumbnail**\n\nPlease send a **photo** (not a document) to set as global thumbnail.\n\n⚠️ Note: Send as photo, not as document!",
         reply_markup=InlineKeyboardMarkup([
@@ -98,28 +105,81 @@ async def save_thumbnail_priority(client, message):
                 {"_id": user_id},
                 {"$set": {"global_thumb": message.photo.file_id}}
             )
-            reply_text = "✅ **Global thumbnail saved successfully!**\n\nAll quality-specific thumbnails are disabled when global thumb is active."
+            success_text = "✅ **Global thumbnail saved successfully!**\n\nAll quality-specific thumbnails are disabled when global thumb is active."
         else:
             if await n4bots.is_global_thumb_enabled(user_id):
-                await message.reply_text("❌ **Global mode is active!**\n\nPlease disable Global Mode first from Global Thumbnail Settings to set quality-specific thumbnails.")
+                # Get the message ID to edit
+                user_data = await n4bots.col.find_one({"_id": int(user_id)})
+                edit_msg_id = user_data.get("thumbnail_edit_msg_id") if user_data else None
+                
+                if edit_msg_id:
+                    await client.edit_message_text(
+                        chat_id=user_id,
+                        message_id=edit_msg_id,
+                        text="❌ **Global mode is active!**\n\nPlease disable Global Mode first from Global Thumbnail Settings to set quality-specific thumbnails.",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("↩️ Cancel", f"quality_{quality}")]
+                        ])
+                    )
+                else:
+                    await message.reply_text("❌ **Global mode is active!**\n\nPlease disable Global Mode first from Global Thumbnail Settings to set quality-specific thumbnails.")
+                
                 await n4bots.clear_temp_quality(user_id)
                 return
                 
             # Save quality-specific thumbnail
             await n4bots.set_quality_thumbnail(user_id, quality, message.photo.file_id)
-            reply_text = f"✅ **{quality.upper()} thumbnail saved successfully!**"
+            success_text = f"✅ **{quality.upper()} thumbnail saved successfully!**"
         
         # Clear temp quality
         await n4bots.clear_temp_quality(user_id)
         
-        # Send success message with buttons
-        await message.reply_text(
-            reply_text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("👀 View Thumbnail", f"view_{quality}")],
-                [InlineKeyboardButton("⚙️ Settings", f"quality_{quality}")]
-            ])
+        # Get the message ID to edit
+        user_data = await n4bots.col.find_one({"_id": int(user_id)})
+        edit_msg_id = user_data.get("thumbnail_edit_msg_id") if user_data else None
+        
+        # Clear stored message ID
+        await n4bots.col.update_one(
+            {"_id": user_id},
+            {"$unset": {"thumbnail_edit_msg_id": ""}}
         )
+        
+        if edit_msg_id:
+            # Edit the original message instead of sending new one
+            current_index = QUALITY_TYPES.index(quality) if quality in QUALITY_TYPES else 0
+            prev_quality = QUALITY_TYPES[(current_index - 1) % len(QUALITY_TYPES)] if quality in QUALITY_TYPES else "360p"
+            next_quality = QUALITY_TYPES[(current_index + 1) % len(QUALITY_TYPES)] if quality in QUALITY_TYPES else "480p"
+            
+            # Create navigation buttons
+            nav_buttons = []
+            if quality in QUALITY_TYPES:
+                nav_buttons = [
+                    [
+                        InlineKeyboardButton("◀️", f"prev_{quality}"),
+                        InlineKeyboardButton("▶️", f"next_{quality}")
+                    ],
+                    [InlineKeyboardButton("🔙 Main Menu", "back_to_main")]
+                ]
+            else:
+                nav_buttons = [
+                    [InlineKeyboardButton("🔙 Main Menu", "back_to_main")]
+                ]
+            
+            await client.edit_message_text(
+                chat_id=user_id,
+                message_id=edit_msg_id,
+                text=f"⚙️ **{quality.upper()} Settings**\n\n**Status:** ✅ Set\n\n{success_text}",
+                reply_markup=InlineKeyboardMarkup(nav_buttons)
+            )
+        else:
+            # Fallback: Send new message if edit not possible
+            await message.reply_text(
+                success_text,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("👀 View Thumbnail", f"view_{quality}")],
+                    [InlineKeyboardButton("⚙️ Settings", f"quality_{quality}")]
+                ])
+            )
         
         # Delete the photo message to keep chat clean
         try:
@@ -129,8 +189,28 @@ async def save_thumbnail_priority(client, message):
             
     except Exception as e:
         print(f"❌ Error saving thumbnail: {e}")
-        await message.reply_text(f"❌ **Error saving thumbnail:**\n`{str(e)}`")
+        
+        # Get the message ID to edit
+        user_data = await n4bots.col.find_one({"_id": int(user_id)})
+        edit_msg_id = user_data.get("thumbnail_edit_msg_id") if user_data else None
+        
+        if edit_msg_id:
+            await client.edit_message_text(
+                chat_id=user_id,
+                message_id=edit_msg_id,
+                text=f"❌ **Error saving thumbnail:**\n`{str(e)[:200]}`",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("↩️ Cancel", f"quality_{quality}")]
+                ])
+            )
+        else:
+            await message.reply_text(f"❌ **Error saving thumbnail:**\n`{str(e)}`")
+        
         await n4bots.clear_temp_quality(user_id)
+        await n4bots.col.update_one(
+            {"_id": user_id},
+            {"$unset": {"thumbnail_edit_msg_id": ""}}
+        )
 
 @Client.on_callback_query(filters.regex(r'^view_global$'))
 async def view_global_thumb(client, callback):
@@ -287,6 +367,12 @@ async def set_thumbnail_handler(client, callback):
     quality = callback.matches[0].group(1)
     await n4bots.set_temp_quality(user_id, quality)
     
+    # Store the message ID for editing later
+    await n4bots.col.update_one(
+        {"_id": user_id},
+        {"$set": {"thumbnail_edit_msg_id": callback.message.id}}
+    )
+    
     await callback.message.edit_text(
         f"🖼️ **Send {quality.upper()} Thumbnail**\n\nPlease send a **photo** (not a document) to set as {quality.upper()} thumbnail.\n\n⚠️ Note: Send as photo, not as document!",
         reply_markup=InlineKeyboardMarkup([
@@ -343,4 +429,8 @@ async def quality_cancel_handler(client, callback):
     """Clear temp quality when user navigates away from set thumbnail screen"""
     user_id = callback.from_user.id
     await n4bots.clear_temp_quality(user_id)
+    await n4bots.col.update_one(
+        {"_id": user_id},
+        {"$unset": {"thumbnail_edit_msg_id": ""}}
+    )
     await quality_handler(client, callback)
