@@ -43,8 +43,6 @@ class Bot(Client):
         # Initialize queue manager with client
         queue_manager.set_client(self)
         
-        n4bots.set_temp_quality()
-        
         self.start_time = time.time()
 
         uptime_seconds = int(time.time() - self.start_time)
