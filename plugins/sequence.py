@@ -208,22 +208,57 @@ async def sequence_messages(client, messages, mode="per_ep", user_id=None):
 # =====================================================
 # CALLBACK QUERY HANDLERS - MOVED TO TOP
 # =====================================================
-
 @Client.on_callback_query(filters.regex("^fileseq_(per_ep|group)$"))
 async def fileseq_callback(client, query):
-    """Handle /fileseq callback for sequence flow selection"""
+    """Handle /fileseq callback and update UI dynamically"""
     user_id = query.from_user.id
     selection = query.data.replace("fileseq_", "")
 
+    # Save to DB and local state
     await n4bots.set_sequence_mode(user_id, selection)
     user_seq_mode[user_id] = selection
 
-    flow_name = "Episode Flow" if selection == "per_ep" else "Quality Flow"
-    await query.answer(
-        f"✅ {flow_name} enabled!",
-        show_alert=True
+    # Prepare updated UI
+    current_text = "Episode Flow" if selection == "per_ep" else "Quality Flow"
+    
+    btn_per_ep = InlineKeyboardButton(
+        f"{'✅ ' if selection == 'per_ep' else ''}📺 Episode Flow", 
+        callback_data='fileseq_per_ep'
+    )
+    btn_group = InlineKeyboardButton(
+        f"{'✅ ' if selection == 'group' else ''}🎬 Quality Flow", 
+        callback_data='fileseq_group'
     )
 
+    # Re-sort buttons for the edit
+    buttons_layout = [[btn_per_ep], [btn_group]] if selection == "per_ep" else [[btn_group], [btn_per_ep]]
+   
+    text = (
+        f"<b>➲ Choose File Sequence Order</b>\n\n"
+        f"<blockquote><b>Current Mode:</b> {current_text}</blockquote>\n\n"
+        
+        "<b>📺 Episode Flow:</b>\n"
+        "<blockquote>Files are sent episode by episode.\n"
+        "Order: Season → Episode → Quality\n\n"
+        "<i>Example:</i>\n"
+        "S1E1 → All qualities\n"
+        "S1E2 → All qualities\n</blockquote>"
+        
+        "<b>🎬 Quality Flow:</b>\n"
+        "<blockquote>Files are sent quality by quality within each season.\n"
+        "Order: Season → Quality → Episode\n\n"
+        "<i>Example:</i>\n"
+        "Season 1 → All 480p episodes\n"
+        "Season 1 → All 720p episodes</blockquote>"
+    )
+
+    try:
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons_layout))
+        await query.answer(f"✅ {current_text} enabled!", show_alert=False)
+    except Exception as e:
+        print(f"Error updating fileseq UI: {e}")
+        await query.answer("Mode Updated!")
+        
 @Client.on_callback_query(filters.regex(r'^close_data$'))
 async def close_callback_handler(client, query):
     """Handle close button callback"""
@@ -763,21 +798,31 @@ async def switch_mode_cmd(client, message):
 # =====================================================
 # /fileseq COMMAND - Choose Sequence Flow
 # =====================================================
-
 @Client.on_message(filters.private & filters.command("fileseq"))
 async def fileseq_command(client, message):
-    """Handle /fileseq command to choose sequence flow"""
+    """Handle /fileseq command with dynamic button ordering"""
     user_id = message.from_user.id
     
-    # Get current mode from database if not in local state
     if user_id not in user_seq_mode:
         db_seq_mode = await n4bots.get_sequence_mode(user_id)
         user_seq_mode[user_id] = db_seq_mode
     
-    # Get current mode for display
     current_mode = user_seq_mode.get(user_id, "per_ep")
     current_text = "Episode Flow" if current_mode == "per_ep" else "Quality Flow"
     
+    # Define buttons
+    btn_per_ep = InlineKeyboardButton(
+        f"{'✅ ' if current_mode == 'per_ep' else ''}📺 Episode Flow", 
+        callback_data='fileseq_per_ep'
+    )
+    btn_group = InlineKeyboardButton(
+        f"{'✅ ' if current_mode == 'group' else ''}🎬 Quality Flow", 
+        callback_data='fileseq_group'
+    )
+
+    # Sort buttons: Selected one on top
+    buttons_layout = [[btn_per_ep], [btn_group]] if current_mode == "per_ep" else [[btn_group], [btn_per_ep]]
+   
     text = (
         f"<b>➲ Choose File Sequence Order</b>\n\n"
         f"<blockquote><b>Current Mode:</b> {current_text}</blockquote>\n\n"
@@ -797,13 +842,8 @@ async def fileseq_command(client, message):
         "Season 1 → All 720p episodes</blockquote>"
     )
     
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📺 Episode Flow", callback_data='fileseq_per_ep')],
-        [InlineKeyboardButton("🎬 Quality Flow", callback_data='fileseq_group')]
-    ])
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons_layout))
     
-    await message.reply_text(text, reply_markup=buttons)
-
 
 # =====================================================
 # /ls COMMAND - Link Sequence from Channel
