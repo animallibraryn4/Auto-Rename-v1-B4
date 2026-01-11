@@ -3,6 +3,11 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from helper.database import n4bots
 from config import Txt
 
+@Client.on_message(filters.command("panel")) # filters.user filter ko temporary hata dein
+async def vpanel_command(client, message):
+    print(f"Command received from: {message.from_user.id}") # Terminal check ke liye
+    await message.reply_text("Vpanel check!")
+
 @Client.on_message(filters.private & filters.command("mode"))
 async def mode_command(client, message: Message):
     """Handle /mode command to switch between File Mode and Caption Mode"""
