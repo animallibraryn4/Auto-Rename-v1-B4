@@ -88,6 +88,11 @@ class FileRouter:
             from plugins.file_rename import process_rename
             await process_rename(client, message)
             return True
+
+        if message.text and message.text.startswith("/start"):
+            from plugins.start import start
+            await start(client, message)
+            return True
         
         return False
 
@@ -100,3 +105,7 @@ async def handle_everything(client, message):
     """Single entry point for the entire bot"""
     # Fix: ensure we call route_file, not route_message
     await file_router.route_file(client, message)
+
+
+
+
