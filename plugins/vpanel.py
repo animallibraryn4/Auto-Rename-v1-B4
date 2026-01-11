@@ -9,7 +9,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
+@Client.on_message(filters.command("panel")) # filters.user filter ko temporary hata dein
+async def vpanel_command(client, message):
+    print(f"Command received from: {message.from_user.id}") # Terminal check ke liye
+    await message.reply_text("Vpanel check!")
+    
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN) & filters.reply)
 async def vpanel_command(bot: Client, m: Message):
     """Main verification panel"""
