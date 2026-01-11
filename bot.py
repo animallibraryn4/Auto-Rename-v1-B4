@@ -1,4 +1,3 @@
-
 import aiohttp, asyncio, warnings, pytz
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -40,8 +39,6 @@ class Bot(Client):
 
         me = await self.get_me()
         print(f"{me.first_name} Is Started.....😊")
-        # Initialize queue manager with client
-        queue_manager.set_client(self)
         
         self.start_time = time.time()
 
