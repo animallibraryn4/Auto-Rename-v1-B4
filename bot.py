@@ -11,19 +11,23 @@ import pyromod
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
+import logging
 
-    
-    # Rest of the existing code...
 pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
 
-# global bot instance for ban system
+# Add logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 bot = None
 
 class Bot(Client):
     def __init__(self):
-        global bot
         super().__init__(
             name="N4_BOTS",
             api_id=Config.API_ID,
@@ -31,7 +35,7 @@ class Bot(Client):
             bot_token=Config.BOT_TOKEN,
             in_memory=True,
             workers=50,
-            plugins={"root": "plugins"},
+            plugins={"root": "plugins"},  # Make sure vpanel.py is in this folder
             sleep_threshold=15,
         )
         bot = self  # Set global bot instance
