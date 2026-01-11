@@ -16,6 +16,7 @@ class FileRouter:
     async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
+        text = message.text or ""
 
             if text.startswith("/") and user_id in Config.ADMIN:
             command = text.split()[0] # Gets the first word (e.g., /set_expiry)
@@ -78,3 +79,5 @@ file_router = FileRouter()
 async def handle_everything(client, message):
     """Single entry point for the entire bot"""
     await file_router.route_message(client, message)
+
+    
