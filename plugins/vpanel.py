@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 print("Vpanel.py file successfully loaded!") # Ye bot start hote hi terminal mein aana chahiye
 
-@Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN), group=-1)
+
 async def vpanel_command(client, message):
     """Main verification panel"""
     try:
@@ -212,7 +212,7 @@ async def premium_add_handler(client, query: CallbackQuery):
         logger.error(f"Error in premium_add_handler: {e}")
         await query.answer(f"❌ Error: {e}", show_alert=True)
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("add_premium"))
+
 async def handle_add_premium_command(client, message: Message):
     """Handle add premium command"""
     try:
@@ -384,7 +384,7 @@ async def premium_remove_handler(client, query: CallbackQuery):
         logger.error(f"Error in premium_remove_handler: {e}")
         await query.answer(f"❌ Error: {e}", show_alert=True)
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("remove_premium"))
+
 async def handle_remove_premium_command(client, message: Message):
     """Handle premium removal command"""
     try:
@@ -489,7 +489,7 @@ async def change_settings_handler(client, query: CallbackQuery):
 # SETTINGS COMMANDS
 # =====================================================
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("set_expiry"))
+
 async def set_expiry_command(client, message: Message):
     """Set verification expiry time"""
     try:
@@ -518,7 +518,7 @@ async def set_expiry_command(client, message: Message):
         logger.error(f"Error in set_expiry_command: {e}")
         await message.reply_text(f"❌ Error: {e}")
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("set_shortlink"))
+
 async def set_shortlink_command(client, message: Message):
     """Set shortlink site"""
     try:
@@ -539,7 +539,7 @@ async def set_shortlink_command(client, message: Message):
         logger.error(f"Error in set_shortlink_command: {e}")
         await message.reply_text(f"❌ Error: {e}")
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("set_tutorial"))
+
 async def set_tutorial_command(client, message: Message):
     """Set tutorial URL"""
     try:
@@ -560,7 +560,7 @@ async def set_tutorial_command(client, message: Message):
         logger.error(f"Error in set_tutorial_command: {e}")
         await message.reply_text(f"❌ Error: {e}")
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("set_image"))
+
 async def set_image_command(client, message: Message):
     """Set verification image"""
     try:
@@ -581,7 +581,7 @@ async def set_image_command(client, message: Message):
         logger.error(f"Error in set_image_command: {e}")
         await message.reply_text(f"❌ Error: {e}")
 
-@Client.on_message(filters.private & filters.user(Config.ADMIN) & filters.command("set_api_key"))
+
 async def set_api_key_command(client, message: Message):
     """Set shortlink API key"""
     try:
@@ -606,7 +606,7 @@ async def set_api_key_command(client, message: Message):
 # TEST COMMAND
 # =====================================================
 
-@Client.on_message(filters.command("test_vpanel") & filters.user(Config.ADMIN))
+
 async def test_vpanel(client, message):
     """Test vpanel functionality"""
     try:
