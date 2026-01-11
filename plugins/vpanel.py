@@ -9,6 +9,21 @@ logger = logging.getLogger(__name__)
 
 print("✅ vpanel.py loaded successfully!")
 
+# Test command to check user ID
+@Client.on_message(filters.command("myid") & filters.private)
+async def check_my_id(client, message):
+    user_id = message.from_user.id
+    username = message.from_user.username or "No username"
+    first_name = message.from_user.first_name or "No name"
+    
+    await message.reply_text(
+        f"**Your User Information:**\n\n"
+        f"👤 **Name:** {first_name}\n"
+        f"🆔 **User ID:** `{user_id}`\n"
+        f"📱 **Username:** @{username}\n\n"
+        f"Config.ADMIN value: `{Config.ADMIN}`"
+    )
+
 async def get_main_vpanel_keyboard():
     """Main VPanel keyboard"""
     buttons = [
