@@ -21,7 +21,7 @@ def set_bot_instance(bot):
     global bot_instance
     bot_instance = bot
 
-@Client.on_message(filters.private & filters.command("restart") & filters.user(ADMIN_USER_ID))
+
 async def restart_bot(b, m):
     global is_restarting
     if not is_restarting:
@@ -50,7 +50,7 @@ async def tutorial(bot: Client, message: Message):
     )
 
 
-@Client.on_message(filters.command(["stats", "status"]) & filters.user(Config.ADMIN))
+
 async def get_stats(bot, message):
     total_users = await n4bots.total_users_count()
     # Simple uptime - calculate from when bot started
@@ -64,7 +64,7 @@ async def get_stats(bot, message):
     time_taken_s = (end_t - start_t) * 1000
     await st.edit(text=f"**--Bot Status--** \n\n**⌚️ Bot Uptime :** {uptime} \n**🐌 Current Ping :** `{time_taken_s:.3f} ms` \n**👭 Total Users :** `{total_users}`")
 
-@Client.on_message(filters.command("broadcast") & filters.user(Config.ADMIN) & filters.reply)
+
 async def broadcast_handler(bot: Client, m: Message):
     """Fixed broadcast function - simpler and more reliable"""
     
@@ -323,7 +323,7 @@ async def get_banned_users():
         logger.error(f"Error getting banned users: {e}")
         return []
 
-@Client.on_message(filters.command("ban") & filters.user(Config.ADMIN))
+
 async def ban_command(bot: Client, message: Message):
     """Ban a user permanently or temporarily"""
     # Set bot instance for ban functions
@@ -407,7 +407,7 @@ async def ban_command(bot: Client, message: Message):
         logger.error(f"Error in ban command: {e}")
         await message.reply_text(f"An error occurred: {str(e)}")
 
-@Client.on_message(filters.command("tban") & filters.user(Config.ADMIN))
+
 async def tban_command(bot: Client, message: Message):
     """Temporary ban with minutes/hours/days specification"""
     # Set bot instance for ban functions
@@ -505,7 +505,7 @@ async def tban_command(bot: Client, message: Message):
         logger.error(f"Error in tban command: {e}")
         await message.reply_text(f"An error occurred: {str(e)}")
 
-@Client.on_message(filters.command("unban") & filters.user(Config.ADMIN))
+
 async def unban_command(bot: Client, message: Message):
     """Unban a user"""
     # Set bot instance for ban functions
@@ -555,7 +555,7 @@ async def unban_command(bot: Client, message: Message):
         logger.error(f"Error in unban command: {e}")
         await message.reply_text(f"An error occurred: {str(e)}")
 
-@Client.on_message(filters.command("banlist") & filters.user(Config.ADMIN))
+
 async def banlist_command(bot: Client, message: Message):
     """Show list of banned users"""
     try:
