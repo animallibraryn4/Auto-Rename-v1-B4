@@ -20,6 +20,7 @@ class FileRouter:
             
             # admin_panel commands
             "restart": self.handle_restart,
+            "tutorial": self.handle_tutorial,
             "stats": self.handle_stats,
             "status": self.handle_stats,  # Alias for stats
             "broadcast": self.handle_broadcast,
@@ -117,6 +118,14 @@ class FileRouter:
         except Exception as e:
             await message.reply_text(f"❌ Error: {str(e)}")
     
+    async def handle_tutorial(self, client: Client, message: Message):
+        """Handle /tutorial command"""
+        try:
+            from plugins.admin_panel import tutorial
+            await tutorial(client, message)
+        except Exception as e:
+            await message.reply_text(f"❌ Error: {str(e)}")
+    
     async def handle_stats(self, client: Client, message: Message):
         """Handle /stats command"""
         try:
@@ -200,45 +209,48 @@ class FileRouter:
             return True
         
         return False
-    
-    # ========== ADMIN COMMAND ROUTING ==========
-    
-    async def route_admin_command(self, client: Client, message: Message):
-        """Route admin commands only"""
-        user_id = message.from_user.id
-        
-        # Only process if user is admin
-        if user_id not in Config.ADMIN:
-            return False
-        
-        # Check if it's a command
-        if message.text and message.text.startswith('/'):
-            command_parts = message.text.split()
-            if command_parts:
-                command = command_parts[0][1:].lower()  # Remove leading '/'
-                
-                # Handle admin commands
-                if command in self.admin_commands:
-                    await self.admin_commands[command](client, message)
-                    return True
-        
-        return False
 
 # Global router instance
 file_router = FileRouter()
 
-# ========== BOTH HANDLERS REMAIN ==========
+# ========== IMPORTANT: KEEP BOTH HANDLERS ==========
 
-# Handler 1: For normal user file processing (KEEP THIS)
+# Handler 1: For normal user file processing (THIS MUST EXIST)
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_all_files(client, message):
     """Single entry point for all file processing"""
     await file_router.route_file(client, message)
 
-# Handler 2: For admin commands only (NEW - REPLACES ALL OTHER ADMIN HANDLERS)
+# Handler 2: For admin commands only
 @Client.on_message(filters.private & filters.incoming)
 async def handle_all_messages(client, message):
     """Single entry point for ALL admin command processing"""
     # Route admin commands if user is admin
     if message.from_user.id in Config.ADMIN:
         await file_router.route_admin_command(client, message)
+
+# ========== ADD THIS MISSING METHOD ==========
+
+async def route_admin_command(self, client: Client, message: Message):
+    """Route admin commands only"""
+    user_id = message.from_user.id
+    
+    # Only process if user is admin
+    if user_id not in Config.ADMIN:
+        return False
+    
+    # Check if it's a command
+    if message.text and message.text.startswith('/'):
+        command_parts = message.text.split()
+        if command_parts:
+            command = command_parts[0][1:].lower()  # Remove leading '/'
+            
+            # Handle admin commands
+            if command in self.admin_commands:
+                await self.admin_commands[command](client, message)
+                return True
+    
+    return False
+
+# Add the method to the class
+FileRouter.route_admin_command = route_admin_command
