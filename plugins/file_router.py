@@ -12,13 +12,15 @@ class FileRouter:
         if user_id not in self.processing_lock:
             self.processing_lock[user_id] = asyncio.Lock()
         return self.processing_lock[user_id]
-    
-    async def route_file(self, client: Client, message: Message):
+
+        async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
+        # Define text from message (handle cases where message might not have text)
         text = message.text or ""
 
-            if text.startswith("/") and user_id in Config.ADMIN:
+        # Corrected Indentation below
+        if text.startswith("/") and user_id in Config.ADMIN:
             command = text.split()[0] # Gets the first word (e.g., /set_expiry)
             
             from plugins.vpanel import (
@@ -27,18 +29,24 @@ class FileRouter:
                 handle_add_premium_command,
                 handle_remove_premium_command
             )
+            
+            # Import administrative handlers
+            from plugins.admin_panel import restart_bot, get_stats, broadcast_handler, is_user_banned
 
             if command == "/restart":
-                await restart_bot(b, m)
+                await restart_bot(client, message)
                 return True
             elif command == "/stats":
-                await get_stats(bot, message)
+                await get_stats(client, message)
                 return True
             elif command == "/broadcast":
                 await broadcast_handler(client, message)
                 return True
             elif command == "/ban":
-                await is_user_banned(client, message)
+                # Note: your admin_panel.py expects user_id for is_user_banned
+                # but you might want to call ban_command here instead
+                from plugins.admin_panel import ban_command
+                await ban_command(client, message)
                 return True
 
         # Get lock for this user
@@ -80,4 +88,5 @@ async def handle_everything(client, message):
     """Single entry point for the entire bot"""
     await file_router.route_message(client, message)
 
+    
     
