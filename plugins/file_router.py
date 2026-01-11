@@ -26,43 +26,35 @@ class FileRouter:
 
         # Handle Admin Commands
         if text.startswith("/") and user_id in Config.ADMIN:
-            # Split the text into a list to simulate Pyrogram's .command attribute
             cmd_args = text.split()
-            message.command = cmd_args # This fixes the 'NoneType' error
-            
+            message.command = cmd_args
             command = cmd_args[0].lower()
             
-            from plugins.admin_panel import (
-                restart_bot, 
-                get_stats, 
-                broadcast_handler, 
-                ban_command,
-                unban_command,
-                tban_command,
-                banlist_command
-            )
+            # List of commands this router SHOULD handle
+            admin_commands = ["/restart", "/stats", "/status", "/broadcast", "/ban", "/unban", "/tban", "/banlist"]
+            
+            if command in admin_commands:
+                from plugins.admin_panel import (
+                    restart_bot, get_stats, broadcast_handler, 
+                    ban_command, unban_command, tban_command, banlist_command
+                )
+                if command == "/restart": await restart_bot(client, message)
+                elif command in ["/stats", "/status"]: await get_stats(client, message)
+                elif command == "/broadcast": await broadcast_handler(client, message)
+                elif command == "/ban": await ban_command(client, message)
+                elif command == "/unban": await unban_command(client, message)
+                elif command == "/tban": await tban_command(client, message)
+                elif command == "/banlist": await banlist_command(client, message)
+                return True # Stop here, command was handled
 
-            if command == "/restart":
-                await restart_bot(client, message)
-                return True
-            elif command in ["/stats", "/status"]:
-                await get_stats(client, message)
-                return True
-            elif command == "/broadcast":
-                await broadcast_handler(client, message)
-                return True
-            elif command == "/ban":
-                await ban_command(client, message)
-                return True
-            elif command == "/unban":
-                await unban_command(client, message)
-                return True
-            elif command == "/tban":
-                await tban_command(client, message)
-                return True
-            elif command == "/banlist":
-                await banlist_command(client, message)
-                return True
+        # 2. NEW: Ignore standard user commands so they reach start.py
+        user_commands = ["/start", "/help", "/donate", "/tutorial", "/bought"]
+        if text.split()[0].lower() in user_commands:
+            return False # Returning False allows Pyrogram to look for other handlers (like in start.py)
+
+        # 3. Only process if it's an actual file or if you intend to rename based on text
+        if not (message.document or message.video or message.audio):
+            return False # Ignore plain text that isn't a command or a file
 
         # Get lock for this user to prevent concurrent file processing
         async with await self.get_user_lock(user_id):
