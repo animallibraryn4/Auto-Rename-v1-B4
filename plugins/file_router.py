@@ -1,6 +1,7 @@
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from config import Config
 
 class FileRouter:
     def __init__(self):
@@ -15,7 +16,30 @@ class FileRouter:
     async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
-        
+
+            if text.startswith("/") and user_id in Config.ADMIN:
+            command = text.split()[0] # Gets the first word (e.g., /set_expiry)
+            
+            from plugins.vpanel import (
+                vpanel_command, 
+                set_expiry_command, 
+                handle_add_premium_command,
+                handle_remove_premium_command
+            )
+
+            if command == "/vpanel":
+                await vpanel_command(client, message)
+                return True
+            elif command == "/set_expiry":
+                await set_expiry_command(client, message)
+                return True
+            elif command == "/add_premium":
+                await handle_add_premium_command(client, message)
+                return True
+            elif command == "/remove_premium":
+                await handle_remove_premium_command(client, message)
+                return True
+
         # Get lock for this user
         async with await self.get_user_lock(user_id):
             
@@ -50,7 +74,7 @@ class FileRouter:
 file_router = FileRouter()
 
 # Single handler for all files
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
-async def handle_all_files(client, message):
-    """Single entry point for all file processing"""
-    await file_router.route_file(client, message)
+@Client.on_message(filters.private & (filters.document | filters.video | filters.audio | filters.text))
+async def handle_everything(client, message):
+    """Single entry point for the entire bot"""
+    await file_router.route_message(client, message)
