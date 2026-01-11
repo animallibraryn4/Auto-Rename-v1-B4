@@ -289,8 +289,6 @@ class Database:
         except Exception as e:
             logging.error(f"Error checking global thumb status for user {id}: {e}")
             return False
-# Add these methods to the Database class in database.py
-# Add them anywhere after the existing methods, before the codeflixbots initialization
 
     async def get_verify_status(self, id):
         try:
@@ -436,8 +434,116 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting banned users: {e}")
             return []
-        
+
+    # New Bot Settings Methods
+    async def get_bot_settings(self):
+        """Get global bot settings"""
+        try:
+            settings = await self.n4bots.bot_settings.find_one({"_id": "global"})
+            if not settings:
+                # Create default settings
+                default_settings = {
+                    "_id": "global",
+                    "verify_enabled": True,
+                    "verify_photo": "https://images8.alphacoders.com/138/1384114.png",
+                    "verify_tutorial": "https://t.me/N4_Society/55",
+                    "shortlink_site": "gplinks.com",
+                    "shortlink_api": "596f423cdf22b174e43d0b48a36a8274759ec2a3",
+                    "verify_expire": 30000,
+                    "force_sub_channels": ["animelibraryn4"],
+                    "log_channel": -1002263636517,
+                    "dump_channel": -1001896877147,
+                    "start_pic": "https://images8.alphacoders.com/138/1384114.png"
+                }
+                await self.n4bots.bot_settings.insert_one(default_settings)
+                return default_settings
+            return settings
+        except Exception as e:
+            logging.error(f"Error getting bot settings: {e}")
+            return None
+
+    async def update_bot_settings(self, updates):
+        """Update bot settings"""
+        try:
+            await self.n4bots.bot_settings.update_one(
+                {"_id": "global"},
+                {"$set": updates},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error updating bot settings: {e}")
+            return False
+
+    async def add_premium_user(self, user_id, duration_days, added_by):
+        """Add premium user with expiry"""
+        try:
+            added_at = datetime.datetime.now().timestamp()
+            expires_at = 0  # Lifetime
+            if duration_days > 0:
+                expires_at = added_at + (duration_days * 24 * 60 * 60)
+            
+            premium_data = {
+                "user_id": user_id,
+                "added_at": added_at,
+                "expires_at": expires_at,
+                "added_by": added_by,
+                "active": True
+            }
+            
+            await self.n4bots.premium_users.update_one(
+                {"user_id": user_id},
+                {"$set": premium_data},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error adding premium user: {e}")
+            return False
+
+    async def remove_premium_user(self, user_id):
+        """Remove premium user"""
+        try:
+            await self.n4bots.premium_users.delete_one({"user_id": user_id})
+            return True
+        except Exception as e:
+            logging.error(f"Error removing premium user: {e}")
+            return False
+
+    async def get_premium_user(self, user_id):
+        """Get premium user status"""
+        try:
+            user = await self.n4bots.premium_users.find_one({"user_id": user_id, "active": True})
+            if user:
+                expires_at = user.get("expires_at", 0)
+                if expires_at > 0 and expires_at < datetime.datetime.now().timestamp():
+                    # Auto-remove expired premium
+                    await self.remove_premium_user(user_id)
+                    return None
+                return user
+            return None
+        except Exception as e:
+            logging.error(f"Error getting premium user: {e}")
+            return None
+
+    async def get_all_premium_users(self):
+        """Get all premium users"""
+        try:
+            users = []
+            current_time = datetime.datetime.now().timestamp()
+            
+            async for user in self.n4bots.premium_users.find({"active": True}):
+                expires_at = user.get("expires_at", 0)
+                if expires_at > 0 and expires_at < current_time:
+                    # Skip expired users
+                    await self.remove_premium_user(user["user_id"])
+                    continue
+                users.append(user)
+            
+            return users
+        except Exception as e:
+            logging.error(f"Error getting premium users: {e}")
+            return []
+
 # Initialize database connection
 n4bots = Database(Config.DB_URL, Config.DB_NAME)
-
-
