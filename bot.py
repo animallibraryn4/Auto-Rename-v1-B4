@@ -11,7 +11,8 @@ import pyromod
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
-from plugins import vpanel
+
+
 pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
