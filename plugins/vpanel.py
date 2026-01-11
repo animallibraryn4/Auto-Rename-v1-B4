@@ -2,6 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
 from helper.database import n4bots
 import datetime
+from config import Config
+
 
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN))
 async def vpanel_command(client, message):
