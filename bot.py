@@ -1,4 +1,4 @@
-from plugins.file_rename import queue_manager
+
 import aiohttp, asyncio, warnings, pytz
 from datetime import datetime, timedelta
 from pytz import timezone
