@@ -20,7 +20,6 @@ class FileRouter:
             
             # admin_panel commands
             "restart": self.handle_restart,
-            "tutorial": self.handle_tutorial,
             "stats": self.handle_stats,
             "status": self.handle_stats,  # Alias for stats
             "broadcast": self.handle_broadcast,
@@ -115,14 +114,6 @@ class FileRouter:
         try:
             from plugins.admin_panel import restart_bot
             await restart_bot(client, message)
-        except Exception as e:
-            await message.reply_text(f"❌ Error: {str(e)}")
-    
-    async def handle_tutorial(self, client: Client, message: Message):
-        """Handle /tutorial command"""
-        try:
-            from plugins.admin_panel import tutorial
-            await tutorial(client, message)
         except Exception as e:
             await message.reply_text(f"❌ Error: {str(e)}")
     
