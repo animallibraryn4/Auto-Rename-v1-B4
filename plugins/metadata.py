@@ -331,11 +331,15 @@ Click on any field to edit it.
         return
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
-
+    
 @Client.on_message(filters.private & ~filters.command(EXCLUDED_COMMANDS))
 async def handle_metadata_value_input(client, message):
     """Handle text input for metadata fields - SILENT UPDATE"""
     user_id = message.from_user.id
+    
+    # Check if this is a text message (not photo/document etc.)
+    if not message.text:
+        return  # Skip non-text messages
     
     # Check if user is in metadata editing mode
     user_data = await db.col.find_one({"_id": int(user_id)})
@@ -420,3 +424,6 @@ async def handle_metadata_value_input(client, message):
             await message.delete()
         except:
             pass
+            
+
+
