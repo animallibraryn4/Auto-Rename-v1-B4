@@ -1,3 +1,4 @@
+
 import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -12,44 +13,37 @@ class FileRouter:
         if user_id not in self.processing_lock:
             self.processing_lock[user_id] = asyncio.Lock()
         return self.processing_lock[user_id]
-
-        async def route_file(self, client: Client, message: Message):
+    
+    async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
-        # Define text from message (handle cases where message might not have text)
-        text = message.text or ""
+        text = message.text or message.caption or "" # Define text to avoid NameError
 
-        # Corrected Indentation below
+        # Check if user is banned first
+        from plugins.admin_panel import is_user_banned
+        if await is_user_banned(user_id):
+            return True
+
+        # Handle Admin Commands
         if text.startswith("/") and user_id in Config.ADMIN:
-            command = text.split()[0] # Gets the first word (e.g., /set_expiry)
+            command = text.split()[0]
             
-            from plugins.vpanel import (
-                vpanel_command, 
-                set_expiry_command, 
-                handle_add_premium_command,
-                handle_remove_premium_command
-            )
-            
-            # Import administrative handlers
-            from plugins.admin_panel import restart_bot, get_stats, broadcast_handler, is_user_banned
+            from plugins.admin_panel import restart_bot, get_stats, broadcast_handler, ban_command
 
             if command == "/restart":
                 await restart_bot(client, message)
                 return True
-            elif command == "/stats":
+            elif command in ["/stats", "/status"]:
                 await get_stats(client, message)
                 return True
             elif command == "/broadcast":
                 await broadcast_handler(client, message)
                 return True
             elif command == "/ban":
-                # Note: your admin_panel.py expects user_id for is_user_banned
-                # but you might want to call ban_command here instead
-                from plugins.admin_panel import ban_command
                 await ban_command(client, message)
                 return True
 
-        # Get lock for this user
+        # Get lock for this user to prevent concurrent file processing
         async with await self.get_user_lock(user_id):
             
             # 1. Check Info Mode (Highest Priority)
@@ -82,11 +76,9 @@ class FileRouter:
 # Global router instance
 file_router = FileRouter()
 
-# Single handler for all files
+# Single handler for all files and text
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio | filters.text))
 async def handle_everything(client, message):
     """Single entry point for the entire bot"""
-    await file_router.route_message(client, message)
-
-    
-    
+    # Fix: ensure we call route_file, not route_message
+    await file_router.route_file(client, message)
