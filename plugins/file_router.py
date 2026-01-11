@@ -13,7 +13,7 @@ class FileRouter:
         if user_id not in self.processing_lock:
             self.processing_lock[user_id] = asyncio.Lock()
         return self.processing_lock[user_id]
-    
+
     async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
@@ -26,9 +26,21 @@ class FileRouter:
 
         # Handle Admin Commands
         if text.startswith("/") and user_id in Config.ADMIN:
-            command = text.split()[0]
+            # Split the text into a list to simulate Pyrogram's .command attribute
+            cmd_args = text.split()
+            message.command = cmd_args # This fixes the 'NoneType' error
             
-            from plugins.admin_panel import restart_bot, get_stats, broadcast_handler, ban_command
+            command = cmd_args[0].lower()
+            
+            from plugins.admin_panel import (
+                restart_bot, 
+                get_stats, 
+                broadcast_handler, 
+                ban_command,
+                unban_command,
+                tban_command,
+                banlist_command
+            )
 
             if command == "/restart":
                 await restart_bot(client, message)
@@ -41,6 +53,15 @@ class FileRouter:
                 return True
             elif command == "/ban":
                 await ban_command(client, message)
+                return True
+            elif command == "/unban":
+                await unban_command(client, message)
+                return True
+            elif command == "/tban":
+                await tban_command(client, message)
+                return True
+            elif command == "/banlist":
+                await banlist_command(client, message)
                 return True
 
         # Get lock for this user to prevent concurrent file processing
