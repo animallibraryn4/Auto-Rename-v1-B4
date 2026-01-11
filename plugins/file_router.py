@@ -20,11 +20,28 @@ class FileRouter:
         # 1. Handle Admin Commands (Highest Priority)
         # This replaces the @Client.on_message(filters.command("vpanel")) in vpanel.py
         if text.startswith("/") and user_id in Config.ADMIN:
-            if text.split()[0] == "/vpanel":
-                from plugins.vpanel import vpanel_command
+            command = text.split()[0] # Gets the first word (e.g., /set_expiry)
+            
+            from plugins.vpanel import (
+                vpanel_command, 
+                set_expiry_command, 
+                handle_add_premium_command,
+                handle_remove_premium_command
+            )
+
+            if command == "/vpanel":
                 await vpanel_command(client, message)
                 return True
-            # Add other admin commands here (e.g., /stats) if needed
+            elif command == "/set_expiry":
+                await set_expiry_command(client, message)
+                return True
+            elif command == "/add_premium":
+                await handle_add_premium_command(client, message)
+                return True
+            elif command == "/remove_premium":
+                await handle_remove_premium_command(client, message)
+                return True
+            
 
         # 2. Handle File Processing (Locks used here to prevent spam)
         if message.document or message.video or message.audio:
@@ -66,3 +83,4 @@ async def handle_everything(client, message):
     """Single entry point for the entire bot"""
     await file_router.route_message(client, message)
     
+        
