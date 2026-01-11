@@ -1,13 +1,13 @@
-
-# vpanel.py - Enhanced version with better error handling
+# vpanel.py - FIXED VERSION
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from config import Config
 from helper.database import n4bots
-from plugins.config_manager import config_manager
 import logging
 
 logger = logging.getLogger(__name__)
+
+print("✅ vpanel.py loaded successfully!")
 
 async def get_main_vpanel_keyboard():
     """Main VPanel keyboard"""
@@ -23,9 +23,9 @@ async def get_main_vpanel_keyboard():
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN))
 async def vpanel_command(client, message: Message):
     """Main VPanel command"""
+    print(f"🎛️ /vpanel command received from admin {message.from_user.id}")
+    
     try:
-        logger.info(f"VPanel command received from {message.from_user.id}")
-        
         text = """
 <b>🎛️ Bot Control Panel</b>
 
@@ -41,24 +41,19 @@ Everything can be changed without restarting the bot.</blockquote>
         
         keyboard = await get_main_vpanel_keyboard()
         await message.reply_text(text, reply_markup=keyboard)
-        logger.info(f"VPanel sent to user {message.from_user.id}")
+        print(f"✅ VPanel sent to admin {message.from_user.id}")
         
     except Exception as e:
-        logger.error(f"Error in vpanel_command: {e}")
-        await message.reply_text(f"❌ Error loading VPanel: {str(e)}")
-
-# Test command to verify the plugin is working
-@Client.on_message(filters.command("testvpanel") & filters.user(Config.ADMIN))
-async def test_vpanel(client, message: Message):
-    """Test command to verify vpanel.py is loaded"""
-    await message.reply_text("✅ vpanel.py is working correctly! Plugin is loaded.")
-
+        print(f"❌ Error in vpanel_command: {e}")
+        await message.reply_text(f"❌ Error loading VPanel: {str(e)[:200]}")
 
 @Client.on_callback_query(filters.regex(r'^vpanel_'))
 async def vpanel_callback_handler(client, query: CallbackQuery):
     """Handle VPanel callbacks"""
     data = query.data
     user_id = query.from_user.id
+    
+    print(f"🔘 Callback received: {data} from user {user_id}")
     
     if data == "vpanel_verify":
         await show_verify_settings(query)
@@ -79,14 +74,16 @@ async def vpanel_callback_handler(client, query: CallbackQuery):
 
 async def show_verify_settings(query):
     """Show verification settings"""
-    settings = await config_manager.get_verify_config()
-    
-    verify_status = "✅ Enabled" if settings.get("verify_enabled", True) else "❌ Disabled"
-    verify_expire = settings.get("verify_expire", 30000)
-    hours = verify_expire // 3600
-    minutes = (verify_expire % 3600) // 60
-    
-    text = f"""
+    try:
+        # Direct database access (without config_manager)
+        settings = await n4bots.get_bot_settings()
+        
+        verify_status = "✅ Enabled" if settings.get("verify_enabled", True) else "❌ Disabled"
+        verify_expire = settings.get("verify_expire", 30000)
+        hours = verify_expire // 3600
+        minutes = (verify_expire % 3600) // 60
+        
+        text = f"""
 <b>⚙️ Verification Settings</b>
 
 <blockquote><b>Status:</b> {verify_status}
@@ -96,96 +93,83 @@ async def show_verify_settings(query):
 
 <b>Available Actions:</b>
 """
-    
-    buttons = [
-        [
-            InlineKeyboardButton("🔄 Toggle Status", callback_data="toggle_verify"),
-            InlineKeyboardButton("⏱️ Change Expiry", callback_data="change_expiry")
-        ],
-        [
-            InlineKeyboardButton("🔗 Change Shortlink", callback_data="change_shortlink"),
-            InlineKeyboardButton("📸 Change Image", callback_data="change_image")
-        ],
-        [
-            InlineKeyboardButton("📚 Change Tutorial", callback_data="change_tutorial"),
-            InlineKeyboardButton("⚡ Quick Actions", callback_data="verify_quick")
-        ],
-        [InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]
-    ]
-    
-    await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        
+        buttons = [
+            [
+                InlineKeyboardButton("🔄 Toggle Status", callback_data="toggle_verify"),
+                InlineKeyboardButton("⏱️ Change Expiry", callback_data="change_expiry")
+            ],
+            [InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]
+        ]
+        
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    except Exception as e:
+        print(f"Error in show_verify_settings: {e}")
+        await query.message.edit_text(f"❌ Error: {str(e)[:200]}")
 
 async def show_premium_management(query):
     """Show premium user management"""
-    premium_users = await n4bots.get_all_premium_users()
-    
-    text = f"""
+    try:
+        premium_users = await n4bots.get_all_premium_users()
+        
+        text = f"""
 <b>⭐ Premium User Management</b>
 
 <blockquote><b>Total Premium Users:</b> {len(premium_users)}</blockquote>
 
 <b>Available Actions:</b>
 """
-    
-    buttons = [
-        [InlineKeyboardButton("➕ Add Premium User", callback_data="add_premium")],
-        [InlineKeyboardButton("➖ Remove Premium User", callback_data="remove_premium")],
-        [InlineKeyboardButton("📋 View All Premium", callback_data="view_premium")],
-        [InlineKeyboardButton("🕐 Set Expiry", callback_data="set_expiry")],
-        [InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]
-    ]
-    
-    await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
-
-@Client.on_callback_query(filters.regex(r'^add_premium$') & filters.user(Config.ADMIN))
-async def add_premium_handler(client, query: CallbackQuery):
-    """Start process to add premium user"""
-    await query.message.edit_text(
-        "**➕ Add Premium User**\n\n"
-        "Please send the user ID to make premium.\n\n"
-        "Format: `/addpremium <user_id> <duration_days>`\n"
-        "Example: `/addpremium 123456789 30`\n\n"
-        "Use 0 for lifetime premium.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="vpanel_premium")]
-        ])
-    )
-
-@Client.on_message(filters.command("addpremium") & filters.user(Config.ADMIN))
-async def add_premium_command(client, message: Message):
-    """Add premium user via command"""
-    try:
-        if len(message.command) != 3:
-            await message.reply_text(
-                "**Usage:** `/addpremium <user_id> <duration_days>`\n"
-                "**Example:** `/addpremium 123456789 30`\n"
-                "Use 0 for lifetime premium."
-            )
-            return
         
-        user_id = int(message.command[1])
-        duration_days = int(message.command[2])
-        added_by = message.from_user.id
+        buttons = [
+            [InlineKeyboardButton("➕ Add Premium User", callback_data="add_premium")],
+            [InlineKeyboardButton("📋 View All Premium", callback_data="view_premium")],
+            [InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]
+        ]
         
-        success = await n4bots.add_premium_user(user_id, duration_days, added_by)
-        
-        if success:
-            duration_text = "Lifetime" if duration_days == 0 else f"{duration_days} days"
-            await message.reply_text(
-                f"✅ **Premium user added successfully!**\n\n"
-                f"**User ID:** `{user_id}`\n"
-                f"**Duration:** {duration_text}\n"
-                f"**Added by:** {message.from_user.mention}"
-            )
-            
-            # Clear cache for this user
-            cache_key = f"premium_{user_id}"
-            if cache_key in config_manager.cache:
-                del config_manager.cache[cache_key]
-        else:
-            await message.reply_text("❌ Failed to add premium user.")
-            
-    except ValueError:
-        await message.reply_text("❌ Invalid user ID or duration.")
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
     except Exception as e:
-        await message.reply_text(f"❌ Error: {str(e)}")
+        print(f"Error in show_premium_management: {e}")
+        await query.message.edit_text(f"❌ Error: {str(e)[:200]}")
+
+async def show_bot_stats(query):
+    """Show bot statistics"""
+    try:
+        total_users = await n4bots.total_users_count()
+        premium_users = await n4bots.get_all_premium_users()
+        
+        text = f"""
+<b>📊 Bot Statistics</b>
+
+<blockquote><b>Total Users:</b> {total_users}
+<b>Premium Users:</b> {len(premium_users)}
+<b>Premium Percentage:</b> {round((len(premium_users)/total_users*100), 2) if total_users > 0 else 0}%</blockquote>
+"""
+        
+        buttons = [[InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]]
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    except Exception as e:
+        print(f"Error in show_bot_stats: {e}")
+        await query.message.edit_text(f"❌ Error: {str(e)[:200]}")
+
+async def show_channel_settings(query):
+    """Show channel settings"""
+    try:
+        settings = await n4bots.get_bot_settings()
+        channels = settings.get("force_sub_channels", ["animelibraryn4"])
+        
+        channels_text = "\n".join([f"• {channel}" for channel in channels])
+        
+        text = f"""
+<b>🔄 Channel Settings</b>
+
+<blockquote><b>Current Force Subscribe Channels:</b>
+{channels_text}</blockquote>
+
+<blockquote><i>Note: To change channels, update directly in database.</i></blockquote>
+"""
+        
+        buttons = [[InlineKeyboardButton("🔙 Back", callback_data="vpanel_back")]]
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    except Exception as e:
+        print(f"Error in show_channel_settings: {e}")
+        await query.message.edit_text(f"❌ Error: {str(e)[:200]}")
