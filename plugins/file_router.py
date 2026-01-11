@@ -17,44 +17,49 @@ class FileRouter:
     async def route_file(self, client: Client, message: Message):
         """Main routing logic - decides which handler to use"""
         user_id = message.from_user.id
-        text = message.text or message.caption or "" # Define text to avoid NameError
+        text = message.text or message.caption or ""
 
-        # Check if user is banned first
+        # 1. Check if user is banned
         from plugins.admin_panel import is_user_banned
         if await is_user_banned(user_id):
             return True
 
-        # Handle Admin Commands
-        if text.startswith("/") and user_id in Config.ADMIN:
+        # 2. Handle Commands
+        if text.startswith("/"):
             cmd_args = text.split()
-            message.command = cmd_args
+            message.command = cmd_args # Fixes 'NoneType' len() error
             command = cmd_args[0].lower()
             
-            # List of commands this router SHOULD handle
-            admin_commands = ["/restart", "/stats", "/status", "/broadcast", "/ban", "/unban", "/tban", "/banlist"]
-            
-            if command in admin_commands:
+            # If it's an Admin command, handle it here
+            if user_id in Config.ADMIN:
                 from plugins.admin_panel import (
                     restart_bot, get_stats, broadcast_handler, 
                     ban_command, unban_command, tban_command, banlist_command
                 )
-                if command == "/restart": await restart_bot(client, message)
-                elif command in ["/stats", "/status"]: await get_stats(client, message)
-                elif command == "/broadcast": await broadcast_handler(client, message)
-                elif command == "/ban": await ban_command(client, message)
-                elif command == "/unban": await unban_command(client, message)
-                elif command == "/tban": await tban_command(client, message)
-                elif command == "/banlist": await banlist_command(client, message)
-                return True # Stop here, command was handled
 
-        # 2. NEW: Ignore standard user commands so they reach start.py
-        user_commands = ["/start", "/help", "/donate", "/tutorial", "/bought"]
-        if text.split()[0].lower() in user_commands:
-            return False # Returning False allows Pyrogram to look for other handlers (like in start.py)
+                if command == "/restart":
+                    await restart_bot(client, message)
+                    return True
+                elif command in ["/stats", "/status"]:
+                    await get_stats(client, message)
+                    return True
+                elif command == "/broadcast":
+                    await broadcast_handler(client, message)
+                    return True
+                elif command == "/ban":
+                    await ban_command(client, message)
+                    return True
+            
+            # 3. ALLOW USER COMMANDS TO PASS THROUGH
+            # List commands that should be handled by other files (start.py, metadata.py, etc.)
+            public_commands = ["/start", "/help", "/mode", "/metadata", "/tutorial", "/donate"]
+            if command in public_commands:
+                return False # This lets Pyrogram look for other handlers
 
-        # 3. Only process if it's an actual file or if you intend to rename based on text
+        # 4. Filter for actual media
+        # Prevent plain text (that isn't a command) from being sent to the renamer
         if not (message.document or message.video or message.audio):
-            return False # Ignore plain text that isn't a command or a file
+            return False
 
         # Get lock for this user to prevent concurrent file processing
         async with await self.get_user_lock(user_id):
