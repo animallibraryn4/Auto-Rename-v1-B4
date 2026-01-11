@@ -28,16 +28,15 @@ SHORTLINK_REUSE_TIME = 600    # 10 minutes
 # CONFIG
 # =====================================================
 
-VERIFY_PHOTO = os.environ.get(
-    "VERIFY_PHOTO",
-    "https://images8.alphacoders.com/138/1384114.png"
-)
-SHORTLINK_SITE = os.environ.get("SHORTLINK_SITE", "gplinks.com")
-SHORTLINK_API = os.environ.get("SHORTLINK_API", "596f423cdf22b174e43d0b48a36a8274759ec2a3")
-VERIFY_EXPIRE = int(os.environ.get("VERIFY_EXPIRE", 30000))
-VERIFY_TUTORIAL = os.environ.get("VERIFY_TUTORIAL", "https://t.me/N4_Society/55")
+# These are now defaults that will be overridden by database config
+VERIFY_PHOTO = "https://images8.alphacoders.com/138/1384114.png"
+SHORTLINK_SITE = "gplinks.com"
+SHORTLINK_API = "596f423cdf22b174e43d0b48a36a8274759ec2a3"
+VERIFY_EXPIRE = 30000
+VERIFY_TUTORIAL = "https://t.me/N4_Society/55"
 
-PREMIUM_USERS = list(map(int, os.environ.get("PREMIUM_USERS", "").split())) if os.environ.get("PREMIUM_USERS") else []
+# Premium users are now managed through database
+PREMIUM_USERS = []
 
 # =====================================================
 # HELPERS
@@ -53,24 +52,37 @@ def get_readable_time(seconds):
     return f"{s}s"
 
 async def is_user_verified(user_id):
-    """Check if user is verified using main database"""
+    """Check if user is verified using dynamic configuration"""
     # First check if user is banned
     from plugins.admin_panel import check_ban_status
     if await check_ban_status(user_id):
         return False  # Banned users cannot use the bot
     
-    if not VERIFY_EXPIRE or user_id in PREMIUM_USERS:
+    # Check premium status from database
+    premium_user = await n4bots.get_premium_user(user_id)
+    if premium_user:
         return True
     
-    # Get verification status from main database
-    last = await n4bots.get_verify_status(user_id)
+    # Get bot settings
+    bot_settings = await n4bots.get_bot_settings()
+    if not bot_settings:
+        # If no settings, use default verification
+        last = await n4bots.get_verify_status(user_id)
+        if not last:
+            return False
+        return (time() - last) < VERIFY_EXPIRE
     
-    # If last is 0 or None, user is not verified
+    # Check if verification is enabled
+    if not bot_settings.get("verify_enabled", True):
+        return True  # Verification disabled
+    
+    # Check verification expiry from database
+    last = await n4bots.get_verify_status(user_id)
     if not last:
         return False
     
-    # Check if verification is still valid
-    return (time() - last) < VERIFY_EXPIRE
+    verify_expire = bot_settings.get("verify_expire", VERIFY_EXPIRE)
+    return (time() - last) < verify_expire
 
 async def delete_verification_messages(client, user_id):
     """Delete all verification messages for a user"""
@@ -89,11 +101,21 @@ async def delete_verification_messages(client, user_id):
 async def get_short_url(longurl):
     cget = create_scraper().request
     disable_warnings()
+    
+    # Get shortlink config from database
+    bot_settings = await n4bots.get_bot_settings()
+    if bot_settings:
+        shortlink_site = bot_settings.get("shortlink_site", SHORTLINK_SITE)
+        shortlink_api = bot_settings.get("shortlink_api", SHORTLINK_API)
+    else:
+        shortlink_site = SHORTLINK_SITE
+        shortlink_api = SHORTLINK_API
+    
     try:
         res = cget(
             "GET",
-            f"https://{SHORTLINK_SITE}/api",
-            params={"api": SHORTLINK_API, "url": longurl, "format": "text"}
+            f"https://{shortlink_site}/api",
+            params={"api": shortlink_api, "url": longurl, "format": "text"}
         )
         return res.text if res.status_code == 200 else longurl
     except:
@@ -120,10 +142,10 @@ async def get_verify_token(bot, user_id, base):
 # MARKUPS
 # =====================================================
 
-def verify_markup(link):
+def verify_markup(link, tutorial_url):
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Tutorial", url=VERIFY_TUTORIAL),
+            InlineKeyboardButton("Tutorial", url=tutorial_url),
             InlineKeyboardButton("⭐ Premium", callback_data="premium_page")
         ],
         [InlineKeyboardButton("Get Token", url=link)]
@@ -144,7 +166,7 @@ def premium_markup():
 # =====================================================
 
 async def send_verification(client, message_or_query):
-    """Send verification message"""
+    """Send verification message using dynamic config"""
     if isinstance(message_or_query, CallbackQuery):
         user_id = message_or_query.from_user.id
         chat_id = message_or_query.message.chat.id
@@ -166,13 +188,30 @@ async def send_verification(client, message_or_query):
     if now - last < VERIFY_MESSAGE_COOLDOWN:
         return
 
+    # Get dynamic config from database
+    bot_settings = await n4bots.get_bot_settings()
+    if not bot_settings:
+        # Use defaults if no settings found
+        verify_photo = VERIFY_PHOTO
+        verify_tutorial = VERIFY_TUTORIAL
+        verify_expire = VERIFY_EXPIRE
+    else:
+        verify_photo = bot_settings.get("verify_photo", VERIFY_PHOTO)
+        verify_tutorial = bot_settings.get("verify_tutorial", VERIFY_TUTORIAL)
+        verify_expire = bot_settings.get("verify_expire", VERIFY_EXPIRE)
+    
+    # Check if verification is enabled
+    if bot_settings and not bot_settings.get("verify_enabled", True):
+        # Verification is disabled, user can use the bot directly
+        return
+
     bot = await client.get_me()
     link = await get_verify_token(client, user_id, f"https://t.me/{bot.username}?start=")
 
     text = (
         f"Hi 👋 {mention}\n\n"
         f"To start using this bot, please complete Ads Token verification.\n\n"
-        f"Validity: {get_readable_time(VERIFY_EXPIRE)}"
+        f"Validity: {get_readable_time(verify_expire)}"
     )
 
     # Store user state as "verification"
@@ -184,26 +223,26 @@ async def send_verification(client, message_or_query):
     if message_obj:
         try:
             sent_message = await message_obj.edit_media(
-                media=VERIFY_PHOTO,
+                media=verify_photo,
                 caption=text,
-                reply_markup=verify_markup(link)
+                reply_markup=verify_markup(link, verify_tutorial)
             )
         except:
             # If editing fails, send a new message
             await message_obj.delete()
             sent_message = await client.send_photo(
                 chat_id=chat_id,
-                photo=VERIFY_PHOTO,
+                photo=verify_photo,
                 caption=text,
-                reply_markup=verify_markup(link)
+                reply_markup=verify_markup(link, verify_tutorial)
             )
     else:
         # Send new message
         sent_message = await client.send_photo(
             chat_id=chat_id,
-            photo=VERIFY_PHOTO,
+            photo=verify_photo,
             caption=text,
-            reply_markup=verify_markup(link)
+            reply_markup=verify_markup(link, verify_tutorial)
         )
     
     # Store the message ID for later deletion
@@ -219,12 +258,26 @@ async def send_welcome_message(client, user_id, message_obj=None):
     # Store user state as "verified"
     user_state[user_id] = "verified"
     
+    # Get verify_expire from database for displaying correct time
+    bot_settings = await n4bots.get_bot_settings()
+    if bot_settings:
+        verify_expire = bot_settings.get("verify_expire", VERIFY_EXPIRE)
+    else:
+        verify_expire = VERIFY_EXPIRE
+    
     text = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ ʙᴀᴄᴋ 😊\n\n"
         f"ʏᴏᴜʀ ᴛᴏᴋᴇɴ ʜᴀꜱ ʙᴇᴇɴ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴠᴇʀɪꜰɪᴇᴅ.\n"
-        f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴜꜱᴇ ᴍᴇ ꜰᴏʀ {get_readable_time(VERIFY_EXPIRE)}.\n\n"
+        f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴜꜱᴇ ᴍᴇ ꜰᴏʀ {get_readable_time(verify_expire)}.\n\n"
         f"ᴇɴᴊᴏʏ ʏᴏᴜʀ ᴛɪᴍᴇ ❤️</b>"
     )
+    
+    # Get start_pic from database if available
+    bot_settings = await n4bots.get_bot_settings()
+    if bot_settings:
+        start_pic = bot_settings.get("start_pic", VERIFY_PHOTO)
+    else:
+        start_pic = VERIFY_PHOTO
     
     # If we have a message object, edit it
     if message_obj:
@@ -238,7 +291,7 @@ async def send_welcome_message(client, user_id, message_obj=None):
             await message_obj.delete()
             await client.send_photo(
                 chat_id=user_id,
-                photo=VERIFY_PHOTO,
+                photo=start_pic,
                 caption=text,
                 reply_markup=welcome_markup()
             )
@@ -246,7 +299,7 @@ async def send_welcome_message(client, user_id, message_obj=None):
         # Send new message
         await client.send_photo(
             chat_id=user_id,
-            photo=VERIFY_PHOTO,
+            photo=start_pic,
             caption=text,
             reply_markup=welcome_markup()
         )
@@ -352,4 +405,3 @@ async def verify_cmd(client, message):
 async def get_token_cmd(client, message):
     """New command to get verification token"""
     await send_verification(client, message)
-
