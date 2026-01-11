@@ -11,11 +11,9 @@ logger = logging.getLogger(__name__)
 
 print("Vpanel.py file successfully loaded!") # Ye bot start hote hi terminal mein aana chahiye
 
-@Client.on_message(filters.text & filters.private)
-async def echo(client, message):
-    if message.text == "/vpanel":
-        await message.reply_text("Manual check: Vpanel command detected!")
-        
+@Client.on_message(filters.command("vpanel"), group=-5)
+async def test_high_priority(client, message):
+    await message.reply_text("High priority test success!")
     
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN) & filters.reply)
 async def vpanel_command(bot: Client, m: Message):
