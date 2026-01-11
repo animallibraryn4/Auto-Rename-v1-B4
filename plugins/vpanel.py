@@ -9,10 +9,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@Client.on_message(filters.command("panel")) # filters.user filter ko temporary hata dein
-async def vpanel_command(client, message):
-    print(f"Command received from: {message.from_user.id}") # Terminal check ke liye
-    await message.reply_text("Vpanel check!")
+print("Vpanel.py file successfully loaded!") # Ye bot start hote hi terminal mein aana chahiye
+
+@Client.on_message(filters.text & filters.private)
+async def echo(client, message):
+    if message.text == "/vpanel":
+        await message.reply_text("Manual check: Vpanel command detected!")
+        
     
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN) & filters.reply)
 async def vpanel_command(bot: Client, m: Message):
