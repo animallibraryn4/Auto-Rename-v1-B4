@@ -12,6 +12,8 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
 
+    
+    # Rest of the existing code...
 pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
 SUPPORT_CHAT = int(os.environ.get("SUPPORT_CHAT", "-1001896877147"))
@@ -37,6 +39,10 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
+
+        # Initialize database
+        from plugins.init_database import initialize_database
+        await initialize_database()
 
         me = await self.get_me()
         print(f"{me.first_name} Is Started.....😊")
