@@ -1,9 +1,13 @@
-# vpanel.py
+
+# vpanel.py - Enhanced version with better error handling
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Message
 from config import Config
 from helper.database import n4bots
 from plugins.config_manager import config_manager
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def get_main_vpanel_keyboard():
     """Main VPanel keyboard"""
@@ -19,7 +23,10 @@ async def get_main_vpanel_keyboard():
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN))
 async def vpanel_command(client, message: Message):
     """Main VPanel command"""
-    text = """
+    try:
+        logger.info(f"VPanel command received from {message.from_user.id}")
+        
+        text = """
 <b>🎛️ Bot Control Panel</b>
 
 <blockquote>Welcome to the real-time bot control panel.
@@ -31,9 +38,21 @@ Everything can be changed without restarting the bot.</blockquote>
 • 📊 Statistics - View bot usage statistics
 • 🔄 Channels - Update force subscription channels
 """
-    
-    keyboard = await get_main_vpanel_keyboard()
-    await message.reply_text(text, reply_markup=keyboard)
+        
+        keyboard = await get_main_vpanel_keyboard()
+        await message.reply_text(text, reply_markup=keyboard)
+        logger.info(f"VPanel sent to user {message.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in vpanel_command: {e}")
+        await message.reply_text(f"❌ Error loading VPanel: {str(e)}")
+
+# Test command to verify the plugin is working
+@Client.on_message(filters.command("testvpanel") & filters.user(Config.ADMIN))
+async def test_vpanel(client, message: Message):
+    """Test command to verify vpanel.py is loaded"""
+    await message.reply_text("✅ vpanel.py is working correctly! Plugin is loaded.")
+
 
 @Client.on_callback_query(filters.regex(r'^vpanel_'))
 async def vpanel_callback_handler(client, query: CallbackQuery):
