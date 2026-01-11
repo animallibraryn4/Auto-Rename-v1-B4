@@ -9,8 +9,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN))
-async def vpanel_command(client, message):
+
+@Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN) & filters.reply)
+async def vpanel_command(bot: Client, m: Message):
     """Main verification panel"""
     try:
         buttons = [
