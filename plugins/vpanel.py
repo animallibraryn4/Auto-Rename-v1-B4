@@ -3,6 +3,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from helper.database import n4bots
 import datetime
 from config import Config
+from info import Config
 
 
 @Client.on_message(filters.command("vpanel") & filters.user(Config.ADMIN))
