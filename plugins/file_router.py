@@ -27,17 +27,17 @@ class FileRouter:
                 handle_remove_premium_command
             )
 
-            if command == "/vpanel":
-                await vpanel_command(client, message)
+            if command == "/restart":
+                await restart_bot(b, m)
                 return True
-            elif command == "/set_expiry":
-                await set_expiry_command(client, message)
+            elif command == "/stats":
+                await get_stats(bot, message)
                 return True
-            elif command == "/add_premium":
-                await handle_add_premium_command(client, message)
+            elif command == "/broadcast":
+                await broadcast_handler(client, message)
                 return True
-            elif command == "/remove_premium":
-                await handle_remove_premium_command(client, message)
+            elif command == "/ban":
+                await is_user_banned(client, message)
                 return True
 
         # Get lock for this user
