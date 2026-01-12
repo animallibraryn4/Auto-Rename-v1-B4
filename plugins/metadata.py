@@ -296,8 +296,11 @@ async def show_main_panel(query, user_id):
 
 async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
+    current = await db.get_metadata(user_id)
+    
     text = f"""
-{summary}
+**Your Metadata Is Currently: {current}**
+
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard()
