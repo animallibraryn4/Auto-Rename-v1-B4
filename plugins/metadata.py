@@ -122,6 +122,7 @@ async def metadata_main(client, message):
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
+    current = await db.get_metadata(user_id)
     
     # Handle toggle commands - NO NOTIFICATIONS
     if data == "on_metadata":
