@@ -27,8 +27,6 @@ async def get_metadata_summary(user_id):
     subtitle = await db.get_subtitle(user_id)
     
     summary = f"""
-**Your Metadata Is Currently: {current}**
-
   **Title:** `{title if title else 'Not Set'}`
   **Author:** `{author if author else 'Not Set'}`
   **Artist:** `{artist if artist else 'Not Set'}`
