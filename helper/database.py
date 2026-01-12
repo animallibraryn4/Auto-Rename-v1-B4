@@ -36,12 +36,12 @@ class Database:
                 ban_reason=''
             ),
             # Preserving all existing metadata fields
-            title='Encoded by @Animelibraryn4',
-            author='@Animelibraryn4',
-            artist='@Animelibraryn4',
-            audio='By @Animelibraryn4',
-            subtitle='By @Animelibraryn4',
-            video='Encoded By @Animelibraryn4',
+            title='Encoded by @N4_Bots',
+            author='@N4_Bots',
+            artist='@N4_Bots',
+            audio='By @N4_Bots',
+            subtitle='By @N4_Bots',
+            video='Encoded By @N4_Bots',
             media_type=None
         )
 
