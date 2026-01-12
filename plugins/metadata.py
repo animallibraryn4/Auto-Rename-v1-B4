@@ -29,7 +29,7 @@ async def get_metadata_summary(user_id):
     subtitle = await db.get_subtitle(user_id)
     
     summary = f"""
-**➲Metadata Status: {current}**
+**Metadata Status: {current}**
  **➥ Title:** `{title if title else 'Not Set'}`
  **➥ Author:** `{author if author else 'Not Set'}`
  **➥ Artist:** `{artist if artist else 'Not Set'}`
@@ -144,8 +144,6 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         summary = await get_metadata_summary(user_id)
         
         text = f"""
-**Metadata Studio**
-
 {summary}
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
@@ -293,24 +291,15 @@ async def show_main_panel(query, user_id):
     if "Metadata Control Panel" in current_text and summary in current_text:
         # Content is the same, don't edit
         return
+    summary = await get_metadata_summary(user_id)
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
 async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
-    text = """
-**⚙️ Set Metadata Values**
-
-Choose which metadata field you want to configure:
-
-• **📝 Title** - The main title of the media
-• **👤 Author** - The creator or uploader
-• **🎨 Artist** - The artist/performer
-• **🎵 Audio** - Audio track information
-• **📺 Subtitle** - Subtitle track information
-• **🎬 Video** - Video quality/encoding info
-
-Click on any field to edit it.
+    text = f"""
+{summary}
+ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard()
     
