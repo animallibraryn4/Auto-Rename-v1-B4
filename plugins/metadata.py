@@ -74,10 +74,20 @@ def get_set_metadata_keyboard():
             InlineKeyboardButton("Video", callback_data="edit_video")
         ],
         [
-            InlineKeyboardButton("Reset All", callback_data="reset_all"),
+            InlineKeyboardButton("View All", callback_data="view_all"),
             InlineKeyboardButton("Help", callback_data="meta_info")
         ],
         [
+            InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
+        ]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+def get_view_all_keyboard():
+    """Keyboard for View All summary page"""
+    buttons = [
+        [
+            InlineKeyboardButton("Close", callback_data="close_meta"),
             InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
         ]
     ]
@@ -116,7 +126,7 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
-@Client.on_callback_query(filters.regex(r"^(on_metadata|off_metadata|set_metadata_menu|edit_|cancel_edit_|reset_all|metadata_home|meta_info|close_meta|clear_)"))
+@Client.on_callback_query(filters.regex(r"^(on_metadata|off_metadata|set_metadata_menu|edit_|cancel_edit_|view_all|metadata_home|meta_info|close_meta|clear_)"))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
@@ -168,6 +178,23 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         await query.message.delete()
         return
     
+    # Handle View All button
+    elif data == "view_all":
+        summary = await get_metadata_summary(user_id)
+        
+        text = f"""
+**📋 Current Metadata Summary**
+
+**Status:** `{current}`
+{summary}
+
+*Use the buttons below to navigate.*
+"""
+        
+        keyboard = get_view_all_keyboard()
+        await query.message.edit_text(text=text, reply_markup=keyboard)
+        return
+    
     # Handle clearing field - NO NOTIFICATIONS
     elif data.startswith("clear_"):
         field = data.split("_")[1]
@@ -189,18 +216,6 @@ async def metadata_callback_handler(client, query: CallbackQuery):
             if method:
                 await method(user_id, default_values[field])
                 await show_set_metadata_menu(query, user_id)
-        return
-    
-    # Handle reset all - NO NOTIFICATIONS
-    elif data == "reset_all":
-        # Reset all fields to defaults
-        await db.set_title(user_id, "Encoded by @N4_Bots")
-        await db.set_author(user_id, "@N4_Bots")
-        await db.set_artist(user_id, "@N4_Bots")
-        await db.set_audio(user_id, "By @N4_Bots")
-        await db.set_subtitle(user_id, "By @N4_Bots")
-        await db.set_video(user_id, "Encoded By @N4_Bots")
-        await show_set_metadata_menu(query, user_id)
         return
     
     # Handle back to home
@@ -296,11 +311,8 @@ async def show_main_panel(query, user_id):
 
 async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
-    current = await db.get_metadata(user_id)
-    
     text = f"""
-**Your Metadata Is Currently: {current}**
-
+{summary}
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard()
