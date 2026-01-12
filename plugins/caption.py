@@ -1,8 +1,5 @@
 from pyrogram import Client, filters 
 from helper.database import n4bots
-import requests
-import os
-from pyrogram import Client, filters
 
 @Client.on_message(filters.private & filters.command('set_caption'))
 async def add_caption(client, message):
@@ -28,33 +25,3 @@ async def see_caption(client, message):
     else:
        await message.reply_text("**You Don't Have Any Caption ❌**")
 
-@Client.on_message(filters.command("catbox") & filters.reply)
-async def catbox_upload(client, message):
-    reply = message.reply_to_message
-
-    if not reply.photo and not reply.document:
-        await message.reply_text("Reply to an image or file.")
-        return
-
-    msg = await message.reply_text("Uploading to Catbox...")
-
-    file_path = await reply.download()
-
-    try:
-        with open(file_path, "rb") as f:
-            r = requests.post(
-                "https://catbox.moe/user/api.php",
-                data={"reqtype": "fileupload"},
-                files={"fileToUpload": f}
-            )
-
-        if r.status_code == 200:
-            await msg.edit(f"✅ Uploaded\n\n{r.text.strip()}")
-        else:
-            await msg.edit("Upload failed.")
-
-    except Exception as e:
-        await msg.edit("Error while uploading.")
-
-    if os.path.exists(file_path):
-        os.remove(file_path)
