@@ -1,3 +1,22 @@
+# quality_thumb.py mein save_thumbnail_priority function ke andar:
+
+# Pehle check karein ki kya user ne thumb set karne ke liye button dabaya hai
+if quality:
+    # Agar quality set hai (user thumb bhejne wala hai), 
+    # toh purana metadata mode hamesha clear kar dein
+    await n4bots.col.update_one(
+        {"_id": int(user_id)},
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    )
+    print(f"Force clearing metadata mode for user {user_id} to save thumbnail.")
+else:
+    # Sirf tab skip karein jab user sach mein metadata edit kar raha ho aur quality set na ho
+    user_data = await n4bots.col.find_one({"_id": int(user_id)})
+    if user_data and "editing_metadata_field" in user_data:
+        print(f"User {user_id} is in metadata editing mode, skipping thumbnail save")
+        return
+        
+
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from helper.database import n4bots
@@ -77,7 +96,22 @@ async def save_thumbnail_priority(client, message):
     quality = await n4bots.get_temp_quality(user_id)
     
     print(f"📸 Photo received from user {user_id}, temp quality: {quality}")
-    
+
+    if quality:
+    # Agar quality set hai (user thumb bhejne wala hai), 
+    # toh purana metadata mode hamesha clear kar dein
+    await n4bots.col.update_one(
+        {"_id": int(user_id)},
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    )
+    print(f"Force clearing metadata mode for user {user_id} to save thumbnail.")
+else:
+    # Sirf tab skip karein jab user sach mein metadata edit kar raha ho aur quality set na ho
+    user_data = await n4bots.col.find_one({"_id": int(user_id)})
+    if user_data and "editing_metadata_field" in user_data:
+        print(f"User {user_id} is in metadata editing mode, skipping thumbnail save")
+        return
+        
     if not quality:
         # No temp quality set, not for thumbnail
         print(f"No temp quality set for user {user_id}, passing to next handler")
