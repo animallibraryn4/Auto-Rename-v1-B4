@@ -11,9 +11,9 @@ async def generate_main_menu_buttons(user_id):
         buttons.append([InlineKeyboardButton(q, f"quality_{q}") for q in row])
     
     buttons.extend([
-        [InlineKeyboardButton("🌐 Global Thumb", "quality_global")],
-        [InlineKeyboardButton("🗑 Delete All Thumbnails", "delete_all_thumbs")],
-        [InlineKeyboardButton("❌ Close", "quality_close")]
+        [InlineKeyboardButton("Global Thumb", "quality_global")],
+        [InlineKeyboardButton("Delete All Thumbnails", "delete_all_thumbs")],
+        [InlineKeyboardButton("Close", "quality_close")]
     ])
     return buttons
 
