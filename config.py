@@ -155,32 +155,21 @@ Pʀɪᴄɪɴɢ:
 ᴀ ᴘʀɪᴠᴀᴛᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʙᴏᴛ.</b>"""
 
     META_TXT = """
-**ᴍᴀɴᴀɢɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ ғᴏʀ ʏᴏᴜʀ ᴠɪᴅᴇᴏs ᴀɴᴅ ғɪʟᴇs**
+**📁 ᴍᴇᴛᴀᴅᴀᴛᴀ ʜᴇʟᴘ**
+ᴍᴇᴛᴀᴅᴀᴛᴀ ᴄᴏɴᴛʀᴏʟꜱ ʜᴏᴡ ʏᴏᴜʀ ꜰɪʟᴇꜱ ᴀʀᴇ ɴᴀᴍᴇᴅ ᴀɴᴅ ꜱʜᴏᴡɴ ɪɴ ᴘʟᴀʏᴇʀꜱ ᴀɴᴅ ᴛᴇʟᴇɢʀᴀᴍ.
 
-**ᴠᴀʀɪᴏᴜꜱ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
+**ʏᴏᴜ ᴄᴀɴ ᴄʜᴀɴɢᴇ:**
 
-- **ᴛɪᴛʟᴇ**: Descriptive title of the media.
-- **ᴀᴜᴛʜᴏʀ**: The creator or owner of the media.
-- **ᴀʀᴛɪꜱᴛ**: The artist associated with the media.
-- **ᴀᴜᴅɪᴏ**: Title or description of audio content.
-- **ꜱᴜʙᴛɪᴛʟᴇ**: Title of subtitle content.
-- **ᴠɪᴅᴇᴏ**: Title or description of video content.
+• **ᴛɪᴛʟᴇ** – ᴛʜᴇ ᴍᴀɪɴ ɴᴀᴍᴇ ᴏꜰ ᴛʜᴇ ᴍᴇᴅɪᴀ
+• **ᴀᴜᴛʜᴏʀ** – ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ ᴏʀ ᴜᴘʟᴏᴀᴅᴇʀ  
+• **ᴀʀᴛɪꜱᴛ** – ᴛʜᴇ ᴀʀᴛɪꜱᴛ ᴏʀ ꜱᴛᴜᴅɪᴏ  
+• **ᴀᴜᴅɪᴏ** – ᴀᴜᴅɪᴏ ᴛʀᴀᴄᴋ ᴛɪᴛʟᴇ  
+• **ꜱᴜʙᴛɪᴛʟᴇ** – ꜱᴜʙᴛɪᴛʟᴇ ᴛʀᴀᴄᴋ ɴᴀᴍᴇ  
+• **ᴠɪᴅᴇᴏ** – ᴠɪᴅᴇᴏ ᴛɪᴛʟᴇ ᴏʀ ꜰᴏʀᴍᴀᴛ
 
-**ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
-➜ /metadata: Turn on or off metadata.
+**ᴇxᴀᴍᴘʟᴇ:** ᴛᴀᴘ ᴀɴʏ ʙᴜᴛᴛᴏɴ ᴛᴏ ꜱᴇᴛ ᴀ ᴠᴀʟᴜᴇ, ᴛʜᴇɴ ꜱᴇɴᴅ ᴛʜᴇ ᴛᴇxᴛ.
 
-**button ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ꜱᴇᴛ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
-
-➜ Title: Set a custom title of media.
-➜ Author: Set the author.
-➜ Artist: Set the artist.
-➜ Audio: Set audio title.
-➜ Subtitle: Set subtitle title.
-➜ Video: Set video title.
-
-**ᴇxᴀᴍᴘʟᴇ:** tap Title and sand the message you can want to set.
-
-**ᴜꜱᴇ ᴛʜᴇꜱᴇ button ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴇɴʀɪᴄʜ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ᴡɪᴛʜ ᴀᴅᴅɪᴛɪᴏɴᴀʟ ᴍᴇᴛᴀᴅᴀᴛᴀ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ!**
+**ᴛʜᴇꜱᴇ ᴏᴘᴛɪᴏɴꜱ ʟᴇᴛ ʏᴏᴜ ᴄᴏɴᴛʀᴏʟ ᴇxᴀᴄᴛʟʏ ʜᴏᴡ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ɪꜱ ᴘʀᴇꜱᴇɴᴛᴇᴅ.**
 """
 
     PLAN_MAIN_TXT = "<b>👋 Hey, {}!\n\nSelect a plan that suits your needs from the options below:</b>"
