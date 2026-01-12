@@ -29,12 +29,12 @@ async def get_metadata_summary(user_id):
     summary = f"""
 **Your Metadata Is Currently: {current}**
 
- **Title:** `{title if title else 'Not Set'}`
- **Author:** `{author if author else 'Not Set'}`
- **Artist:** `{artist if artist else 'Not Set'}`
- **Audio:** `{audio if audio else 'Not Set'}`
- **Subtitle:** `{subtitle if subtitle else 'Not Set'}`
- **Video:** `{video if video else 'Not Set'}`
+  **Title:** `{title if title else 'Not Set'}`
+  **Author:** `{author if author else 'Not Set'}`
+  **Artist:** `{artist if artist else 'Not Set'}`
+  **Audio:** `{audio if audio else 'Not Set'}`
+  **Subtitle:** `{subtitle if subtitle else 'Not Set'}`
+  **Video:** `{video if video else 'Not Set'}`
 """
     return summary
 
@@ -250,7 +250,7 @@ async def show_edit_field_prompt(query, user_id, field):
     example = examples.get(field, "Your custom value")
     
     text = f"""
-**Send Me The New {field_display} Value:**
+**✏️ Send Me The New {field_display} Value:**
 
 **Current {field_display}:** `{current_value}`
 
@@ -371,7 +371,7 @@ async def handle_metadata_value_input(client, message):
         
         # Update the original edit prompt message
         updated_text = f"""
-**Send Me The New {field_display} Value:**
+**✏️ Send Me The New {field_display} Value:**
 
 **Current {field_display}:** `{current_value}`
 
