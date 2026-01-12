@@ -52,10 +52,10 @@ def get_main_menu_keyboard(current_status):
             )
         ],
         [
-            InlineKeyboardButton("⚙️ Set Metadata", callback_data="set_metadata_menu")
+            InlineKeyboardButton("🧑🏻‍💻 Set Metadata", callback_data="set_metadata_menu")
         ],
         [
-            InlineKeyboardButton("✖️ Close", callback_data="close_meta")
+            InlineKeyboardButton("Close", callback_data="close_meta")
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -64,20 +64,20 @@ def get_set_metadata_keyboard():
     """Keyboard for setting metadata values"""
     buttons = [
         [
-            InlineKeyboardButton("📝 Edit Title", callback_data="edit_title"),
-            InlineKeyboardButton("👤 Edit Author", callback_data="edit_author")
+            InlineKeyboardButton("Title", callback_data="edit_title"),
+            InlineKeyboardButton("Author", callback_data="edit_author")
         ],
         [
-            InlineKeyboardButton("🎨 Edit Artist", callback_data="edit_artist"),
-            InlineKeyboardButton("🎵 Edit Audio", callback_data="edit_audio")
+            InlineKeyboardButton("Artist", callback_data="edit_artist"),
+            InlineKeyboardButton("Audio", callback_data="edit_audio")
         ],
         [
-            InlineKeyboardButton("📺 Edit Subtitle", callback_data="edit_subtitle"),
-            InlineKeyboardButton("🎬 Edit Video", callback_data="edit_video")
+            InlineKeyboardButton("Subtitle", callback_data="edit_subtitle"),
+            InlineKeyboardButton("Video", callback_data="edit_video")
         ],
         [
-            InlineKeyboardButton("🔄 Reset All", callback_data="reset_all"),
-            InlineKeyboardButton("❓ Help", callback_data="meta_info")
+            InlineKeyboardButton("Reset All", callback_data="reset_all"),
+            InlineKeyboardButton("Help", callback_data="meta_info")
         ],
         [
             InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
@@ -89,7 +89,7 @@ def get_edit_field_keyboard(field):
     """Keyboard for editing a specific field"""
     buttons = [
         [
-            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_edit_{field}"),
+            InlineKeyboardButton("Cancel", callback_data=f"cancel_edit_{field}"),
             InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
         ]
     ]
@@ -230,7 +230,7 @@ Click on any field to edit it.
             reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
-                    InlineKeyboardButton("✖️ Close", callback_data="close_meta")
+                    InlineKeyboardButton("Close", callback_data="close_meta")
                 ]
             ])
         )
