@@ -26,6 +26,10 @@ class Config(object):
     
     SEASON_PLACEHOLDER = "{season}"  
 
+    # Catbox upload config
+    CATBOX_ENABLED = bool(os.environ.get("CATBOX_ENABLED", "True"))
+    MAX_CATBOX_SIZE = int(os.environ.get("MAX_CATBOX_SIZE", "209715200"))  # 200MB in bytes
+
 class Txt(object):
     
         
