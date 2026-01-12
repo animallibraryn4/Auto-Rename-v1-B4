@@ -76,8 +76,6 @@ async def save_thumbnail_priority(client, message):
     user_id = message.from_user.id
     quality = await n4bots.get_temp_quality(user_id)
     
-    print(f"📸 Photo received from user {user_id}, temp quality: {quality}")
-    
     if not quality:
         # No temp quality set, not for thumbnail
         print(f"No temp quality set for user {user_id}, passing to next handler")
