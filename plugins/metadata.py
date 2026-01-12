@@ -84,11 +84,11 @@ def get_set_metadata_keyboard():
     return InlineKeyboardMarkup(buttons)
 
 def get_view_all_keyboard():
-    """Keyboard for View All summary page"""
+    """Keyboard for View All Overview page"""
     buttons = [
         [
             InlineKeyboardButton("Close", callback_data="close_meta"),
-            InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
+            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -183,7 +183,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         summary = await get_metadata_summary(user_id)
         
         text = f"""
-**📋 Current Metadata Summary**
+**📋 Current Metadata Overview**
 
 **Current status:** `{current}`
 {summary}
@@ -309,8 +309,10 @@ async def show_main_panel(query, user_id):
 
 async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
+  
     text = f"""
-{summary}
+**Your Metadata Is Currently: {current}**
+
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard()
