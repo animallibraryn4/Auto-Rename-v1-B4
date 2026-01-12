@@ -103,11 +103,11 @@ async def metadata_main(client, message):
     summary = await get_metadata_summary(user_id)
     
     text = f"""
-**>Metadata Settings*"
+**Metadata Settings**
 
-This lets you change the names and details shown on your media files.
+ᴛʜɪꜱ ʟᴇᴛꜱ ʏᴏᴜ ᴄʜᴀɴɢᴇ ᴛʜᴇ ɴᴀᴍᴇꜱ ᴀɴᴅ ᴅᴇᴛᴀɪʟꜱ ꜱʜᴏᴡɴ ᴏɴ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇꜱ.
 
-You can edit things like title, audio name, subtitle name, and author so your files look clean and easy to read.
+ʏᴏᴜ ᴄᴀɴ ᴇᴅɪᴛ ᴛʜɪɴɢꜱ ʟɪᴋᴇ ᴛɪᴛʟᴇ, ᴀᴜᴅɪᴏ ɴᴀᴍᴇ, ꜱᴜʙᴛɪᴛʟᴇ ɴᴀᴍᴇ, ᴀɴᴅ ᴀᴜᴛʜᴏʀ ꜱᴏ ʏᴏᴜʀ ꜰɪʟᴇꜱ ʟᴏᴏᴋ ᴄʟᴇᴀɴ ᴀɴᴅ ᴇᴀꜱʏ ᴛᴏ ʀᴇᴀᴅ.
 """
     
     keyboard = get_main_menu_keyboard(current_status)
@@ -281,16 +281,13 @@ async def show_main_panel(query, user_id):
     """Show the main metadata panel"""
     current_status = await db.get_metadata(user_id)
     summary = await get_metadata_summary(user_id)
-    
+
     text = f"""
-**✨ Metadata Control Panel**
+**Metadata Settings**
 
-{summary}
+ᴛʜɪꜱ ʟᴇᴛꜱ ʏᴏᴜ ᴄʜᴀɴɢᴇ ᴛʜᴇ ɴᴀᴍᴇꜱ ᴀɴᴅ ᴅᴇᴛᴀɪʟꜱ ꜱʜᴏᴡɴ ᴏɴ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇꜱ.
 
-**📌 Quick Actions:**
-• **Enable/Disable** - Toggle metadata on or off
-• **Set Metadata** - Configure all fields at once
-• **Help** - Learn more about metadata settings
+ʏᴏᴜ ᴄᴀɴ ᴇᴅɪᴛ ᴛʜɪɴɢꜱ ʟɪᴋᴇ ᴛɪᴛʟᴇ, ᴀᴜᴅɪᴏ ɴᴀᴍᴇ, ꜱᴜʙᴛɪᴛʟᴇ ɴᴀᴍᴇ, ᴀɴᴅ ᴀᴜᴛʜᴏʀ ꜱᴏ ʏᴏᴜʀ ꜰɪʟᴇꜱ ʟᴏᴏᴋ ᴄʟᴇᴀɴ ᴀɴᴅ ᴇᴀꜱʏ ᴛᴏ ʀᴇᴀᴅ.
 """
     
     keyboard = get_main_menu_keyboard(current_status)
