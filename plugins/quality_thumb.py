@@ -70,8 +70,7 @@ async def set_global_thumb(client, callback):
         ])
     )
 
-# HIGH PRIORITY PHOTO HANDLER - यह metadata.py से पहले चलेगा
-# HIGH PRIORITY PHOTO HANDLER - यह metadata.py से पहले चलेगा
+# HIGH PRIORITY PHOTO HANDLER
 @Client.on_message(filters.private & filters.photo, group=1)
 async def save_thumbnail_priority(client, message):
     user_id = message.from_user.id
@@ -388,9 +387,22 @@ async def delete_thumbnail(client, callback):
     )
 
 # Handler to clear temp quality when user cancels
-@Client.on_callback_query(filters.regex(r'^quality_(360p|480p|720p|1080p|HDrip|2160p|4K|2K|4kX264|4kx265)$'))
+@Client.on_callback_query(filters.regex(r'^quality_(360p|480p|720p|1080p|HDrip|2160p|4K|2K|4kX264|4kx265|global)$'))
 async def quality_cancel_handler(client, callback):
-    """Clear temp quality when user navigates away from set thumbnail screen"""
+    """Clear temp quality and metadata editing state when user navigates away from set thumbnail screen"""
     user_id = callback.from_user.id
     await n4bots.clear_temp_quality(user_id)
-    await quality_handler(client, callback)
+    
+    # Also clear metadata editing state if it exists
+    await n4bots.col.update_one(
+        {"_id": int(user_id)},
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    )
+    
+    quality = callback.data.split('_')[1]
+    if quality == "global":
+        await global_thumb_menu(client, callback)
+    else:
+        await quality_handler(client, callback)
+        
+
