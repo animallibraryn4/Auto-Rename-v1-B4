@@ -142,16 +142,10 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         text = """
 **⚙️ Set Metadata Values**
 
-Choose which metadata field you want to configure:
+{summary}
 
-• **📝 Title** - The main title of the media
-• **👤 Author** - The creator or uploader
-• **🎨 Artist** - The artist/performer
-• **🎵 Audio** - Audio track information
-• **📺 Subtitle** - Subtitle track information
-• **🎬 Video** - Video quality/encoding info
+Choose what you want to edit
 
-Click on any field to edit it.
 """
         keyboard = get_set_metadata_keyboard()
         await query.message.edit_text(text=text, reply_markup=keyboard)
