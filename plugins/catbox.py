@@ -2,6 +2,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 import os
+from fp.fp import FreeProxy
 
 @Client.on_message(filters.command("catbox") & filters.private)
 async def catbox_upload(client, message):
@@ -22,12 +23,18 @@ async def catbox_upload(client, message):
             await msg.edit_text("📤 Uploading to Catbox...")
             
             try:
+                # Automatic working proxy dhoondna
+                proxy_url = FreeProxy(https=True).get() 
+                proxies = {"http": proxy_url, "https": proxy_url}
+                
                 # Upload to Catbox
                 with open(file_path, "rb") as f:
                     response = requests.post(
                         "https://catbox.moe/user/api.php",
                         data={"reqtype": "fileupload"},
-                        files={"fileToUpload": f}
+                        files={"fileToUpload": f},
+                        proxies=proxies, # Proxy yahan add ho rahi hai
+                        timeout=20      # Timeout thoda zyada rakhein
                     )
                 
                 if response.status_code == 200 and response.text.strip():
@@ -79,12 +86,18 @@ async def handle_photo_with_caption(client, message):
         await msg.edit_text("📤 Uploading to Catbox...")
         
         try:
+            # Automatic working proxy dhoondna
+            proxy_url = FreeProxy(https=True).get() 
+            proxies = {"http": proxy_url, "https": proxy_url}
+            
             # Upload to Catbox
             with open(file_path, "rb") as f:
                 response = requests.post(
                     "https://catbox.moe/user/api.php",
                     data={"reqtype": "fileupload"},
-                    files={"fileToUpload": f}
+                    files={"fileToUpload": f},
+                    proxies=proxies, # Proxy yahan add ho rahi hai
+                    timeout=20      # Timeout thoda zyada rakhein
                 )
             
             if response.status_code == 200 and response.text.strip():
@@ -94,7 +107,7 @@ async def handle_photo_with_caption(client, message):
                 # Send success message with button
                 await msg.edit_text(
                     "✅ Upload Successful",
-                    reply_markup=InlineKeyboardMarkup([
+                    reply_mup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("🔗 Open Link", url=catbox_url)]
                     ])
                 )
