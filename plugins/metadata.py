@@ -143,6 +143,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         summary = await get_metadata_summary(user_id)
         
         text = f"""
+**Your Metadata Is Currently: {current}**
 {summary}
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
