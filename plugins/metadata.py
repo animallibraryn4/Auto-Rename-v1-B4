@@ -185,10 +185,8 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         text = f"""
 **📋 Current Metadata Summary**
 
-**Status:** `{current}`
+**Current status:** `{current}`
 {summary}
-
-*Use the buttons below to navigate.*
 """
         
         keyboard = get_view_all_keyboard()
