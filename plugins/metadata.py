@@ -27,7 +27,7 @@ async def get_metadata_summary(user_id):
     subtitle = await db.get_subtitle(user_id)
     
     summary = f"""
-**YOUR METADATA IS CURRENTLY: {current}**
+**Your Metadata Is Currently: {current}**
 
  **Title:** `{title if title else 'Not Set'}`
  **Author:** `{author if author else 'Not Set'}`
@@ -43,11 +43,11 @@ def get_main_menu_keyboard(current_status):
     buttons = [
         [
             InlineKeyboardButton(
-                f"{'✅' if current_status == 'ON' else '○'} Enable", 
+                f"{'✅' if current_status == 'On' else '○'} Enable", 
                 callback_data='on_metadata'
             ),
             InlineKeyboardButton(
-                f"{'✅' if current_status == 'OFF' else '○'} Disable", 
+                f"{'✅' if current_status == 'Off' else '○'} Disable", 
                 callback_data='off_metadata'
             )
         ],
@@ -144,7 +144,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         
         text = f"""
 {summary}
-ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
+Use the buttons below to make changes
 """
         keyboard = get_set_metadata_keyboard()
         await query.message.edit_text(text=text, reply_markup=keyboard)
@@ -298,7 +298,7 @@ async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
     text = f"""
 {summary}
-ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
+Use the buttons below to make changes
 """
     keyboard = get_set_metadata_keyboard()
     
