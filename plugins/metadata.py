@@ -1,5 +1,3 @@
-
-
 from helper.database import n4bots as db
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
@@ -29,13 +27,14 @@ async def get_metadata_summary(user_id):
     subtitle = await db.get_subtitle(user_id)
     
     summary = f"""
-**Metadata Status: {current}**
- **➥ Title:** `{title if title else 'Not Set'}`
- **➥ Author:** `{author if author else 'Not Set'}`
- **➥ Artist:** `{artist if artist else 'Not Set'}`
- **➥ Audio:** `{audio if audio else 'Not Set'}`
- **➥ Subtitle:** `{subtitle if subtitle else 'Not Set'}`
- **➥ Video:** `{video if video else 'Not Set'}`
+**YOUR METADATA IS CURRENTLY: {current}**
+
+ **Title:** `{title if title else 'Not Set'}`
+ **Author:** `{author if author else 'Not Set'}`
+ **Artist:** `{artist if artist else 'Not Set'}`
+ **Audio:** `{audio if audio else 'Not Set'}`
+ **Subtitle:** `{subtitle if subtitle else 'Not Set'}`
+ **Video:** `{video if video else 'Not Set'}`
 """
     return summary
 
@@ -44,11 +43,11 @@ def get_main_menu_keyboard(current_status):
     buttons = [
         [
             InlineKeyboardButton(
-                f"{'✅' if current_status == 'On' else '○'} Enable", 
+                f"{'✅' if current_status == 'ON' else '○'} Enable", 
                 callback_data='on_metadata'
             ),
             InlineKeyboardButton(
-                f"{'✅' if current_status == 'Off' else '○'} Disable", 
+                f"{'✅' if current_status == 'OFF' else '○'} Disable", 
                 callback_data='off_metadata'
             )
         ],
