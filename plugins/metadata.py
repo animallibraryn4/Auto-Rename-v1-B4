@@ -139,6 +139,9 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         # Don't edit if we're already on the set metadata menu
         if "Set Metadata Values" in query.message.text:
             return
+
+        summary = await get_metadata_summary(user_id)
+        
         text = f"""
 **⚙️ Set Metadata Values**
 
