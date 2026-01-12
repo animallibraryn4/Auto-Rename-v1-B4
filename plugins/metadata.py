@@ -103,16 +103,11 @@ async def metadata_main(client, message):
     summary = await get_metadata_summary(user_id)
     
     text = f"""
-**✨ Metadata Control Panel**
+**>Metadata Settings*"
 
-*Customize how your media files appear with metadata settings*
+This lets you change the names and details shown on your media files.
 
-{summary}
-
-**📌 Quick Actions:**
-• **Enable/Disable** - Toggle metadata on or off
-• **Set Metadata** - Configure all fields at once
-• **Help** - Learn more about metadata settings
+You can edit things like title, audio name, subtitle name, and author so your files look clean and easy to read.
 """
     
     keyboard = get_main_menu_keyboard(current_status)
