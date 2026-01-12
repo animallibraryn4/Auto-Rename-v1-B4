@@ -139,13 +139,12 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         # Don't edit if we're already on the set metadata menu
         if "Set Metadata Values" in query.message.text:
             return
-        text = """
+        text = f"""
 **⚙️ Set Metadata Values**
 
 {summary}
 
 Choose what you want to edit
-
 """
         keyboard = get_set_metadata_keyboard()
         await query.message.edit_text(text=text, reply_markup=keyboard)
