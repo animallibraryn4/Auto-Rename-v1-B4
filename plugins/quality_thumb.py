@@ -71,6 +71,7 @@ async def set_global_thumb(client, callback):
     )
 
 # HIGH PRIORITY PHOTO HANDLER - यह metadata.py से पहले चलेगा
+# HIGH PRIORITY PHOTO HANDLER - यह metadata.py से पहले चलेगा
 @Client.on_message(filters.private & filters.photo, group=1)
 async def save_thumbnail_priority(client, message):
     user_id = message.from_user.id
@@ -87,8 +88,21 @@ async def save_thumbnail_priority(client, message):
         # Check if user is in metadata editing mode
         user_data = await n4bots.col.find_one({"_id": int(user_id)})
         if user_data and "editing_metadata_field" in user_data:
-            print(f"User {user_id} is in metadata editing mode, skipping thumbnail save")
-            return  # Let metadata.py handle this
+            print(f"User {user_id} is in metadata editing mode, checking if this is thumbnail...")
+            
+            # If user has temp_quality set, they're trying to set thumbnail, not metadata
+            # So we should save the thumbnail and clear the metadata editing state
+            if quality:
+                print(f"User {user_id} has temp_quality set, saving thumbnail and clearing metadata state")
+                # Clear metadata editing state
+                await n4bots.col.update_one(
+                    {"_id": int(user_id)},
+                    {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+                )
+            else:
+                # No temp_quality, let metadata.py handle it
+                print(f"No temp_quality for user {user_id}, passing to metadata handler")
+                return
         
         print(f"Saving thumbnail for user {user_id}, quality: {quality}")
         
