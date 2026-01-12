@@ -143,7 +143,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         
         text = f"""
 **Your Metadata Is Currently: {current}**
-{summary}
+
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
         keyboard = get_set_metadata_keyboard()
