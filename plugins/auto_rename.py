@@ -164,7 +164,7 @@ def get_codec_info(stream):
             'language': language
         }
 
-@Client.on_message(filters.private & filters.command("info"))
+
 async def info_command(client, message):
     user_id = message.from_user.id
 
