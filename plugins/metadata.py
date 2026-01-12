@@ -16,6 +16,14 @@ EXCLUDED_COMMANDS = [
     "plans", "about", "home"
 ]
 
+async def clear_metadata_state(user_id):
+    """Editing mode clear"""
+    await db.col.update_one(
+        {"_id": int(user_id)},
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+    )
+    
+
 async def get_metadata_summary(user_id):
     """Generate a summary of all metadata settings"""
     current = await db.get_metadata(user_id)
