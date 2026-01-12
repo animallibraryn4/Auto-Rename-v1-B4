@@ -341,18 +341,19 @@ async def handle_metadata_value_input(client, message):
     user_data = await db.col.find_one({"_id": int(user_id)})
     if not user_data or "editing_metadata_field" not in user_data or "editing_message_id" not in user_data:
         return
-    
-    field = user_data["editing_metadata_field"]
-    edit_message_id = user_data["editing_message_id"]
-    new_value = message.text.strip()
-    
-    if not new_value:
-        # Just delete the invalid input message
+
+    # FIX: Check if message.text exists before stripping
+    if not message.text:
         try:
+            # Optionally alert the user or just delete the non-text message
             await message.delete()
         except:
             pass
         return
+        
+    field = user_data["editing_metadata_field"]
+    edit_message_id = user_data["editing_message_id"]
+    new_value = message.text.strip()
     
     # Update the specific field
     field_methods = {
