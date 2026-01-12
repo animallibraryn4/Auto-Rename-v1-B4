@@ -144,7 +144,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         
         text = f"""
 {summary}
-Use the buttons below to make changes
+ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
         keyboard = get_set_metadata_keyboard()
         await query.message.edit_text(text=text, reply_markup=keyboard)
@@ -175,12 +175,12 @@ Use the buttons below to make changes
         
         # Reset to default value
         default_values = {
-            "title": "Encoded by @Animelibraryn4",
-            "author": "@Animelibraryn4",
-            "artist": "@Animelibraryn4",
-            "audio": "By @Animelibraryn4",
-            "subtitle": "By @Animelibraryn4",
-            "video": "Encoded By @Animelibraryn4"
+            "title": "Encoded by @N4_Bots",
+            "author": "@N4_Bots",
+            "artist": "@N4_Bots",
+            "audio": "By @N4_Bots",
+            "subtitle": "By @N4_Bots",
+            "video": "Encoded By @N4_Bots"
         }
         
         if field in default_values:
@@ -194,12 +194,12 @@ Use the buttons below to make changes
     # Handle reset all - NO NOTIFICATIONS
     elif data == "reset_all":
         # Reset all fields to defaults
-        await db.set_title(user_id, "Encoded by @Animelibraryn4")
-        await db.set_author(user_id, "@Animelibraryn4")
-        await db.set_artist(user_id, "@Animelibraryn4")
-        await db.set_audio(user_id, "By @Animelibraryn4")
-        await db.set_subtitle(user_id, "By @Animelibraryn4")
-        await db.set_video(user_id, "Encoded By @Animelibraryn4")
+        await db.set_title(user_id, "Encoded by @N4_Bots")
+        await db.set_author(user_id, "@N4_Bots")
+        await db.set_artist(user_id, "@N4_Bots")
+        await db.set_audio(user_id, "By @N4_Bots")
+        await db.set_subtitle(user_id, "By @N4_Bots")
+        await db.set_video(user_id, "Encoded By @N4_Bots")
         await show_set_metadata_menu(query, user_id)
         return
     
@@ -240,17 +240,17 @@ async def show_edit_field_prompt(query, user_id, field):
     
     # Get example value
     examples = {
-        "title": "My Awesome Video",
-        "author": "Your Name",
-        "artist": "Artist Name",
-        "audio": "High Quality Audio",
-        "subtitle": "English Subtitles",
-        "video": "HD 1080p"
+        "title": "Encoded By N4_Bots",
+        "author": "N4_Bots",
+        "artist": "N4_Bots",
+        "audio": "N4_Bots",
+        "subtitle": "N4_Bots",
+        "video": "Encoded By N4_Bots"
     }
     example = examples.get(field, "Your custom value")
     
     text = f"""
-**✏️ Send me the new {field_display} value:**
+**Send Me The New {field_display} Value:**
 
 **Current {field_display}:** `{current_value}`
 
@@ -298,7 +298,7 @@ async def show_set_metadata_menu(query, user_id):
     """Show the set metadata menu"""
     text = f"""
 {summary}
-Use the buttons below to make changes
+ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard()
     
@@ -360,18 +360,18 @@ async def handle_metadata_value_input(client, message):
         
         # Get example value
         examples = {
-            "title": "My Awesome Video",
-            "author": "Your Name",
-            "artist": "Artist Name",
-            "audio": "High Quality Audio",
-            "subtitle": "English Subtitles",
-            "video": "HD 1080p"
+        "title": "Encoded By N4_Bots",
+        "author": "N4_Bots",
+        "artist": "N4_Bots",
+        "audio": "N4_Bots",
+        "subtitle": "N4_Bots",
+        "video": "Encoded By N4_Bots"
         }
         example = examples.get(field, "Your custom value")
         
         # Update the original edit prompt message
         updated_text = f"""
-**✏️ Send me the new {field_display} value:**
+**Send Me The New {field_display} Value:**
 
 **Current {field_display}:** `{current_value}`
 
