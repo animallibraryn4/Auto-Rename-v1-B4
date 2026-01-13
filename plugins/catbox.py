@@ -22,27 +22,51 @@ async def catbox_upload(client, message):
             await msg.edit_text("📤 Uploading to Catbox...")
             
             try:
-                # Upload to Catbox using Lite Mirror URL
-                with open(file_path, "rb") as f:
-                    response = requests.post(
-                        "https://lite.catbox.moe/user/api.php",  # Changed to Lite Mirror
-                        data={"reqtype": "fileupload"},
-                        files={"fileToUpload": f}
-                    )
+                # Try multiple proxies (choose one that works)
+                proxy_list = [
+                    # HTTP Proxies
+                    {"http": "http://88.99.234.44:3128", "https": "http://88.99.234.44:3128"},
+                    {"http": "http://43.134.172.75:3128", "https": "http://43.134.172.75:3128"},
+                    {"http": "http://138.68.60.8:3128", "https": "http://138.68.60.8:3128"},
+                    # SOCKS5 Proxies (if you install requests[socks])
+                    # {"http": "socks5://45.79.221.233:1080", "https": "socks5://45.79.221.233:1080"},
+                ]
                 
-                if response.status_code == 200 and response.text.strip():
+                response = None
+                last_error = None
+                
+                # Try each proxy
+                for proxy in proxy_list:
+                    try:
+                        with open(file_path, "rb") as f:
+                            response = requests.post(
+                                "https://catbox.moe/user/api.php",
+                                data={"reqtype": "fileupload"},
+                                files={"fileToUpload": f},
+                                proxies=proxy,
+                                timeout=30
+                            )
+                        # If successful, break out of loop
+                        if response.status_code == 200:
+                            break
+                    except Exception as e:
+                        last_error = e
+                        continue
+                
+                if response and response.status_code == 200 and response.text.strip():
                     # Success - get the link
                     catbox_url = response.text.strip()
                     
                     # Send success message with button
                     await msg.edit_text(
-                        "✅ Upload Successful",
+                        f"✅ Upload Successful",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("🔗 Open Link", url=catbox_url)]
                         ])
                     )
                 else:
-                    await msg.edit_text("❌ Upload failed")
+                    error_msg = last_error if last_error else "Upload failed"
+                    await msg.edit_text(f"❌ Error: {str(error_msg)}")
                     
             except Exception as e:
                 await msg.edit_text(f"❌ Error: {str(e)}")
@@ -79,15 +103,35 @@ async def handle_photo_with_caption(client, message):
         await msg.edit_text("📤 Uploading to Catbox...")
         
         try:
-            # Upload to Catbox using Lite Mirror URL
-            with open(file_path, "rb") as f:
-                response = requests.post(
-                    "https://lite.catbox.moe/user/api.php",  # Changed to Lite Mirror
-                    data={"reqtype": "fileupload"},
-                    files={"fileToUpload": f}
-                )
+            # Try multiple proxies (choose one that works)
+            proxy_list = [
+                {"http": "http://88.99.234.44:3128", "https": "http://88.99.234.44:3128"},
+                {"http": "http://43.134.172.75:3128", "https": "http://43.134.172.75:3128"},
+                {"http": "http://138.68.60.8:3128", "https": "http://138.68.60.8:3128"},
+            ]
             
-            if response.status_code == 200 and response.text.strip():
+            response = None
+            last_error = None
+            
+            # Try each proxy
+            for proxy in proxy_list:
+                try:
+                    with open(file_path, "rb") as f:
+                        response = requests.post(
+                            "https://catbox.moe/user/api.php",
+                            data={"reqtype": "fileupload"},
+                            files={"fileToUpload": f},
+                            proxies=proxy,
+                            timeout=30
+                        )
+                    # If successful, break out of loop
+                    if response.status_code == 200:
+                        break
+                except Exception as e:
+                    last_error = e
+                    continue
+            
+            if response and response.status_code == 200 and response.text.strip():
                 # Success - get the link
                 catbox_url = response.text.strip()
                 
@@ -99,7 +143,8 @@ async def handle_photo_with_caption(client, message):
                     ])
                 )
             else:
-                await msg.edit_text("❌ Upload failed")
+                error_msg = last_error if last_error else "Upload failed"
+                await msg.edit_text(f"❌ Error: {str(error_msg)}")
                 
         except Exception as e:
             await msg.edit_text(f"❌ Error: {str(e)}")
