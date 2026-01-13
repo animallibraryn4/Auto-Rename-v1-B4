@@ -3,7 +3,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import requests
 import os
 import asyncio
-import aiohttp
 
 @Client.on_message(filters.command("catbox") & filters.private)
 async def catbox_upload(client, message):
@@ -77,16 +76,17 @@ async def catbox_upload(client, message):
                     
                     if transfer_success:
                         # Send Transfer.sh success
+                        buttons = [
+                            [InlineKeyboardButton("🔗 Open Link", url=transfer_url)]
+                        ]
+                        
                         await msg.edit_text(
                             f"✅ **Uploaded to Transfer.sh**\n\n"
                             f"**File:** `{file_name}`\n"
                             f"**Size:** {file_size // 1024} KB\n"
                             f"**Link:** `{transfer_url}`\n\n"
                             f"⚠️ *Note: Link expires in 14 days*",
-                            reply_markup=InlineKeyboardMarkup([
-                                [InlineKeyboardButton("🔗 Open Link", url=transfer_url)],
-                                [InlineKeyboardButton("📋 Copy Link", text=transfer_url)]
-                            ])
+                            reply_markup=InlineKeyboardMarkup(buttons)
                         )
                         os.remove(file_path)
                         return
@@ -104,15 +104,16 @@ async def catbox_upload(client, message):
                             
                             if response.status_code == 200 and response.text.strip():
                                 zerozero_url = response.text.strip()
+                                buttons = [
+                                    [InlineKeyboardButton("🔗 Open Link", url=zerozero_url)]
+                                ]
+                                
                                 await msg.edit_text(
                                     f"✅ **Uploaded to 0x0.st**\n\n"
                                     f"**File:** `{file_name}`\n"
                                     f"**Size:** {file_size // 1024} KB\n"
                                     f"**Link:** `{zerozero_url}`",
-                                    reply_markup=InlineKeyboardMarkup([
-                                        [InlineKeyboardButton("🔗 Open Link", url=zerozero_url)],
-                                        [InlineKeyboardButton("📋 Copy Link", text=zerozero_url)]
-                                    ])
+                                    reply_markup=InlineKeyboardMarkup(buttons)
                                 )
                                 os.remove(file_path)
                                 return
@@ -136,17 +137,21 @@ async def catbox_upload(client, message):
                         return
                 
                 # Catbox success
+                short_code = catbox_url.split('/')[-1]
+                short_url = f"https://catbox.moe/c/{short_code}"
+                
+                buttons = [
+                    [InlineKeyboardButton("🔗 Direct Link", url=catbox_url)],
+                    [InlineKeyboardButton("🌐 Short Link", url=short_url)]
+                ]
+                
                 await msg.edit_text(
                     f"✅ **Upload Successful!**\n\n"
                     f"**File:** `{file_name}`\n"
                     f"**Size:** {file_size // 1024} KB\n"
                     f"**Direct Link:** `{catbox_url}`\n"
-                    f"**Short Link:** https://catbox.moe/c/{catbox_url.split('/')[-1]}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔗 Direct Link", url=catbox_url)],
-                        [InlineKeyboardButton("🌐 Short Link", url=f"https://catbox.moe/c/{catbox_url.split('/')[-1]}")],
-                        [InlineKeyboardButton("📋 Copy Link", text=catbox_url)]
-                    ])
+                    f"**Short Link:** `{short_url}`",
+                    reply_markup=InlineKeyboardMarkup(buttons)
                 )
                     
             except Exception as e:
@@ -180,7 +185,151 @@ async def catbox_upload(client, message):
 async def handle_file_with_caption(client, message):
     # Check if caption contains /catbox command
     if message.caption and "/catbox" in message.caption:
-        # Simulate the command
-        message.reply_to_message = message
-        message.text = "/catbox"
-        await catbox_upload(client, message)
+        # Download the file
+        msg = await message.reply_text("📥 Downloading file...")
+        
+        # Download file
+        file_path = await message.download()
+        
+        try:
+            # Get file info
+            file_size = os.path.getsize(file_path)
+            file_name = os.path.basename(file_path)
+            
+            # Check if file is too large (Catbox limit: 200MB)
+            if file_size > 200 * 1024 * 1024:  # 200MB
+                await msg.edit_text("❌ File too large! Catbox max size is 200MB")
+                os.remove(file_path)
+                return
+            
+            # Try Catbox first
+            await msg.edit_text("📤 Uploading to Catbox...")
+            
+            catbox_success = False
+            catbox_url = ""
+            
+            try:
+                with open(file_path, "rb") as f:
+                    response = requests.post(
+                        "https://catbox.moe/user/api.php",
+                        data={"reqtype": "fileupload"},
+                        files={"fileToUpload": f},
+                        timeout=60
+                    )
+                
+                if response.status_code == 200 and response.text.strip():
+                    catbox_url = response.text.strip()
+                    if catbox_url.startswith("http"):
+                        catbox_success = True
+            except:
+                catbox_success = False
+            
+            # If Catbox failed, try Transfer.sh
+            if not catbox_success:
+                await msg.edit_text("⚠️ Catbox failed, trying Transfer.sh...")
+                
+                transfer_success = False
+                transfer_url = ""
+                
+                try:
+                    with open(file_path, "rb") as f:
+                        response = requests.post(
+                            "https://transfer.sh/",
+                            files={"file": f},
+                            timeout=60
+                        )
+                    
+                    if response.status_code == 200 and response.text.strip():
+                        transfer_url = response.text.strip()
+                        transfer_success = True
+                except Exception as e:
+                    await msg.edit_text(f"⚠️ Transfer.sh failed: {str(e)[:100]}")
+                    transfer_success = False
+                
+                if transfer_success:
+                    # Send Transfer.sh success
+                    buttons = [
+                        [InlineKeyboardButton("🔗 Open Link", url=transfer_url)]
+                    ]
+                    
+                    await msg.edit_text(
+                        f"✅ **Uploaded to Transfer.sh**\n\n"
+                        f"**File:** `{file_name}`\n"
+                        f"**Size:** {file_size // 1024} KB\n"
+                        f"**Link:** `{transfer_url}`\n\n"
+                        f"⚠️ *Note: Link expires in 14 days*",
+                        reply_markup=InlineKeyboardMarkup(buttons)
+                    )
+                    os.remove(file_path)
+                    return
+                else:
+                    # Last resort: Try 0x0.st
+                    await msg.edit_text("⚠️ Trying 0x0.st as last option...")
+                    
+                    try:
+                        with open(file_path, "rb") as f:
+                            response = requests.post(
+                                "https://0x0.st",
+                                files={"file": f},
+                                timeout=60
+                            )
+                        
+                        if response.status_code == 200 and response.text.strip():
+                            zerozero_url = response.text.strip()
+                            buttons = [
+                                [InlineKeyboardButton("🔗 Open Link", url=zerozero_url)]
+                            ]
+                            
+                            await msg.edit_text(
+                                f"✅ **Uploaded to 0x0.st**\n\n"
+                                f"**File:** `{file_name}`\n"
+                                f"**Size:** {file_size // 1024} KB\n"
+                                f"**Link:** `{zerozero_url}`",
+                                reply_markup=InlineKeyboardMarkup(buttons)
+                            )
+                            os.remove(file_path)
+                            return
+                    except:
+                        pass
+                    
+                    # All methods failed
+                    await msg.edit_text(
+                        "❌ **All upload methods failed!**\n\n"
+                        "**Possible reasons:**\n"
+                        "• Your hosting blocks file uploads\n"
+                        "• All file hosts are blocked\n"
+                        "• Network issues\n\n"
+                        "**Solutions:**\n"
+                        "1. Deploy on Koyeb.com (free)\n"
+                        "2. Try Railway.app (free credits)\n"
+                        "3. Use Replit.com (free)\n"
+                        "4. Check bot logs for details"
+                    )
+                    os.remove(file_path)
+                    return
+            
+            # Catbox success
+            short_code = catbox_url.split('/')[-1]
+            short_url = f"https://catbox.moe/c/{short_code}"
+            
+            buttons = [
+                [InlineKeyboardButton("🔗 Direct Link", url=catbox_url)],
+                [InlineKeyboardButton("🌐 Short Link", url=short_url)]
+            ]
+            
+            await msg.edit_text(
+                f"✅ **Upload Successful!**\n\n"
+                f"**File:** `{file_name}`\n"
+                f"**Size:** {file_size // 1024} KB\n"
+                f"**Direct Link:** `{catbox_url}`\n"
+                f"**Short Link:** `{short_url}`",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+                
+        except Exception as e:
+            await msg.edit_text(f"❌ Error: {str(e)[:150]}")
+            
+        finally:
+            # Clean up downloaded file
+            if os.path.exists(file_path):
+                os.remove(file_path)
