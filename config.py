@@ -19,7 +19,7 @@ class Config(object):
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]
     # channel
     FORCE_SUB_CHANNELS = []
-    channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001954599807')
+    channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001896877147')
     if channels_str:
         # Split by comma and convert to integers, filter out invalid ones
         channels = channels_str.split(',')
