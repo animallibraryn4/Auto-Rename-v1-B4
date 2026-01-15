@@ -1,3 +1,16 @@
+import sys
+import os
+
+# Check if required packages are installed
+try:
+    from pyrogram import Client
+except ImportError as e:
+    print("❌ Pyrogram not found. Installing required packages...")
+    os.system(f"{sys.executable} -m pip install pyrogram==2.0.80 TgCrypto motor dnspython")
+    print("✅ Packages installed. Please restart the bot.")
+    sys.exit(1)
+
+# Now import the rest
 from plugins.file_rename import queue_manager
 import aiohttp, asyncio, warnings, pytz
 from datetime import datetime, timedelta
@@ -11,6 +24,15 @@ import pyromod
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import time
+
+# Try to import libtorrent, but don't fail if it's missing
+try:
+    import libtorrent as lt
+    LIBTORRENT_AVAILABLE = True
+    print("✅ libtorrent is available")
+except ImportError:
+    LIBTORRENT_AVAILABLE = False
+    print("⚠ libtorrent is not available. Torrent features will be disabled.")
 
 pyrogram.utils.MIN_CHANNEL_ID = -1001896877147
 
@@ -69,6 +91,34 @@ class Bot(Client):
             except Exception as e:
                 print(e)
 
-
 if __name__ == "__main__":
-    Bot().run()
+    print("=" * 50)
+    print("Starting Auto-Rename Bot with Torrent Support")
+    print("=" * 50)
+    
+    if not LIBTORRENT_AVAILABLE:
+        print("⚠ Warning: libtorrent is not installed.")
+        print("Torrent features will be disabled.")
+        print("To enable torrent features, install libtorrent:")
+        print("sudo apt-get install python3-libtorrent")
+        print("or")
+        print("pip install libtorrent==2.0.9")
+        print("=" * 50)
+    
+    # Check if config is set
+    if not Config.API_ID or not Config.API_HASH or not Config.BOT_TOKEN:
+        print("❌ Error: API_ID, API_HASH, or BOT_TOKEN not set in config!")
+        print("Please set these environment variables:")
+        print("export API_ID='your_api_id'")
+        print("export API_HASH='your_api_hash'")
+        print("export BOT_TOKEN='your_bot_token'")
+        sys.exit(1)
+    
+    print("✅ Bot configuration loaded successfully")
+    print("Starting bot...")
+    
+    try:
+        Bot().run()
+    except Exception as e:
+        print(f"❌ Error starting bot: {e}")
+        print("Please check your configuration and try again.")
