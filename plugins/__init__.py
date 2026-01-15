@@ -10,7 +10,15 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from cloudscraper import create_scraper
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import Config, Txt
-from helper.database import n4bots  
+from helper.database import n4bots 
+
+# Add near the top with other imports
+from plugins.torrent_handler import TorrentManager
+
+# Add after other global variables
+torrent_manager = TorrentManager()
+user_torrent_state = {}  # user_id -> {state, magnet_link, torrent_path, selected_file}
+
 
 # =====================================================
 # MEMORY (SIMPLE & STABLE)
@@ -352,4 +360,41 @@ async def verify_cmd(client, message):
 async def get_token_cmd(client, message):
     """New command to get verification token"""
     await send_verification(client, message)
+
+
+
+# Add this handler after other command handlers
+@Client.on_message(filters.private & filters.command("torrent"))
+async def torrent_command(client, message):
+    """Handle /torrent command"""
+    user_id = message.from_user.id
+    
+    # Check if user is banned
+    from plugins.admin_panel import check_ban_status
+    if await check_ban_status(user_id):
+        return
+        
+    # Check verification
+    if not await is_user_verified(user_id):
+        await send_verification(client, message)
+        return
+    
+    # Initialize torrent state
+    user_torrent_state[user_id] = {
+        "state": "waiting_link",
+        "magnet_link": None,
+        "torrent_path": None,
+        "selected_file": None,
+        "files": [],
+        "message_id": message.id
+    }
+    
+    await message.reply_text(
+        "📥 **Torrent Downloader**\n\n"
+        "Send me a **magnet link** or **.torrent file** to download.\n\n"
+        "**Supported formats:**\n"
+        "• Magnet links (magnet:?...)\n"
+        "• .torrent files\n\n"
+        "**Note:** Large torrents may take time to download."
+    )
 
