@@ -26,7 +26,7 @@ class Config(object):
     # FORCE_SUB_CHANNELS configuration
     FORCE_SUB_CHANNELS = []
     try:
-        channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001896877147').strip()
+        channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1002263636517').strip()
         if channels_str:
             # Split by comma and convert to integers
             channels = channels_str.split(',')
