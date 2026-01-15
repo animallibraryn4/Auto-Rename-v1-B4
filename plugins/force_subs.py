@@ -1,7 +1,7 @@
 import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from pyrogram.errors import UserNotParticipant, ChatAdminRequired
+from pyrogram.errors import UserNotParticipant
 from config import Config
 
 FORCE_SUB_CHANNELS = Config.FORCE_SUB_CHANNELS
@@ -23,55 +23,48 @@ async def not_subscribed(_, __, message):
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
     not_joined_channels = []
+    channel_info = {}
     
     for channel_id in FORCE_SUB_CHANNELS:
         try:
-            # Try to get user status in channel
-            try:
-                user = await client.get_chat_member(int(channel_id), message.from_user.id)
-                if user.status in {"kicked", "left"}:
-                    not_joined_channels.append(channel_id)
-            except UserNotParticipant:
-                not_joined_channels.append(channel_id)
-            except Exception as e:
-                print(f"Error checking user status in channel {channel_id}: {e}")
-                not_joined_channels.append(channel_id)
-                
+            chat = await client.get_chat(int(channel_id))
+            channel_name = chat.title if chat.title else f"Channel {channel_id}"
+            invite_link = chat.invite_link if chat.invite_link else None
+            
+            user = await client.get_chat_member(int(channel_id), message.from_user.id)
+            if user.status in {"kicked", "left"}:
+                not_joined_channels.append({
+                    'id': channel_id,
+                    'name': channel_name,
+                    'invite_link': invite_link
+                })
+        except UserNotParticipant:
+            not_joined_channels.append({
+                'id': channel_id,
+                'name': f"Channel {channel_id}",
+                'invite_link': None
+            })
         except Exception as e:
-            print(f"Error with channel {channel_id}: {e}")
-            not_joined_channels.append(channel_id)
+            print(f"Error getting channel info for {channel_id}: {e}")
+            continue
 
     if not not_joined_channels:
         return
 
-    # Build buttons for channels
     buttons = []
-    for channel_id in not_joined_channels:
-        try:
-            # Get channel info
-            chat = await client.get_chat(int(channel_id))
-            channel_name = chat.title if chat.title else f"Channel {channel_id}"
-            
-            # Try to get invite link
-            try:
-                invite_link = await client.export_chat_invite_link(int(channel_id))
-            except:
-                # If bot doesn't have permission to create invite link, use alternative
-                invite_link = f"https://t.me/c/{str(channel_id)[4:]}"
-                
+    for channel in not_joined_channels:
+        if channel['invite_link']:
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"Join {channel_name}",
-                    url=invite_link
+                    text=f"Join {channel['name']}",
+                    url=channel['invite_link']
                 )
             ])
-        except Exception as e:
-            print(f"Error getting info for channel {channel_id}: {e}")
-            # Fallback button
+        else:
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"Join Channel {channel_id}",
-                    url=f"https://t.me/c/{str(channel_id)[4:]}"
+                    text=f"Join {channel['name']}",
+                    url=f"https://t.me/c/{str(channel['id'])[4:]}"
                 )
             ])
     
@@ -113,7 +106,7 @@ async def check_subscription(client, callback_query: CallbackQuery):
             pass
         
         # Send the normal start message
-        from config import Txt, Config
+        from config import Txt
         user = callback_query.from_user
         
         buttons = InlineKeyboardMarkup([
@@ -146,26 +139,25 @@ async def check_subscription(client, callback_query: CallbackQuery):
             try:
                 chat = await client.get_chat(int(channel_id))
                 channel_name = chat.title if chat.title else f"Channel {channel_id}"
+                invite_link = chat.invite_link if chat.invite_link else None
                 
-                try:
-                    invite_link = await client.export_chat_invite_link(int(channel_id))
-                except:
-                    invite_link = f"https://t.me/c/{str(channel_id)[4:]}"
-                
-                buttons.append([
-                    InlineKeyboardButton(
-                        text=f"Join {channel_name}",
-                        url=invite_link
-                    )
-                ])
+                if invite_link:
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"Join {channel_name}",
+                            url=invite_link
+                        )
+                    ])
+                else:
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"Join {channel_name}",
+                            url=f"https://t.me/c/{str(channel_id)[4:]}"
+                        )
+                    ])
             except Exception as e:
                 print(f"Error getting channel info: {e}")
-                buttons.append([
-                    InlineKeyboardButton(
-                        text=f"Join Channel {channel_id}",
-                        url=f"https://t.me/c/{str(channel_id)[4:]}"
-                    )
-                ])
+                continue
         
         buttons.append([
             InlineKeyboardButton(
