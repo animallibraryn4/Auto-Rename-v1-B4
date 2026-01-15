@@ -24,21 +24,10 @@ async def not_subscribed(_, __, message):
             print(f"Error checking channel {channel_id}: {e}")
             continue
     return False
-    
+
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
-    # --- ADD THIS BLOCK AT THE START OF THE FUNCTION ---
-    for channel_id in FORCE_SUB_CHANNELS:
-        try:
-            # This line makes the bot's session aware of the channel
-            await client.resolve_peer(channel_id)
-        except Exception as e:
-            print(f"Could not resolve peer for {channel_id}: {e}")
-   
-    user = message.from_user
-    
     not_joined_channels = []
-    channel_info = {}
     
     # Get channel information
     for channel_id in FORCE_SUB_CHANNELS:
@@ -47,8 +36,8 @@ async def forces_sub(client, message):
             channel_name = chat.title or f"Channel {channel_id}"
             invite_link = chat.invite_link
             
-            user = await client.get_chat_member(channel_id, message.from_user.id)
-            if user.status in {"kicked", "left"}:
+            user_member = await client.get_chat_member(channel_id, message.from_user.id)
+            if user_member.status in {"kicked", "left"}:
                 not_joined_channels.append({
                     'id': channel_id,
                     'name': channel_name,
@@ -67,44 +56,17 @@ async def forces_sub(client, message):
     if not not_joined_channels:
         return
         
-    # Create buttons for each channel
+    # Create buttons
     buttons = []
     for channel in not_joined_channels:
-        if channel['invite_link']:
-            buttons.append([
-                InlineKeyboardButton(
-                    text=f"Join {channel['name']}",
-                    url=channel['invite_link']
-                )
-            ])
-        else:
-            buttons.append([
-                InlineKeyboardButton(
-                    text=f"Join {channel['name']}",
-                    url=f"https://t.me/{channel['id']}" if str(channel['id']).startswith('@') else f"https://t.me/c/{str(channel['id']).replace('-100', '')}"
-                )
-            ])
+        url = channel['invite_link'] or (f"https://t.me/{channel['id']}" if str(channel['id']).startswith('@') else f"https://t.me/c/{str(channel['id']).replace('-100', '')}")
+        buttons.append([InlineKeyboardButton(text=f"Join {channel['name']}", url=url)])
     
-    buttons.append([
-        InlineKeyboardButton(
-            text="I have joined",
-            callback_data="check_subscription"
-        )
-    ])
+    buttons.append([InlineKeyboardButton(text="I have joined", callback_data="check_subscription")])
 
-    text = f"""**👋 Hello {user.first_name}!**
-    
-**Please Join Our Channels To Use This Bot!**
+    # FIXED: Use message.from_user.first_name instead of chat_member object
+    text = f"**👋 Hello {message.from_user.first_name}!**\n\n**Please Join Our Channels To Use This Bot!**"
 
-<blockquote><b>Steps:</b>
-1. Join the channels below
-2. Come back and click "I Have Joined"
-3. Start using the bot!</blockquote>
-
-<b>Note:</b>You need to join all the required channels.
-"""
-
-    # Send the force subscribe message
     await message.reply_photo(
         photo=IMAGE_URL,
         caption=text,
