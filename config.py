@@ -21,27 +21,30 @@ class Config(object):
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002263636517"))
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
-    
 
     # FORCE_SUB_CHANNELS configuration
     FORCE_SUB_CHANNELS = []
     try:
         channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1002263636517').strip()
         if channels_str:
-            # Split by comma and convert to integers
+            print(f"DEBUG: Raw FORCE_SUB_CHANNELS string: {channels_str}")
             channels = channels_str.split(',')
             for channel in channels:
                 channel = channel.strip()
-                if channel:  # Check if not empty
+                if channel:
                     try:
-                        # Convert to integer (handles negative channel IDs)
+                        # Remove any quotes or extra characters
+                        channel = channel.replace("'", "").replace('"', '')
                         channel_id = int(channel)
                         FORCE_SUB_CHANNELS.append(channel_id)
-                    except ValueError:
-                        print(f"Invalid channel ID: {channel}. Skipping...")
+                        print(f"DEBUG: Added channel ID: {channel_id}")
+                    except ValueError as e:
+                        print(f"ERROR: Invalid channel ID format: {channel}. Error: {e}")
     except Exception as e:
-        print(f"Error parsing FORCE_SUB_CHANNELS: {e}")
+        print(f"ERROR parsing FORCE_SUB_CHANNELS: {e}")
         FORCE_SUB_CHANNELS = []
+
+    print(f"DEBUG: Final FORCE_SUB_CHANNELS list: {FORCE_SUB_CHANNELS}")
 
     SEASON_PLACEHOLDER = "{season}"  
 
