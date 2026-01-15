@@ -20,22 +20,17 @@ class Config(object):
     API_ID    = os.environ.get("API_ID", "")
     API_HASH  = os.environ.get("API_HASH", "")
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "") 
-
     # database config
     DB_NAME = os.environ.get("DB_NAME","nikhil7858978052")     
     DB_URL  = os.environ.get("DB_URL","mongodb+srv://mikota4432:jkJDQuZH6o8pxxZe@cluster0.2vngilq.mongodb.net/?retryWrites=true&w=majority")
     PORT = os.environ.get("PORT", "9090")
- 
     # other configs
     BOT_UPTIME  = time.time()
     START_PIC   = os.environ.get("START_PIC", "https://images8.alphacoders.com/138/1384114.png")
-    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]
-            
+    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]        
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002263636517"))
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
-    WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
-
-    
+    WEBHOOK = bool(os.environ.get("WEBHOOK", "True")) 
     # Force Subscribe Channels (up to 5) - Use Channel IDs
     FORCE_SUB_CHANNELS1 = "-1001896877147"  # Channel ID 1 (required) 
     FORCE_SUB_CHANNELS2 = "-1002263636517"  # Set to channel ID string or None
