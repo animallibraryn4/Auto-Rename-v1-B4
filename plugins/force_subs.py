@@ -1,313 +1,215 @@
 import os
-import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from pyrogram.errors import UserNotParticipant, ChatAdminRequired, ChannelInvalid, ChannelPrivate, PeerIdInvalid
+from pyrogram.errors import UserNotParticipant
 from config import Config, Txt
 
-FORCE_SUB_CHANNELS = Config.FORCE_SUB_CHANNELS
-MAX_CHANNELS = 5
+IMAGE_URL = "https://graph.org/file/a27d85469761da836337c.jpg"
 
-print(f"FORCE_SUB_DEBUG: Loaded {len(FORCE_SUB_CHANNELS)} channels: {FORCE_SUB_CHANNELS}")
+# Get active force subscribe channels
+FORCE_SUB_CHANNELS = Config.get_force_sub_channels()
 
-async def is_user_subscribed(client, user_id, channel_id):
-    """Check if a user is subscribed to a channel"""
-    try:
-        # First, check if bot can access the channel
-        try:
-            chat = await client.get_chat(channel_id)
-            print(f"FORCE_SUB_DEBUG: Bot can access channel {channel_id} ({chat.title})")
-        except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Bot cannot access channel {channel_id}: {e}")
-            return True  # If bot can't access, skip this channel
-        
-        # Check user membership
-        try:
-            user = await client.get_chat_member(channel_id, user_id)
-            print(f"FORCE_SUB_DEBUG: User {user_id} status in {channel_id}: {user.status}")
-            
-            if user.status in ["kicked", "left"]:
-                return False
-            return True
-        except UserNotParticipant:
-            print(f"FORCE_SUB_DEBUG: User {user_id} not participant in {channel_id}")
-            return False
-        except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Error checking user {user_id} in {channel_id}: {e}")
-            return True  # Skip on error
-        
-    except Exception as e:
-        print(f"FORCE_SUB_DEBUG: General error for channel {channel_id}: {e}")
-        return True  # Skip on error
-
-async def not_subscribed(_, client, message):
-    """Check if user is not subscribed to any channel"""
-    if not FORCE_SUB_CHANNELS or len(FORCE_SUB_CHANNELS) == 0:
-        print("FORCE_SUB_DEBUG: No channels configured")
+async def not_subscribed(_, __, message):
+    if not FORCE_SUB_CHANNELS:
         return False
-    
-    user_id = message.from_user.id
-    
-    for channel_id in FORCE_SUB_CHANNELS[:MAX_CHANNELS]:
+        
+    for channel_id in FORCE_SUB_CHANNELS:
         try:
-            # Try to get chat info first to verify bot access
-            try:
-                chat = await client.get_chat(channel_id)
-                print(f"FORCE_SUB_DEBUG: Checking channel {channel_id} ({chat.title}) for user {user_id}")
-            except Exception as e:
-                print(f"FORCE_SUB_DEBUG: Skipping channel {channel_id}, bot can't access: {e}")
-                continue  # Skip channels bot can't access
-            
-            # Check user subscription
-            try:
-                user = await client.get_chat_member(channel_id, user_id)
-                if user.status in ["kicked", "left"]:
-                    print(f"FORCE_SUB_DEBUG: User {user_id} not in channel {channel_id}")
-                    return True
-            except UserNotParticipant:
-                print(f"FORCE_SUB_DEBUG: User {user_id} not participant in {channel_id}")
+            user = await message._client.get_chat_member(channel_id, message.from_user.id)
+            if user.status in {"kicked", "left"}:
                 return True
-            except Exception as e:
-                print(f"FORCE_SUB_DEBUG: Error in get_chat_member for {channel_id}: {e}")
-                continue
-                
+        except UserNotParticipant:
+            return True
         except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Unexpected error for channel {channel_id}: {e}")
+            print(f"Error checking channel {channel_id}: {e}")
             continue
-    
-    print(f"FORCE_SUB_DEBUG: User {user_id} is subscribed to all channels")
     return False
 
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
-    """Show force subscribe message"""
-    user = message.from_user
-    print(f"FORCE_SUB_DEBUG: Showing force sub for user {user.id}")
+    if not FORCE_SUB_CHANNELS:
+        return
+        
+    not_joined_channels = []
+    channel_info = {}
     
-    # Get accessible channels
-    accessible_channels = []
-    for channel_id in FORCE_SUB_CHANNELS[:MAX_CHANNELS]:
+    # Get channel information
+    for channel_id in FORCE_SUB_CHANNELS:
         try:
             chat = await client.get_chat(channel_id)
-            accessible_channels.append((channel_id, chat))
-            print(f"FORCE_SUB_DEBUG: Channel accessible: {channel_id} - {chat.title}")
-        except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Channel {channel_id} not accessible: {e}")
-            continue
-    
-    if not accessible_channels:
-        print("FORCE_SUB_DEBUG: No accessible channels, allowing user")
-        return
-    
-    # Check which channels user needs to join
-    need_to_join = []
-    for channel_id, chat in accessible_channels:
-        try:
-            user_status = await client.get_chat_member(channel_id, user.id)
-            if user_status.status in ["kicked", "left"]:
-                need_to_join.append((channel_id, chat))
+            channel_name = chat.title or f"Channel {channel_id}"
+            invite_link = chat.invite_link
+            
+            user = await client.get_chat_member(channel_id, message.from_user.id)
+            if user.status in {"kicked", "left"}:
+                not_joined_channels.append({
+                    'id': channel_id,
+                    'name': channel_name,
+                    'invite_link': invite_link
+                })
         except UserNotParticipant:
-            need_to_join.append((channel_id, chat))
+            not_joined_channels.append({
+                'id': channel_id,
+                'name': channel_name,
+                'invite_link': invite_link
+            })
         except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Error checking user in {channel_id}: {e}")
-            need_to_join.append((channel_id, chat))
-    
-    if not need_to_join:
-        print(f"FORCE_SUB_DEBUG: User {user.id} already joined all channels")
-        return
-    
-    # Create buttons
-    buttons = []
-    for channel_id, chat in need_to_join:
-        channel_name = chat.title or f"Channel {abs(channel_id)}"
-        
-        # Get invite link
-        invite_link = None
-        try:
-            if hasattr(chat, 'username') and chat.username:
-                invite_link = f"https://t.me/{chat.username}"
-            else:
-                # Try to get invite link
-                try:
-                    invite_link = await client.export_chat_invite_link(channel_id)
-                except:
-                    # Fallback to t.me/c/ format
-                    if str(channel_id).startswith("-100"):
-                        invite_link = f"https://t.me/c/{str(abs(channel_id))}"
-        except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Error getting invite link for {channel_id}: {e}")
+            print(f"Error getting chat info for {channel_id}: {e}")
             continue
+
+    if not not_joined_channels:
+        return
         
-        if invite_link:
+    # Create buttons for each channel
+    buttons = []
+    for channel in not_joined_channels:
+        if channel['invite_link']:
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"📢 Join {channel_name}",
-                    url=invite_link
+                    text=f"📢 Join {channel['name']}",
+                    url=channel['invite_link']
+                )
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"📢 Join {channel['name']}",
+                    url=f"https://t.me/{channel['id']}" if str(channel['id']).startswith('@') else f"https://t.me/c/{str(channel['id']).replace('-100', '')}"
                 )
             ])
     
-    if not buttons:
-        print("FORCE_SUB_DEBUG: No valid buttons to show")
-        return
-    
     buttons.append([
-        InlineKeyboardButton("✅ I Have Joined", callback_data="check_subscription")
-    ])
-    
-    caption = f"""**👋 Hello {user.first_name}!**
-
-📌 **Please join our channel(s) to use this bot.**
-
-**Steps:**
-1. Join the channel(s) below
-2. Come back and click **"I Have Joined"**
-3. Start using the bot!
-
-**Note:** You need to join **all** the required channels."""
-    
-    try:
-        await message.reply_photo(
-            photo="https://graph.org/file/a27d85469761da836337c.jpg",
-            caption=caption,
-            reply_markup=InlineKeyboardMarkup(buttons)
+        InlineKeyboardButton(
+            text="✅ I have joined",
+            callback_data="check_subscription"
         )
-        print(f"FORCE_SUB_DEBUG: Force sub message sent to user {user.id}")
-    except Exception as e:
-        print(f"FORCE_SUB_DEBUG: Error sending force sub message: {e}")
+    ])
+
+    text = """**Please join our channel(s) to use this bot!**
+
+You must join all the required channels below to access the bot features."""
+
+    # Send the force subscribe message
+    await message.reply_photo(
+        photo=IMAGE_URL,
+        caption=text,
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
 @Client.on_callback_query(filters.regex("^check_subscription$"))
 async def check_subscription(client, callback_query: CallbackQuery):
-    """Handle subscription check"""
-    user = callback_query.from_user
-    user_id = user.id
+    user_id = callback_query.from_user.id
     
-    print(f"FORCE_SUB_DEBUG: Checking subscription for user {user_id}")
-    
-    # Get accessible channels
-    accessible_channels = []
-    for channel_id in FORCE_SUB_CHANNELS[:MAX_CHANNELS]:
-        try:
-            chat = await client.get_chat(channel_id)
-            accessible_channels.append((channel_id, chat))
-        except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Channel {channel_id} not accessible: {e}")
-            continue
-    
-    if not accessible_channels:
-        # No accessible channels, allow user
+    if not FORCE_SUB_CHANNELS:
         await callback_query.message.delete()
-        await send_welcome_message(client, user_id)
+        await send_start_message(client, callback_query)
         return
+        
+    not_joined_channels = []
     
-    # Check user subscription
-    need_to_join = []
-    for channel_id, chat in accessible_channels:
+    for channel_id in FORCE_SUB_CHANNELS:
         try:
-            user_status = await client.get_chat_member(channel_id, user_id)
-            if user_status.status in ["kicked", "left"]:
-                need_to_join.append((channel_id, chat))
+            user = await client.get_chat_member(channel_id, user_id)
+            if user.status in {"kicked", "left"}:
+                not_joined_channels.append(channel_id)
         except UserNotParticipant:
-            need_to_join.append((channel_id, chat))
+            not_joined_channels.append(channel_id)
         except Exception as e:
-            print(f"FORCE_SUB_DEBUG: Error checking {channel_id}: {e}")
-            need_to_join.append((channel_id, chat))
-    
-    if need_to_join:
-        # User needs to join more channels
-        buttons = []
-        for channel_id, chat in need_to_join:
-            channel_name = chat.title or f"Channel {abs(channel_id)}"
-            
-            # Get invite link
-            invite_link = None
+            print(f"Error checking subscription for {channel_id}: {e}")
+            continue
+
+    if not not_joined_channels:
+        # User has joined all channels
+        await callback_query.message.delete()
+        await send_start_message(client, callback_query)
+    else:
+        # User hasn't joined all channels
+        await callback_query.answer("❌ Please join all channels first!", show_alert=True)
+        
+        # Update the message with remaining channels
+        channel_info = {}
+        for channel_id in not_joined_channels:
             try:
-                if hasattr(chat, 'username') and chat.username:
-                    invite_link = f"https://t.me/{chat.username}"
-                else:
-                    try:
-                        invite_link = await client.export_chat_invite_link(channel_id)
-                    except:
-                        if str(channel_id).startswith("-100"):
-                            invite_link = f"https://t.me/c/{str(abs(channel_id))}"
-            except:
-                continue
-            
-            if invite_link:
+                chat = await client.get_chat(channel_id)
+                channel_info[channel_id] = {
+                    'name': chat.title or f"Channel {channel_id}",
+                    'invite_link': chat.invite_link
+                }
+            except Exception as e:
+                channel_info[channel_id] = {
+                    'name': f"Channel {channel_id}",
+                    'invite_link': None
+                }
+
+        # Create new buttons
+        buttons = []
+        for channel_id in not_joined_channels:
+            info = channel_info.get(channel_id, {})
+            if info.get('invite_link'):
                 buttons.append([
                     InlineKeyboardButton(
-                        text=f"📢 Join {channel_name}",
-                        url=invite_link
+                        text=f"📢 Join {info['name']}",
+                        url=info['invite_link']
+                    )
+                ])
+            else:
+                buttons.append([
+                    InlineKeyboardButton(
+                        text=f"📢 Join {info['name']}",
+                        url=f"https://t.me/{channel_id}" if str(channel_id).startswith('@') else f"https://t.me/c/{str(channel_id).replace('-100', '')}"
                     )
                 ])
         
-        if buttons:
-            buttons.append([
-                InlineKeyboardButton("✅ I Have Joined", callback_data="check_subscription")
-            ])
-            
-            caption = f"""**⚠️ Please join all channels!**
-
-You still need to join {len(need_to_join)} channel(s)."""
-            
-            try:
-                await callback_query.message.edit_caption(
-                    caption=caption,
-                    reply_markup=InlineKeyboardMarkup(buttons)
-                )
-                await callback_query.answer(f"Please join {len(need_to_join)} more channel(s)!", show_alert=True)
-            except:
-                await callback_query.answer("Please join all channels first!", show_alert=True)
-        else:
-            await callback_query.answer("Cannot verify channels. Please contact admin.", show_alert=True)
-    else:
-        # User has joined all channels
-        await callback_query.message.delete()
-        await send_welcome_message(client, user_id)
-
-async def send_welcome_message(client, user_id):
-    """Send welcome/start message after verification"""
-    try:
-        # Send welcome animation
-        welcome_msg = await client.send_message(
-            user_id,
-            "✅ **Verification successful!**\n\nWelcome to the bot!"
-        )
-        await asyncio.sleep(1)
-        
-        # Send start message
-        user = await client.get_users(user_id)
-        
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')],
-            [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Animelibraryn4')],
-            [
-                InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
-                InlineKeyboardButton('sᴏᴜʀᴄᴇ', callback_data='source')
-            ]
+        buttons.append([
+            InlineKeyboardButton(
+                text="✅ I have joined",
+                callback_data="check_subscription"
+            )
         ])
-        
-        if Config.START_PIC:
-            await client.send_photo(
-                chat_id=user_id,
-                photo=Config.START_PIC,
-                caption=Txt.START_TXT.format(user.mention),
-                reply_markup=buttons
-            )
-        else:
-            await client.send_message(
-                chat_id=user_id,
-                text=Txt.START_TXT.format(user.mention),
-                reply_markup=buttons,
-                disable_web_page_preview=True
-            )
-        
-        # Delete welcome message
+
+        text = f"""**❌ You still need to join {len(not_joined_channels)} channel(s)!**
+
+Please join all the channels below:"""
+
         try:
-            await welcome_msg.delete()
-        except:
-            pass
-            
-        print(f"FORCE_SUB_DEBUG: Welcome message sent to user {user_id}")
-        
-    except Exception as e:
-        print(f"FORCE_SUB_DEBUG: Error sending welcome message: {e}")
+            await callback_query.message.edit_caption(
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        except Exception as e:
+            print(f"Error editing message: {e}")
+            await callback_query.answer("Please try again!", show_alert=True)
+
+async def send_start_message(client, callback_query: CallbackQuery):
+    """Send the normal /start command message"""
+    user = callback_query.from_user
+    
+    # Define buttons for the start message
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')
+        ],
+        [
+            InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Animelibraryn4')
+        ],
+        [
+            InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
+            InlineKeyboardButton('sᴏᴜʀᴄᴇ', callback_data='source')
+        ]
+    ])
+
+    # Send start message with or without picture
+    if Config.START_PIC:
+        await client.send_photo(
+            chat_id=user.id,
+            photo=Config.START_PIC,
+            caption=Txt.START_TXT.format(user.mention),
+            reply_markup=buttons
+        )
+    else:
+        await client.send_message(
+            chat_id=user.id,
+            text=Txt.START_TXT.format(user.mention),
+            reply_markup=buttons,
+            disable_web_page_preview=True
+        )
