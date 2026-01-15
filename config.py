@@ -17,24 +17,32 @@ class Config(object):
     BOT_UPTIME  = time.time()
     START_PIC   = os.environ.get("START_PIC", "https://images8.alphacoders.com/138/1384114.png")
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]
-    # channel
-    FORCE_SUB_CHANNELS = []
-    channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001896877147')
-    if channels_str:
-        # Split by comma and convert to integers, filter out invalid ones
-        channels = channels_str.split(',')
-        for channel in channels:
-            channel = channel.strip()
-            if channel.startswith('-100') and channel[1:].isdigit():
-                FORCE_SUB_CHANNELS.append(int(channel))
-            elif channel.isdigit() or (channel.startswith('-') and channel[1:].isdigit()):
-                FORCE_SUB_CHANNELS.append(int(channel))
             
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002263636517"))
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
     
-    
+
+    # FORCE_SUB_CHANNELS configuration
+    FORCE_SUB_CHANNELS = []
+    try:
+        channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001896877147').strip()
+        if channels_str:
+            # Split by comma and convert to integers
+            channels = channels_str.split(',')
+            for channel in channels:
+                channel = channel.strip()
+                if channel:  # Check if not empty
+                    try:
+                        # Convert to integer (handles negative channel IDs)
+                        channel_id = int(channel)
+                        FORCE_SUB_CHANNELS.append(channel_id)
+                    except ValueError:
+                        print(f"Invalid channel ID: {channel}. Skipping...")
+    except Exception as e:
+        print(f"Error parsing FORCE_SUB_CHANNELS: {e}")
+        FORCE_SUB_CHANNELS = []
+
     SEASON_PLACEHOLDER = "{season}"  
 
     # Catbox upload config
