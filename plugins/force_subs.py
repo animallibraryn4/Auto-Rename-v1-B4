@@ -1,7 +1,7 @@
 import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from pyrogram.errors import UserNotParticipant, MessageNotModified  # Added MessageNotModified
+from pyrogram.errors import UserNotParticipant
 from config import Config
 
 FORCE_SUB_CHANNELS = Config.FORCE_SUB_CHANNELS
@@ -28,10 +28,23 @@ async def forces_sub(client, message):
         except UserNotParticipant:
             not_joined_channels.append(channel)
 
-    buttons = [[InlineKeyboardButton(text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}")] for channel in not_joined_channels]
-    buttons.append([InlineKeyboardButton(text="I have joined", callback_data="check_subscription")])
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}"
+            )
+        ]
+        for channel in not_joined_channels
+    ]
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="I have joined", callback_data="check_subscription"
+            )
+        ]
+    )
 
-    text = "**ʙᴀᴋᴋᴀ!!, ʏᴏᴜ'ʀᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴛᴏ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs, ᴊᴏɪɴ ᴛʜᴇ ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ**"
+    text = "**ЩбіАбіЛбіЛбіА!!, ПбіПбіЬ' АбіЗ …ібіПбіЫ біКбіП…™…ібіЗбіЕ біЫбіП біА Я Я АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs, біКбіП…™…і біЫ ЬбіЗ біЬбіШбіЕбіАбіЫбіЗ біД ЬбіА…і…ібіЗ Яs біЫбіП біДбіП…ібіЫ…™…ібіЬбіЗ**"
     await message.reply_photo(
         photo=IMAGE_URL,
         caption=text,
@@ -52,26 +65,53 @@ async def check_subscription(client, callback_query: CallbackQuery):
             not_joined_channels.append(channel)
 
     if not not_joined_channels:
-        new_text = "**ʏᴏᴜ ʜᴀᴠᴇ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴛʜᴇ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs. ᴛʜᴀɴᴋ ʏᴏᴜ! 😊 /start ɴᴏᴡ**"
-        try:
-            await callback_query.message.edit_caption(
-                caption=new_text,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("ɴᴏᴡ ᴄʟɪᴄᴋ ʜᴇʀᴇ", callback_data='help')]
-                ])
-            )
-        except MessageNotModified:
-            await callback_query.answer("You are already verified!", show_alert=False)
+        new_text = "**ПбіПбіЬ ЬбіАбі†біЗ біКбіП…™…ібіЗбіЕ біА Я Я біЫ ЬбіЗ АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs. біЫ ЬбіА…ібіЛ ПбіПбіЬ! рЯШК /start …ібіПбі°**"
+        
+        # Only edit if the text is different (or add a small unique identifier)
+        if callback_query.message.caption and callback_query.message.caption != new_text:
+            try:
+                await callback_query.message.edit_caption(
+                    caption=new_text,
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("…ібіПбі° біД Я…™біДбіЛ ЬбіЗ АбіЗ", callback_data='help')]
+                    ])
+                )
+            except Exception as e:
+                print(f"Error editing caption: {e}")
+                pass
     else:
-        buttons = [[InlineKeyboardButton(text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}")] for channel in not_joined_channels]
-        buttons.append([InlineKeyboardButton(text="I have joined", callback_data="check_subscription")])
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    text=f"Join {channel.capitalize()}",
+                    url=f"https://t.me/{channel}",
+                )
+            ]
+            for channel in not_joined_channels
+        ]
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="I have joined", callback_data="check_subscription"
+                )
+            ]
+        )
 
-        text = "**ʏᴏᴜ ʜᴀᴠᴇ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴛʜᴇ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs. ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇ ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ**"
-        try:
-            await callback_query.message.edit_caption(
-                caption=text,
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
-        except MessageNotModified:
-            await callback_query.answer("Please join the channels first!", show_alert=True)
+        text = "**ПбіПбіЬ ЬбіАбі†біЗ біКбіП…™…ібіЗбіЕ біА Я Я біЫ ЬбіЗ АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs. біШ ЯбіЗбіАsбіЗ біКбіП…™…і біЫ ЬбіЗ біЬбіШбіЕбіАбіЫбіЗ біД ЬбіА…і…ібіЗ Яs біЫбіП біДбіП…ібіЫ…™…ібіЬбіЗ**"
+        
+        # Only edit if the text is different
+        if callback_query.message.caption and callback_query.message.caption != text:
+            try:
+                await callback_query.message.edit_caption(
+                    caption=text,
+                    reply_markup=InlineKeyboardMarkup(buttons)
+                )
+            except Exception as e:
+                print(f"Error editing caption: {e}")
+                pass
     
+    # Always answer the callback query to remove the loading state
+    try:
+        await callback_query.answer()
+    except:
+        pass
