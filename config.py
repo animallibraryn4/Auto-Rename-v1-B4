@@ -18,7 +18,18 @@ class Config(object):
     START_PIC   = os.environ.get("START_PIC", "https://images8.alphacoders.com/138/1384114.png")
     ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '5380609667').split()]
     # channel
-    FORCE_SUB_CHANNELS = [int(channel) for channel in os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001954599807').split(',') if channel]
+    FORCE_SUB_CHANNELS = []
+    channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1001954599807')
+    if channels_str:
+        # Split by comma and convert to integers, filter out invalid ones
+        channels = channels_str.split(',')
+        for channel in channels:
+            channel = channel.strip()
+            if channel.startswith('-100') and channel[1:].isdigit():
+                FORCE_SUB_CHANNELS.append(int(channel))
+            elif channel.isdigit() or (channel.startswith('-') and channel[1:].isdigit()):
+                FORCE_SUB_CHANNELS.append(int(channel))
+            
     LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002263636517"))
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
