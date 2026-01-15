@@ -90,9 +90,11 @@ async def forces_sub(client, message):
 <blockquote expandable><b>Steps:</b>
 1. Join the channels below
 2. Come back and click "I Have Joined"
-3. Start using the bot!<blockquote>
+3. Start using the bot!</blockquote>
 
-<b>Note:</b> You need to join all the required channels.
+<b>Note:</b> 
+<spoiler>You need to join all the required channels.
+</spoiler>
 """
 
     # Send the force subscribe message
@@ -154,28 +156,35 @@ async def check_subscription(client, callback_query: CallbackQuery):
             if info.get('invite_link'):
                 buttons.append([
                     InlineKeyboardButton(
-                        text=f"📢 Join {info['name']}",
+                        text=f"Join {info['name']}",
                         url=info['invite_link']
                     )
                 ])
             else:
                 buttons.append([
                     InlineKeyboardButton(
-                        text=f"📢 Join {info['name']}",
+                        text=f"Join {info['name']}",
                         url=f"https://t.me/{channel_id}" if str(channel_id).startswith('@') else f"https://t.me/c/{str(channel_id).replace('-100', '')}"
                     )
                 ])
         
         buttons.append([
             InlineKeyboardButton(
-                text="✅ I have joined",
+                text="I have joined",
                 callback_data="check_subscription"
             )
         ])
 
-        text = f"""**❌ You still need to join {len(not_joined_channels)} channel(s)!**
+        text = f"""**⚠️ Please join all channels!**
+        
+You still need to join {len(not_joined_channels)} channels:
 
-Please join all the channels below:"""
+<b>Instructions:</b>
+> 1. Join the remaining channels above
+2. Come back and click "I Have Joined" again
+3. You must join all channels to proceed
+
+**Please join all the channels below:**"""
 
         try:
             await callback_query.message.edit_caption(
