@@ -3,6 +3,19 @@ from os import environ, getenv
 id_pattern = re.compile(r'^.\d+$') 
 
 class Config(object):
+
+    @staticmethod
+    def get_force_sub_channels():
+        channels = []
+        for i in range(1, 6):
+            channel_id = getattr(Config, f'FORCE_SUB_CHANNELS{i}', None)
+            if channel_id and channel_id != 'None':
+                try:
+                    channels.append(int(channel_id))
+                except ValueError:
+                    channels.append(channel_id)
+        return channels
+        
     # pyro client config
     API_ID    = os.environ.get("API_ID", "")
     API_HASH  = os.environ.get("API_HASH", "")
@@ -22,30 +35,14 @@ class Config(object):
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
 
-    # FORCE_SUB_CHANNELS configuration
-    FORCE_SUB_CHANNELS = []
-    try:
-        channels_str = os.environ.get('FORCE_SUB_CHANNELS', '-1001896877147,-1002263636517').strip()
-        if channels_str:
-            print(f"DEBUG: Raw FORCE_SUB_CHANNELS string: {channels_str}")
-            channels = channels_str.split(',')
-            for channel in channels:
-                channel = channel.strip()
-                if channel:
-                    try:
-                        # Remove any quotes or extra characters
-                        channel = channel.replace("'", "").replace('"', '')
-                        channel_id = int(channel)
-                        FORCE_SUB_CHANNELS.append(channel_id)
-                        print(f"DEBUG: Added channel ID: {channel_id}")
-                    except ValueError as e:
-                        print(f"ERROR: Invalid channel ID format: {channel}. Error: {e}")
-    except Exception as e:
-        print(f"ERROR parsing FORCE_SUB_CHANNELS: {e}")
-        FORCE_SUB_CHANNELS = []
-
-    print(f"DEBUG: Final FORCE_SUB_CHANNELS list: {FORCE_SUB_CHANNELS}")
-
+    
+    # Force Subscribe Channels (up to 5) - Use Channel IDs
+    FORCE_SUB_CHANNELS1 = "-1002263636517"  # Channel ID 1 (required) 
+    FORCE_SUB_CHANNELS2 = "-1001896877147"  # Set to channel ID string or None
+    FORCE_SUB_CHANNELS3 = None  # Set to channel ID string or None
+    FORCE_SUB_CHANNELS4 = None  # Set to channel ID string or None
+    FORCE_SUB_CHANNELS5 = None  # Set to channel ID string or None
+  
     SEASON_PLACEHOLDER = "{season}"  
 
     # Catbox upload config
