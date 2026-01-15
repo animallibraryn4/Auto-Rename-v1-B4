@@ -24,12 +24,18 @@ async def not_subscribed(_, __, message):
             print(f"Error checking channel {channel_id}: {e}")
             continue
     return False
-
+    
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
-    if not FORCE_SUB_CHANNELS:
-        return
-        
+    user = message.from_user
+    # --- ADD THIS BLOCK AT THE START OF THE FUNCTION ---
+    for channel_id in FORCE_SUB_CHANNELS:
+        try:
+            # This line makes the bot's session aware of the channel
+            await client.resolve_peer(channel_id)
+        except Exception as e:
+            print(f"Could not resolve peer for {channel_id}: {e}")
+    
     not_joined_channels = []
     channel_info = {}
     
@@ -85,7 +91,9 @@ async def forces_sub(client, message):
         )
     ])
 
-    text = """**Please Join Our Channels To Use This Bot!**
+    text = f"""**👋 Hello {user.first_name}!**
+    
+**Please Join Our Channels To Use This Bot!**
 
 <blockquote><b>Steps:</b>
 1. Join the channels below
