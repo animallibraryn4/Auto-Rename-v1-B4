@@ -11,3 +11,4 @@ pyromod
 ffmpeg-python
 cloudscraper
 requests[socks]
+libtorrent==2.0.9
