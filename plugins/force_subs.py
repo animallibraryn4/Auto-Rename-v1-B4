@@ -27,7 +27,6 @@ async def not_subscribed(_, __, message):
     
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
-    user = message.from_user
     # --- ADD THIS BLOCK AT THE START OF THE FUNCTION ---
     for channel_id in FORCE_SUB_CHANNELS:
         try:
@@ -35,6 +34,8 @@ async def forces_sub(client, message):
             await client.resolve_peer(channel_id)
         except Exception as e:
             print(f"Could not resolve peer for {channel_id}: {e}")
+   
+    user = message.from_user
     
     not_joined_channels = []
     channel_info = {}
