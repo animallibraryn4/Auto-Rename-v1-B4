@@ -66,28 +66,34 @@ async def forces_sub(client, message):
         if channel['invite_link']:
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"📢 Join {channel['name']}",
+                    text=f"Join {channel['name']}",
                     url=channel['invite_link']
                 )
             ])
         else:
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"📢 Join {channel['name']}",
+                    text=f"Join {channel['name']}",
                     url=f"https://t.me/{channel['id']}" if str(channel['id']).startswith('@') else f"https://t.me/c/{str(channel['id']).replace('-100', '')}"
                 )
             ])
     
     buttons.append([
         InlineKeyboardButton(
-            text="✅ I have joined",
+            text="I have joined",
             callback_data="check_subscription"
         )
     ])
 
-    text = """**Please join our channel(s) to use this bot!**
+    text = """**Please join our channels to use this bot!**
 
-You must join all the required channels below to access the bot features."""
+<blockquote expandable><b>Steps:</b>
+1. Join the channels below
+2. Come back and click "I Have Joined"
+3. Start using the bot!<blockquote>
+
+<b>Note:</b> You need to join all the required channels.
+"""
 
     # Send the force subscribe message
     await message.reply_photo(
