@@ -1,7 +1,7 @@
 import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from pyrogram.errors import UserNotParticipant
+from pyrogram.errors import UserNotParticipant, MessageNotModified  # Added MessageNotModified
 from config import Config
 
 FORCE_SUB_CHANNELS = Config.FORCE_SUB_CHANNELS
@@ -28,21 +28,8 @@ async def forces_sub(client, message):
         except UserNotParticipant:
             not_joined_channels.append(channel)
 
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}"
-            )
-        ]
-        for channel in not_joined_channels
-    ]
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                text="I have joined", callback_data="check_subscription"
-            )
-        ]
-    )
+    buttons = [[InlineKeyboardButton(text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}")] for channel in not_joined_channels]
+    buttons.append([InlineKeyboardButton(text="I have joined", callback_data="check_subscription")])
 
     text = "**ʙᴀᴋᴋᴀ!!, ʏᴏᴜ'ʀᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴛᴏ ᴀʟʟ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs, ᴊᴏɪɴ ᴛʜᴇ ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ**"
     await message.reply_photo(
@@ -66,34 +53,25 @@ async def check_subscription(client, callback_query: CallbackQuery):
 
     if not not_joined_channels:
         new_text = "**ʏᴏᴜ ʜᴀᴠᴇ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴛʜᴇ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs. ᴛʜᴀɴᴋ ʏᴏᴜ! 😊 /start ɴᴏᴡ**"
-        if callback_query.message.caption != new_text:
+        try:
             await callback_query.message.edit_caption(
                 caption=new_text,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("ɴᴏᴡ ᴄʟɪᴄᴋ ʜᴇʀᴇ", callback_data='help')]
                 ])
             )
+        except MessageNotModified:
+            await callback_query.answer("You are already verified!", show_alert=False)
     else:
-        buttons = [
-            [
-                InlineKeyboardButton(
-                    text=f"Join {channel.capitalize()}",
-                    url=f"https://t.me/{channel}",
-                )
-            ]
-            for channel in not_joined_channels
-        ]
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text="I have joined", callback_data="check_subscription"
-                )
-            ]
-        )
+        buttons = [[InlineKeyboardButton(text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}")] for channel in not_joined_channels]
+        buttons.append([InlineKeyboardButton(text="I have joined", callback_data="check_subscription")])
 
         text = "**ʏᴏᴜ ʜᴀᴠᴇ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴛʜᴇ ʀᴇǫᴜɪʀᴇᴅ ᴄʜᴀɴɴᴇʟs. ᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇ ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ**"
-        if callback_query.message.caption != text:
+        try:
             await callback_query.message.edit_caption(
                 caption=text,
                 reply_markup=InlineKeyboardMarkup(buttons)
             )
+        except MessageNotModified:
+            await callback_query.answer("Please join the channels first!", show_alert=True)
+    
