@@ -10,41 +10,72 @@ IMAGE_URL = "https://graph.org/file/a27d85469761da836337c.jpg"
 async def not_subscribed(_, __, message):
     for channel in FORCE_SUB_CHANNELS:
         try:
-            user = await message._client.get_chat_member(channel, message.from_user.id)
+            user = await message._client.get_chat_member(int(channel), message.from_user.id)
             if user.status in {"kicked", "left"}:
                 return True
         except UserNotParticipant:
+            return True
+        except Exception as e:
+            print(f"Error checking subscription for channel {channel}: {e}")
             return True
     return False
 
 @Client.on_message(filters.private & filters.create(not_subscribed))
 async def forces_sub(client, message):
     not_joined_channels = []
-    for channel in FORCE_SUB_CHANNELS:
+    channel_info = {}
+    
+    for channel_id in FORCE_SUB_CHANNELS:
         try:
-            user = await client.get_chat_member(channel, message.from_user.id)
+            chat = await client.get_chat(int(channel_id))
+            channel_name = chat.title if chat.title else f"Channel {channel_id}"
+            invite_link = chat.invite_link if chat.invite_link else None
+            
+            user = await client.get_chat_member(int(channel_id), message.from_user.id)
             if user.status in {"kicked", "left"}:
-                not_joined_channels.append(channel)
+                not_joined_channels.append({
+                    'id': channel_id,
+                    'name': channel_name,
+                    'invite_link': invite_link
+                })
         except UserNotParticipant:
-            not_joined_channels.append(channel)
+            not_joined_channels.append({
+                'id': channel_id,
+                'name': f"Channel {channel_id}",
+                'invite_link': None
+            })
+        except Exception as e:
+            print(f"Error getting channel info for {channel_id}: {e}")
+            continue
 
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text=f"Join {channel.capitalize()}", url=f"https://t.me/{channel}"
-            )
-        ]
-        for channel in not_joined_channels
-    ]
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                text="I have joined", callback_data="check_subscription"
-            )
-        ]
-    )
+    if not not_joined_channels:
+        return
 
-    text = "**ЩбіАбіЛбіЛбіА!!, ПбіПбіЬ' АбіЗ …ібіПбіЫ біКбіП…™…ібіЗбіЕ біЫбіП біА Я Я АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs, біКбіП…™…і біЫ ЬбіЗ біЬбіШбіЕбіАбіЫбіЗ біД ЬбіА…і…ібіЗ Яs біЫбіП біДбіП…ібіЫ…™…ібіЬбіЗ**"
+    buttons = []
+    for channel in not_joined_channels:
+        if channel['invite_link']:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"Join {channel['name']}",
+                    url=channel['invite_link']
+                )
+            ])
+        else:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"Join {channel['name']}",
+                    url=f"https://t.me/c/{str(channel['id'])[4:]}"
+                )
+            ])
+    
+    buttons.append([
+        InlineKeyboardButton(
+            text="✅ I have joined", 
+            callback_data="check_subscription"
+        )
+    ])
+
+    text = "**Please join all the channels below to use this bot. After joining, click 'I have joined'**"
     await message.reply_photo(
         photo=IMAGE_URL,
         caption=text,
@@ -55,63 +86,93 @@ async def forces_sub(client, message):
 async def check_subscription(client, callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     not_joined_channels = []
-
-    for channel in FORCE_SUB_CHANNELS:
+    
+    for channel_id in FORCE_SUB_CHANNELS:
         try:
-            user = await client.get_chat_member(channel, user_id)
+            user = await client.get_chat_member(int(channel_id), user_id)
             if user.status in {"kicked", "left"}:
-                not_joined_channels.append(channel)
+                not_joined_channels.append(channel_id)
         except UserNotParticipant:
-            not_joined_channels.append(channel)
+            not_joined_channels.append(channel_id)
+        except Exception as e:
+            print(f"Error checking subscription for channel {channel_id}: {e}")
+            not_joined_channels.append(channel_id)
 
     if not not_joined_channels:
-        new_text = "**ПбіПбіЬ ЬбіАбі†біЗ біКбіП…™…ібіЗбіЕ біА Я Я біЫ ЬбіЗ АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs. біЫ ЬбіА…ібіЛ ПбіПбіЬ! рЯШК /start …ібіПбі°**"
+        # Delete the force sub message
+        try:
+            await callback_query.message.delete()
+        except:
+            pass
         
-        # Only edit if the text is different (or add a small unique identifier)
-        if callback_query.message.caption and callback_query.message.caption != new_text:
-            try:
-                await callback_query.message.edit_caption(
-                    caption=new_text,
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("…ібіПбі° біД Я…™біДбіЛ ЬбіЗ АбіЗ", callback_data='help')]
-                    ])
-                )
-            except Exception as e:
-                print(f"Error editing caption: {e}")
-                pass
+        # Send the normal start message
+        from config import Txt
+        user = callback_query.from_user
+        
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')],
+            [InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Animelibraryn4')],
+            [
+                InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
+                InlineKeyboardButton('sᴏᴜʀᴄᴇ', callback_data='source')
+            ]
+        ])
+        
+        if Config.START_PIC:
+            await callback_query.message.reply_photo(
+                Config.START_PIC,
+                caption=Txt.START_TXT.format(user.mention),
+                reply_markup=buttons
+            )
+        else:
+            await callback_query.message.reply_text(
+                text=Txt.START_TXT.format(user.mention),
+                reply_markup=buttons,
+                disable_web_page_preview=True
+            )
+        
+        await callback_query.answer("✅ Successfully verified! Welcome to the bot!", show_alert=True)
     else:
-        buttons = [
-            [
-                InlineKeyboardButton(
-                    text=f"Join {channel.capitalize()}",
-                    url=f"https://t.me/{channel}",
-                )
-            ]
-            for channel in not_joined_channels
-        ]
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text="I have joined", callback_data="check_subscription"
-                )
-            ]
-        )
-
-        text = "**ПбіПбіЬ ЬбіАбі†біЗ біКбіП…™…ібіЗбіЕ біА Я Я біЫ ЬбіЗ АбіЗ«ЂбіЬ…™ АбіЗбіЕ біД ЬбіА…і…ібіЗ Яs. біШ ЯбіЗбіАsбіЗ біКбіП…™…і біЫ ЬбіЗ біЬбіШбіЕбіАбіЫбіЗ біД ЬбіА…і…ібіЗ Яs біЫбіП біДбіП…ібіЫ…™…ібіЬбіЗ**"
-        
-        # Only edit if the text is different
-        if callback_query.message.caption and callback_query.message.caption != text:
+        # Get updated channel info
+        buttons = []
+        for channel_id in not_joined_channels:
             try:
-                await callback_query.message.edit_caption(
-                    caption=text,
-                    reply_markup=InlineKeyboardMarkup(buttons)
-                )
+                chat = await client.get_chat(int(channel_id))
+                channel_name = chat.title if chat.title else f"Channel {channel_id}"
+                invite_link = chat.invite_link if chat.invite_link else None
+                
+                if invite_link:
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"Join {channel_name}",
+                            url=invite_link
+                        )
+                    ])
+                else:
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"Join {channel_name}",
+                            url=f"https://t.me/c/{str(channel_id)[4:]}"
+                        )
+                    ])
             except Exception as e:
-                print(f"Error editing caption: {e}")
-                pass
-    
-    # Always answer the callback query to remove the loading state
-    try:
-        await callback_query.answer()
-    except:
-        pass
+                print(f"Error getting channel info: {e}")
+                continue
+        
+        buttons.append([
+            InlineKeyboardButton(
+                text="✅ I have joined", 
+                callback_data="check_subscription"
+            )
+        ])
+        
+        text = "**Please join all the channels below to use this bot. After joining, click 'I have joined'**"
+        try:
+            await callback_query.message.edit_caption(
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+            await callback_query.answer("❌ Please join all channels first!", show_alert=True)
+        except Exception as e:
+            print(f"Error editing message: {e}")
+            await callback_query.answer("❌ Please join all channels first!", show_alert=True)
