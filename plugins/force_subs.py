@@ -85,16 +85,14 @@ async def forces_sub(client, message):
         )
     ])
 
-    text = """**Please join our channels to use this bot!**
+    text = """**Please Join Our Channels To Use This Bot!**
 
-<blockquote expandable><b>Steps:</b>
+<blockquote><b>Steps:</b>
 1. Join the channels below
 2. Come back and click "I Have Joined"
 3. Start using the bot!</blockquote>
 
-<b>Note:</b> 
-<spoiler>You need to join all the required channels.
-</spoiler>
+<b>Note:</b>You need to join all the required channels.
 """
 
     # Send the force subscribe message
@@ -175,16 +173,16 @@ async def check_subscription(client, callback_query: CallbackQuery):
             )
         ])
 
-        text = f"""**⚠️ Please join all channels!**
+        text = f"""**⚠️ Please Join All Channels!**
         
-You still need to join {len(not_joined_channels)} channels:
+You Still Need To Join {len(not_joined_channels)} Channels:
 
 <b>Instructions:</b>
-> 1. Join the remaining channels above
-2. Come back and click "I Have Joined" again
-3. You must join all channels to proceed
+1. Join The Remaining Channels Below
+2. Come Back And Click "I Have Joined" Again
+3. You Must Join All Channels To Use Me!
 
-**Please join all the channels below:**"""
+**Please Join All The Channels Below:**"""
 
         try:
             await callback_query.message.edit_caption(
