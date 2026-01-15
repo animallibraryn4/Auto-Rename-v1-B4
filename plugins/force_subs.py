@@ -35,6 +35,7 @@ async def forces_sub(client, message):
         except Exception as e:
             print(f"Could not resolve peer for {channel_id}: {e}")
    
+    user = message.from_user
     
     not_joined_channels = []
     channel_info = {}
@@ -91,7 +92,7 @@ async def forces_sub(client, message):
         )
     ])
 
-    text = f"""**👋 Hello!**
+    text = f"""**👋 Hello {user.first_name}!**
     
 **Please Join Our Channels To Use This Bot!**
 
