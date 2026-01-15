@@ -8,41 +8,6 @@ from helper.database import n4bots
 from config import *
 from config import Config
 
-# FORCE SUB CHANNELS: helper function
-async def send_start_message(client, message):
-    """Send the start message - can be called from other modules"""
-    user = message.from_user if hasattr(message, 'from_user') else message.chat
-    
-    # Define buttons for the start message
-    buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs", callback_data='help')
-        ],
-        [
-            InlineKeyboardButton('ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Animelibraryn4')
-        ],
-        [
-            InlineKeyboardButton('ᴀʙᴏᴜᴛ', callback_data='about'),
-            InlineKeyboardButton('sᴏᴜʀᴄᴇ', callback_data='source')
-        ]
-    ])
-
-    # Send start message with or without picture
-    if Config.START_PIC:
-        await client.send_photo(
-            chat_id=message.chat.id,
-            photo=Config.START_PIC,
-            caption=Txt.START_TXT.format(user.mention if hasattr(user, 'mention') else user.first_name),
-            reply_markup=buttons
-        )
-    else:
-        await client.send_message(
-            chat_id=message.chat.id,
-            text=Txt.START_TXT.format(user.mention if hasattr(user, 'mention') else user.first_name),
-            reply_markup=buttons,
-            disable_web_page_preview=True
-        )
-        
 # Start Command Handler
 @Client.on_message(filters.private & filters.command("start"))
 async def start(client, message):
@@ -66,9 +31,6 @@ async def start(client, message):
     await m.edit_text("⚡")
     await asyncio.sleep(0.6)
     await m.delete()
-    
-    # Send start message using the helper function
-    await send_start_message(client, message)
     
     # Define buttons for the start message
     buttons = InlineKeyboardMarkup([
