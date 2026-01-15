@@ -181,8 +181,8 @@ async def catbox_upload(client, message):
         )
 
 # Also handle when user sends file with caption /catbox
-@Client.on_message(filters.private & (filters.photo | filters.document | filters.video | filters.audio | filters.voice))
-async def handle_file_with_caption(client, message):
+@Client.on_message(filters.photo & filters.private)
+async def handle_photo_with_caption(client, message):
     # Check if caption contains /catbox command
     if message.caption and "/catbox" in message.caption:
         # Download the file
