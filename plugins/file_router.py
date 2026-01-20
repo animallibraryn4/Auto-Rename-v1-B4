@@ -49,8 +49,15 @@ class FileRouter:
 # Global router instance
 file_router = FileRouter()
 
-# Single handler for all files
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
+# Single handler for all files - UPDATED TO INCLUDE IMAGES
+@Client.on_message(filters.private & (
+    filters.document | 
+    filters.video | 
+    filters.audio | 
+    filters.photo | 
+    filters.animation | 
+    filters.sticker
+))
 async def handle_all_files(client, message):
     """Single entry point for all file processing"""
     await file_router.route_file(client, message)
