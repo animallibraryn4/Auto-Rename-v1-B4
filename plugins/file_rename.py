@@ -270,8 +270,13 @@ async def convert_to_mkv(input_path, output_path):
     
     if process.returncode != 0:
         error_message = stderr.decode()
-        raise Exception(f"MKV conversion failed: {error_message}")
-
+        
+        # Check for disk space error
+        if "No space left on device" in error_message:
+            raise Exception("Disk space error: Server storage is full. Please free up disk space or contact admin.")
+        else:
+            raise Exception(f"MKV conversion failed: {error_message}")
+            
 def extract_quality(text):
     """Extract quality from text with enhanced caption support"""
     caption_quality_patterns = [
@@ -680,6 +685,7 @@ async def process_rename(client: Client, message: Message):
 
             if need_mkv_conversion and not path.lower().endswith('.mkv'):
                 temp_mkv_path = f"{path}.temp.mkv"
+         
                 try:
                     await convert_to_mkv(path, temp_mkv_path)
                     os.remove(path)
@@ -687,6 +693,10 @@ async def process_rename(client: Client, message: Message):
                     renamed_file_name = f"{format_template}.mkv"
                     metadata_path = f"Metadata/{message.id}_{renamed_file_name}"
                 except Exception as e:
+                    # Check if it's a disk space error
+                    if "Disk space error" in str(e):
+                    await download_msg.edit(f"❌ **Server Storage Full!**\n\nPlease contact the bot admin: @Animelibraryn4")
+                else:
                     await download_msg.edit(f"**MKV Conversion Error:** {e}")
                     return
 
