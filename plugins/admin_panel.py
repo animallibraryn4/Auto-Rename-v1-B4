@@ -5,6 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.errors import FloodWait, InputUserDeactivated, UserIsBlocked, PeerIdInvalid
 import os, sys, time, asyncio, logging, datetime
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import shutil
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -20,6 +21,28 @@ def set_bot_instance(bot):
     """Set the bot instance for use in ban functions"""
     global bot_instance
     bot_instance = bot
+
+@Client.on_message(filters.command("disk") & filters.user(Config.ADMIN))
+async def disk_space_cmd(bot, message):
+    """Check disk space usage"""
+    try:
+        total, used, free = shutil.disk_usage("/")
+        
+        text = (
+            f"**💾 Disk Space Usage**\n\n"
+            f"**Total:** {humanbytes(total)}\n"
+            f"**Used:** {humanbytes(used)} ({used/total*100:.1f}%)\n"
+            f"**Free:** {humanbytes(free)} ({free/total*100:.1f}%)\n\n"
+        )
+        
+        if free < 1 * 1024**3:  # Less than 1GB free
+            text += "⚠️ **WARNING:** Low disk space!\n"
+        elif free < 2 * 1024**3:  # Less than 2GB free
+            text += "⚠️ **Warning:** Disk space getting low.\n"
+            
+        await message.reply_text(text)
+    except Exception as e:
+        await message.reply_text(f"Error checking disk space: {e}")
 
 @Client.on_message(filters.private & filters.command("restart") & filters.user(ADMIN_USER_ID))
 async def restart_bot(b, m):
