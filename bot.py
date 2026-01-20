@@ -38,11 +38,6 @@ class Bot(Client):
     async def start(self):
         await super().start()
 
-    # Add at the end of Bot class or in cleanup function
-    async def stop(self):
-        await bypasser.close_session()
-        await super().stop()
-
         me = await self.get_me()
         print(f"{me.first_name} Is Started.....😊")
         # Initialize queue manager with client
