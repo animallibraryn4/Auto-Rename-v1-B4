@@ -197,10 +197,17 @@ pattern11 = re.compile(r'Vol(\d+)\s*-\s*Ch(\d+)', re.IGNORECASE)
 # ===== HELPER FUNCTIONS =====
 def standardize_quality_name(quality):
     """Standardize quality names for consistent storage"""
-    if not quality or quality == "Unknown":
+    # Handle None or empty quality
+    if not quality or quality == "Unknown" or quality == "None":
         return "Unknown"
-        
+    
+    # Ensure quality is string
+    if not isinstance(quality, str):
+        return "Unknown"
+    
     q = quality.lower().strip()
+    
+    # Check for common quality patterns
     if any(x in q for x in ['4k', '2160', 'uhd']): return '2160p'
     if any(x in q for x in ['2k', '1440', 'qhd']): return '1440p'
     if '1080' in q: return '1080p'
@@ -212,10 +219,11 @@ def standardize_quality_name(quality):
     if '4kx265' in q: return '4kx265'
     
     match = re.search(r'(\d{3,4}p)', q)
-    if match: return match.group(1)
+    if match: 
+        return match.group(1)
     
-    return quality.capitalize()
-
+    return quality.capitalize() if quality != "Unknown" else "Unknown"
+    
 async def convert_ass_subtitles(input_path, output_path):
     """Convert ASS subtitles to mov_text format for MP4 compatibility"""
     ffmpeg_cmd = shutil.which('ffmpeg')
@@ -276,9 +284,12 @@ async def convert_to_mkv(input_path, output_path):
             raise Exception("Disk space error: Server storage is full. Please free up disk space or contact admin.")
         else:
             raise Exception(f"MKV conversion failed: {error_message}")
-            
+
 def extract_quality(text):
     """Extract quality from text with enhanced caption support"""
+    if not text:
+        return "Unknown"
+    
     caption_quality_patterns = [
         (re.compile(r'(?:quality|resolution|res|qualit[ée])\s*[:=-]?\s*(\d{3,4}[^\dp]*p)', re.IGNORECASE), 
          lambda m: m.group(1)),
@@ -288,20 +299,33 @@ def extract_quality(text):
          lambda m: m.group(0)),
     ]
     
-    for pattern, quality in caption_quality_patterns:
+    for pattern, extract_func in caption_quality_patterns:
         match = re.search(pattern, text)
         if match:
-            return quality(match) if callable(quality) else quality
+            quality = extract_func(match) if callable(extract_func) else extract_func
+            if quality:
+                return str(quality)
     
-    for pattern, quality in [(pattern5, lambda m: m.group(1) or m.group(2)), 
-                            (pattern6, "4k"), 
-                            (pattern7, "2k"), 
-                            (pattern8, "HdRip"), 
-                            (pattern9, "4kX264"), 
-                            (pattern10, "4kx265")]:
+    patterns = [
+        (pattern5, lambda m: m.group(1) or m.group(2)), 
+        (pattern6, "4k"), 
+        (pattern7, "2k"), 
+        (pattern8, "HdRip"), 
+        (pattern9, "4kX264"), 
+        (pattern10, "4kx265")
+    ]
+    
+    for pattern, quality_value in patterns:
         match = re.search(pattern, text)
         if match: 
-            return quality(match) if callable(quality) else quality
+            if callable(quality_value):
+                quality = quality_value(match)
+            else:
+                quality = quality_value
+            
+            if quality:
+                return str(quality)
+    
     return "Unknown"
 
 def extract_season_number(text, is_caption_mode=False):
