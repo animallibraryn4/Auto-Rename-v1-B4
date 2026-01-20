@@ -1,7 +1,9 @@
+
+
 import re
 import asyncio
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import FloodWait, ChannelPrivate, ChatAdminRequired
 from helper.database import n4bots
 from plugins.admin_panel import check_ban_status
@@ -128,7 +130,21 @@ async def process_single_link(client: Client, message: Message, link_info: dict)
         from plugins.file_rename import auto_rename_files
         
         # Process the file through auto-rename system
-        await auto_rename_files(client, target_msg)
+        # We need to simulate a message from the user with the fetched message
+        # Create a mock message object with the user's ID
+        class MockMessage:
+            def __init__(self, original_msg, target_msg):
+                self.from_user = original_msg.from_user
+                self.chat = original_msg.chat
+                self.id = target_msg.id
+                self.document = target_msg.document
+                self.video = target_msg.video
+                self.audio = target_msg.audio
+                self.caption = target_msg.caption
+                self.reply_to_message = None
+        
+        mock_message = MockMessage(message, target_msg)
+        await auto_rename_files(client, mock_message)
         
         await processing_msg.delete()
         
@@ -200,8 +216,22 @@ async def process_multiple_links(client: Client, message: Message, links: list):
                 # Import the auto-rename handler
                 from plugins.file_rename import auto_rename_files
                 
+                # Create a mock message object
+                class MockMessage:
+                    def __init__(self, original_msg, target_msg):
+                        self.from_user = original_msg.from_user
+                        self.chat = original_msg.chat
+                        self.id = target_msg.id
+                        self.document = target_msg.document
+                        self.video = target_msg.video
+                        self.audio = target_msg.audio
+                        self.caption = target_msg.caption
+                        self.reply_to_message = None
+                
+                mock_message = MockMessage(message, target_msg)
+                
                 # Process the file
-                await auto_rename_files(client, target_msg)
+                await auto_rename_files(client, mock_message)
                 successful += 1
                 
                 # Small delay to prevent flooding
@@ -427,3 +457,4 @@ Simply send any Telegram file link and the bot will detect it automatically.
 1. Bot must be added to the channel
 2. Bot needs appropriate permissions to access files
 """
+#[file content end]
