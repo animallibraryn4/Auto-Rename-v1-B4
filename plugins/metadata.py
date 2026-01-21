@@ -20,7 +20,7 @@ async def clear_metadata_state(user_id):
     """Editing mode clear"""
     await db.col.update_one(
         {"_id": int(user_id)},
-        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": "", "editing_profile": ""}}
     )
     
 async def get_metadata_summary(user_id, profile_num=None):
@@ -256,10 +256,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     elif data.startswith("cancel_edit_"):
         field = data.split("_")[2]
         # Clear any editing state
-        await db.col.update_one(
-            {"_id": int(user_id)},
-            {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
-        )
+        await clear_metadata_state(user_id)
         # Delete message with animation
         await query.message.delete()
         return
@@ -301,11 +298,11 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         }
         
         if field in default_values:
-            method_name = f"set_{field}"
-            method = getattr(db, method_name, None)
-            if method:
-                await method(user_id, default_values[field])
-                await show_set_metadata_menu(query, user_id)
+            # Get current profile
+            current_profile = await db.get_current_profile(user_id)
+            # Reset profile-specific field
+            await db.set_metadata_field_with_profile(user_id, field, default_values[field], current_profile)
+            await show_set_metadata_menu(query, user_id)
         return
     
     # Handle back to home
@@ -401,12 +398,6 @@ async def show_main_panel(query, user_id):
     
     keyboard = get_main_menu_keyboard(current_status, current_profile)
     
-    # Check if we're already showing this content to avoid MESSAGE_NOT_MODIFIED
-    current_text = query.message.text
-    if "Metadata Control Panel" in current_text:
-        # Content is the same, don't edit
-        return
-    
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
 async def show_set_metadata_menu(query, user_id):
@@ -423,10 +414,6 @@ async def show_set_metadata_menu(query, user_id):
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard(current_profile)
-    
-    # Check if we're already showing this content
-    if "Set Metadata Values" in query.message.text and f"Profile {current_profile}" in query.message.text:
-        return
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
@@ -487,10 +474,10 @@ async def handle_metadata_value_input(client, message):
     if not user_data or "editing_metadata_field" not in user_data or "editing_message_id" not in user_data:
         return
 
-    # FIX: Check if message.text exists before stripping
+    # Check if message.text exists before stripping
     if not message.text:
         try:
-            # Optionally alert the user or just delete the non-text message
+            # Delete the non-text message
             await message.delete()
         except:
             pass
@@ -506,10 +493,7 @@ async def handle_metadata_value_input(client, message):
     
     if success:
         # Clear editing flag
-        await db.col.update_one(
-            {"_id": int(user_id)},
-            {"$unset": {"editing_metadata_field": "", "editing_message_id": "", "editing_profile": ""}}
-        )
+        await clear_metadata_state(user_id)
         
         # SILENT UPDATE: Edit the original prompt message with new current value
         field_display = field.capitalize()
@@ -552,7 +536,7 @@ async def handle_metadata_value_input(client, message):
             )
         except Exception as e:
             # If message not found or other error, just continue
-            print(f"Error editing message: {e}")
+            pass
         
         # Delete the user's input message
         try:
