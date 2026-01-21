@@ -20,7 +20,7 @@ async def clear_metadata_state(user_id):
     """Editing mode clear"""
     await db.col.update_one(
         {"_id": int(user_id)},
-        {"$unset": {"editing_metadata_field": "", "editing_message_id": "", "editing_profile": ""}}
+        {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
     )
     
 async def get_metadata_summary(user_id, profile_num=None):
@@ -51,22 +51,8 @@ async def get_metadata_summary(user_id, profile_num=None):
     return summary
 
 def get_main_menu_keyboard(current_status, current_profile):
-    """Generate main menu keyboard with profile buttons"""
-    # Profile buttons at the top
-    profile_buttons = [
-        [
-            InlineKeyboardButton(
-                f"{'✅ ' if current_profile == 1 else ''}Profile 1", 
-                callback_data='switch_profile_1'
-            ),
-            InlineKeyboardButton(
-                f"{'✅ ' if current_profile == 2 else ''}Profile 2", 
-                callback_data='switch_profile_2'
-            )
-        ]
-    ]
-    
-    # Main action buttons
+    """Generate main menu keyboard WITHOUT profile buttons"""
+    # Main action buttons ONLY (no profile buttons at top)
     action_buttons = [
         [
             InlineKeyboardButton(
@@ -82,18 +68,30 @@ def get_main_menu_keyboard(current_status, current_profile):
             InlineKeyboardButton("🧑🏻‍💻 Set Metadata", callback_data="set_metadata_menu")
         ],
         [
-            InlineKeyboardButton("📋 View All Profiles", callback_data="view_all_profiles")
-        ],
-        [
             InlineKeyboardButton("Close", callback_data="close_meta")
         ]
     ]
     
-    return InlineKeyboardMarkup(profile_buttons + action_buttons)
+    return InlineKeyboardMarkup(action_buttons)
 
 def get_set_metadata_keyboard(current_profile):
-    """Keyboard for setting metadata values with profile info"""
-    buttons = [
+    """Keyboard for setting metadata values WITH profile buttons"""
+    # Profile buttons at the top
+    profile_buttons = [
+        [
+            InlineKeyboardButton(
+                f"{'✅ ' if current_profile == 1 else ''}Profile 1", 
+                callback_data='switch_profile_1'
+            ),
+            InlineKeyboardButton(
+                f"{'✅ ' if current_profile == 2 else ''}Profile 2", 
+                callback_data='switch_profile_2'
+            )
+        ]
+    ]
+    
+    # Main metadata action buttons
+    metadata_buttons = [
         [
             InlineKeyboardButton("Title", callback_data="edit_title"),
             InlineKeyboardButton("Author", callback_data="edit_author")
@@ -111,11 +109,11 @@ def get_set_metadata_keyboard(current_profile):
             InlineKeyboardButton("Help", callback_data="meta_info")
         ],
         [
-            InlineKeyboardButton(f"🔄 Profile {current_profile}", callback_data="switch_profile_menu"),
             InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
         ]
     ]
-    return InlineKeyboardMarkup(buttons)
+    
+    return InlineKeyboardMarkup(profile_buttons + metadata_buttons)
 
 def get_switch_profile_keyboard(current_profile):
     """Keyboard for switching between profiles"""
@@ -145,11 +143,14 @@ def get_switch_profile_keyboard(current_profile):
     return InlineKeyboardMarkup(buttons)
 
 def get_view_all_keyboard(current_profile):
-    """Keyboard for View All Overview page"""
+    """Keyboard for View All Overview page - UPDATED with 🔄 Profile button"""
     buttons = [
         [
-            InlineKeyboardButton("Close", callback_data="close_meta"),
-            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
+            InlineKeyboardButton("🔄 View All Profiles", callback_data="view_all_profiles")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
+            InlineKeyboardButton("Close", callback_data="close_meta")
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -177,7 +178,7 @@ async def metadata_main(client, message):
 
 ʏᴏᴜ ᴄᴀɴ ꜱᴀᴠᴇ ᴛᴡᴏ ᴅɪꜰꜰᴇʀᴇɴᴛ ᴍᴇᴛᴀᴅᴀᴛᴀ ᴘʀᴏꜰɪʟᴇꜱ ᴀɴᴅ ꜱᴡɪᴛᴄʜ ʙᴇᴛᴡᴇᴇɴ ᴛʜᴇᴍ ᴇᴀꜱɪʟʏ.
 
-**Current Profile:** Profile {current_profile} {'✅' if current_profile == 1 else ''}
+**Current Profile:** Profile {current_profile}
 """
     
     keyboard = get_main_menu_keyboard(current_status, current_profile)
@@ -188,8 +189,7 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
-# FIXED: Simplified regex pattern to catch all callbacks
-@Client.on_callback_query(filters.regex(r'.*'))
+@Client.on_callback_query(filters.regex(r'^(on_metadata|off_metadata|set_metadata_menu|edit_|cancel_edit_|view_all|metadata_home|meta_info|close_meta|clear_|switch_profile_|switch_to_profile_|copy_profile_|view_all_profiles)$'))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
@@ -210,7 +210,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
                 current_profile = profile_num
             
             # Show main panel with new profile
-            await show_main_panel(query, user_id)
+            await show_set_metadata_menu(query, user_id)
             return
     
     # Handle switch to profile from menu
@@ -232,7 +232,7 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         return
     
     # Handle toggle commands - NO NOTIFICATIONS
-    elif data == "on_metadata":
+    if data == "on_metadata":
         await db.set_metadata(user_id, "On")
         await show_main_panel(query, user_id)
         return
@@ -257,7 +257,10 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     elif data.startswith("cancel_edit_"):
         field = data.split("_")[2]
         # Clear any editing state
-        await clear_metadata_state(user_id)
+        await db.col.update_one(
+            {"_id": int(user_id)},
+            {"$unset": {"editing_metadata_field": "", "editing_message_id": ""}}
+        )
         # Delete message with animation
         await query.message.delete()
         return
@@ -299,11 +302,11 @@ async def metadata_callback_handler(client, query: CallbackQuery):
         }
         
         if field in default_values:
-            # Get current profile
-            current_profile = await db.get_current_profile(user_id)
-            # Reset profile-specific field
-            await db.set_metadata_field_with_profile(user_id, field, default_values[field], current_profile)
-            await show_set_metadata_menu(query, user_id)
+            method_name = f"set_{field}"
+            method = getattr(db, method_name, None)
+            if method:
+                await method(user_id, default_values[field])
+                await show_set_metadata_menu(query, user_id)
         return
     
     # Handle back to home
@@ -331,11 +334,6 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     elif data == "close_meta":
         await query.message.delete()
         return
-    
-    # If no handler matched, answer with an error
-    else:
-        # Try to handle it with a simple answer
-        await query.answer("Button not implemented yet", show_alert=True)
 
 async def show_edit_field_prompt(query, user_id, field):
     """Show edit prompt for a specific field"""
@@ -399,10 +397,16 @@ async def show_main_panel(query, user_id):
 
 ʏᴏᴜ ᴄᴀɴ ꜱᴀᴠᴇ ᴛᴡᴏ ᴅɪꜰꜰᴇʀᴇɴᴛ ᴍᴇᴛᴀᴅᴀᴛᴀ ᴘʀᴏꜰɪʟᴇꜱ ᴀɴᴅ ꜱᴡɪᴛᴄʜ ʙᴇᴛᴡᴇᴇɴ ᴛʜᴇᴍ ᴇᴀꜱɪʟʏ.
 
-**Current Profile:** Profile {current_profile} {'✅' if current_profile == 1 else ''}
+**Current Profile:** Profile {current_profile}
 """
     
     keyboard = get_main_menu_keyboard(current_status, current_profile)
+    
+    # Check if we're already showing this content to avoid MESSAGE_NOT_MODIFIED
+    current_text = query.message.text
+    if "Metadata Control Panel" in current_text:
+        # Content is the same, don't edit
+        return
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
@@ -420,6 +424,10 @@ async def show_set_metadata_menu(query, user_id):
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard(current_profile)
+    
+    # Check if we're already showing this content
+    if "Set Metadata Values" in query.message.text and f"Profile {current_profile}" in query.message.text:
+        return
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
@@ -463,8 +471,8 @@ async def show_all_profiles_overview(query, user_id):
     text += "ℹ️ *Use the main menu to switch between profiles.*"
     
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Profile", callback_data="switch_profile_menu")],
         [InlineKeyboardButton("🔙 Back to Main", callback_data="metadata_home")],
-        [InlineKeyboardButton("🔄 Switch Profiles", callback_data="switch_profile_menu")],
         [InlineKeyboardButton("Close", callback_data="close_meta")]
     ])
     
@@ -480,10 +488,10 @@ async def handle_metadata_value_input(client, message):
     if not user_data or "editing_metadata_field" not in user_data or "editing_message_id" not in user_data:
         return
 
-    # Check if message.text exists before stripping
+    # FIX: Check if message.text exists before stripping
     if not message.text:
         try:
-            # Delete the non-text message
+            # Optionally alert the user or just delete the non-text message
             await message.delete()
         except:
             pass
@@ -499,7 +507,10 @@ async def handle_metadata_value_input(client, message):
     
     if success:
         # Clear editing flag
-        await clear_metadata_state(user_id)
+        await db.col.update_one(
+            {"_id": int(user_id)},
+            {"$unset": {"editing_metadata_field": "", "editing_message_id": "", "editing_profile": ""}}
+        )
         
         # SILENT UPDATE: Edit the original prompt message with new current value
         field_display = field.capitalize()
@@ -542,7 +553,7 @@ async def handle_metadata_value_input(client, message):
             )
         except Exception as e:
             # If message not found or other error, just continue
-            pass
+            print(f"Error editing message: {e}")
         
         # Delete the user's input message
         try:
