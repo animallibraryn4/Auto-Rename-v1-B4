@@ -99,7 +99,7 @@ def get_set_metadata_keyboard(current_profile):
     ]
     return InlineKeyboardMarkup(buttons)
 
-def get_view_all_keyboard():
+def get_view_all_keyboard(current_profile):
     """Keyboard for View All Overview page WITH Switch Profile button"""
     buttons = [
         [
@@ -363,7 +363,8 @@ async def show_all_profiles_overview(query, user_id):
     
     text += "ℹ️ *Go back to the Set Metadata menu to switch profiles.*"
     
-    keyboard = get_view_all_keyboard()
+    # Pass current_profile to the keyboard function
+    keyboard = get_view_all_keyboard(current_profile)
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
