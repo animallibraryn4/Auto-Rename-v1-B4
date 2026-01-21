@@ -74,7 +74,7 @@ def get_main_menu_keyboard(current_status):
     return InlineKeyboardMarkup(buttons)
 
 def get_set_metadata_keyboard(current_profile):
-    """Keyboard for setting metadata values WITH profile info"""
+    """Keyboard for setting metadata values WITH profile toggle button"""
     buttons = [
         [
             InlineKeyboardButton("Title", callback_data="edit_title"),
@@ -93,45 +93,15 @@ def get_set_metadata_keyboard(current_profile):
             InlineKeyboardButton("Help", callback_data="meta_info")
         ],
         [
-            InlineKeyboardButton(f"🔄 Profile {current_profile}", callback_data="switch_profile_menu"),
+            InlineKeyboardButton(f"🔄 Switch to Profile {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile"),
             InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
         ]
     ]
     return InlineKeyboardMarkup(buttons)
 
-def get_switch_profile_keyboard(current_profile):
-    """Keyboard for switching between profiles"""
-    buttons = [
-        [
-            InlineKeyboardButton(
-                f"{'✅ ' if current_profile == 1 else ''}Switch to Profile 1", 
-                callback_data='switch_to_profile_1'
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                f"{'✅ ' if current_profile == 2 else ''}Switch to Profile 2", 
-                callback_data='switch_to_profile_2'
-            )
-        ],
-        [
-            InlineKeyboardButton("📋 Copy Profile 1 → Profile 2", callback_data="copy_profile_1_to_2")
-        ],
-        [
-            InlineKeyboardButton("📋 Copy Profile 2 → Profile 1", callback_data="copy_profile_2_to_1")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
-        ]
-    ]
-    return InlineKeyboardMarkup(buttons)
-
-def get_view_all_keyboard(current_profile):
+def get_view_all_keyboard():
     """Keyboard for View All Overview page WITH Switch Profile button"""
     buttons = [
-        [
-            InlineKeyboardButton("🔄 Switch Profile", callback_data="switch_profile_menu"),
-        ],
         [
             InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
             InlineKeyboardButton("Close", callback_data="close_meta")
@@ -180,39 +150,17 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     current = await db.get_metadata(user_id)
     current_profile = await db.get_current_profile(user_id)
     
-    # Handle profile switching
-    if data.startswith("switch_profile_"):
-        if data == "switch_profile_menu":
-            # Show profile switching menu
-            await show_switch_profile_menu(query, user_id)
-            return
-        elif data in ["switch_profile_1", "switch_profile_2"]:
-            # Switch profile directly
-            profile_num = int(data.split("_")[2])
-            if profile_num != current_profile:
-                await db.set_current_profile(user_id, profile_num)
-                current_profile = profile_num
-            
-            # Show main panel with new profile
-            await show_main_panel(query, user_id)
-            return
-    
-    # Handle switch to profile from menu
-    elif data.startswith("switch_to_profile_"):
-        profile_num = int(data.split("_")[3])
-        await db.set_current_profile(user_id, profile_num)
+    # Handle toggle profile - DIRECT SWITCHING
+    if data == "toggle_profile":
+        # Toggle between profile 1 and 2
+        new_profile = 2 if current_profile == 1 else 1
+        await db.set_current_profile(user_id, new_profile)
+        
+        # Update the current message to show new profile
+        current_profile = new_profile
+        
+        # Show updated set metadata menu
         await show_set_metadata_menu(query, user_id)
-        return
-    
-    # Handle profile copying
-    elif data.startswith("copy_profile_"):
-        if data == "copy_profile_1_to_2":
-            await db.copy_profile_to_profile(user_id, 1, 2)
-            await query.answer("✅ Copied Profile 1 to Profile 2!", show_alert=True)
-        elif data == "copy_profile_2_to_1":
-            await db.copy_profile_to_profile(user_id, 2, 1)
-            await query.answer("✅ Copied Profile 2 to Profile 1!", show_alert=True)
-        await show_switch_profile_menu(query, user_id)
         return
     
     # Handle toggle commands - NO NOTIFICATIONS
@@ -383,30 +331,12 @@ async def show_set_metadata_menu(query, user_id):
 **Set Metadata Values**
 
 **Current Status:** {current}
-**Current Profile:** Profile {current_profile} {'✅' if current_profile == await db.get_current_profile(user_id) else ''}
+**Current Profile:** Profile {current_profile} {'✅'}
 
 ᴜꜱᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ ᴛᴏ ᴍᴀᴋᴇ ᴄʜᴀɴɢᴇꜱ
 """
     keyboard = get_set_metadata_keyboard(current_profile)
     
-    await query.message.edit_text(text=text, reply_markup=keyboard)
-
-async def show_switch_profile_menu(query, user_id):
-    """Show the profile switching menu"""
-    current_profile = await db.get_current_profile(user_id)
-    
-    text = f"""
-**🔄 Switch Metadata Profile**
-
-**Current Active Profile:** Profile {current_profile} {'✅'}
-
-Choose a profile to switch to or copy settings between profiles.
-
-**Profile 1:** First metadata configuration
-**Profile 2:** Second metadata configuration
-"""
-    
-    keyboard = get_switch_profile_keyboard(current_profile)
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
 async def show_all_profiles_overview(query, user_id):
@@ -428,9 +358,9 @@ async def show_all_profiles_overview(query, user_id):
         text += f"• **Subtitle:** `{profile_data['subtitle'] or 'Not Set'}`\n"
         text += f"• **Video:** `{profile_data['video'] or 'Not Set'}`\n\n"
     
-    text += "ℹ️ *You can switch between profiles using the button below.*"
+    text += "ℹ️ *Go back to the Set Metadata menu to switch profiles.*"
     
-    keyboard = get_view_all_keyboard(current_profile)
+    keyboard = get_view_all_keyboard()
     
     await query.message.edit_text(text=text, reply_markup=keyboard)
 
