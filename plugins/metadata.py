@@ -93,7 +93,7 @@ def get_set_metadata_keyboard(current_profile):
             InlineKeyboardButton("Help", callback_data="meta_info")
         ],
         [
-            InlineKeyboardButton(f"🔄 Switch to Profile {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile"),
+            InlineKeyboardButton(f"🔄 Switch {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile"),
             InlineKeyboardButton("🔙 Back", callback_data="metadata_home")
         ]
     ]
@@ -103,8 +103,11 @@ def get_view_all_keyboard():
     """Keyboard for View All Overview page WITH Switch Profile button"""
     buttons = [
         [
-            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
-            InlineKeyboardButton("Close", callback_data="close_meta")
+            InlineKeyboardButton(f"🔄 Switch {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile")
+        ],
+        [
+            InlineKeyboardButton("Close", callback_data="close_meta"),
+            InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -236,8 +239,8 @@ async def metadata_callback_handler(client, query: CallbackQuery):
             disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu"),
-                    InlineKeyboardButton("Close", callback_data="close_meta")
+                    InlineKeyboardButton("Close", callback_data="close_meta"),
+                    InlineKeyboardButton("🔙 Back", callback_data="set_metadata_menu")
                 ]
             ])
         )
