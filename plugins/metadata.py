@@ -103,7 +103,7 @@ def get_view_all_keyboard(current_profile):
     """Keyboard for View All Overview page WITH Switch Profile button"""
     buttons = [
         [
-            InlineKeyboardButton(f"🔄 Switch {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile")
+            InlineKeyboardButton(f"🔄 Switch {2 if current_profile == 1 else 1}", callback_data=f"toggle_profile_from_view")
         ],
         [
             InlineKeyboardButton("Close", callback_data="close_meta"),
@@ -153,8 +153,18 @@ async def metadata_callback_handler(client, query: CallbackQuery):
     current = await db.get_metadata(user_id)
     current_profile = await db.get_current_profile(user_id)
     
-    # Handle toggle profile - DIRECT SWITCHING
-    if data == "toggle_profile":
+    # Handle toggle profile from View All page
+    if data == "toggle_profile_from_view":
+        # Toggle between profile 1 and 2
+        new_profile = 2 if current_profile == 1 else 1
+        await db.set_current_profile(user_id, new_profile)
+        
+        # Update the current overview message instead of opening new menu
+        await show_all_profiles_overview(query, user_id)
+        return
+    
+    # Handle regular toggle profile (from Set Metadata menu)
+    elif data == "toggle_profile":
         # Toggle between profile 1 and 2
         new_profile = 2 if current_profile == 1 else 1
         await db.set_current_profile(user_id, new_profile)
