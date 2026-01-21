@@ -719,12 +719,30 @@ async def process_rename(client: Client, message: Message):
                     await download_msg.edit(f"**MKV Conversion Error:** {e}")
                     return
 
-            file_title = await n4bots.get_title(user_id)
-            artist = await n4bots.get_artist(user_id)
-            author = await n4bots.get_author(user_id)
-            video_title = await n4bots.get_video(user_id)
-            audio_title = await n4bots.get_audio(user_id)
-            subtitle_title = await n4bots.get_subtitle(user_id)
+            # Get current profile
+            current_profile = await n4bots.get_current_profile(user_id)
+
+            # Get profile-specific metadata
+            file_title = await n4bots.get_metadata_field_with_profile(user_id, "title", current_profile)
+            artist = await n4bots.get_metadata_field_with_profile(user_id, "artist", current_profile)
+            author = await n4bots.get_metadata_field_with_profile(user_id, "author", current_profile)
+            video_title = await n4bots.get_metadata_field_with_profile(user_id, "video", current_profile)
+            audio_title = await n4bots.get_metadata_field_with_profile(user_id, "audio", current_profile)
+            subtitle_title = await n4bots.get_metadata_field_with_profile(user_id, "subtitle", current_profile)
+
+            # If profile-specific values are None, fall back to default
+            if not file_title:
+                file_title = await n4bots.get_title(user_id)
+            if not artist:
+                artist = await n4bots.get_artist(user_id)
+            if not author:
+                author = await n4bots.get_author(user_id)
+            if not video_title:
+                video_title = await n4bots.get_video(user_id)
+            if not audio_title:
+                audio_title = await n4bots.get_audio(user_id)
+            if not subtitle_title:
+                subtitle_title = await n4bots.get_subtitle(user_id)
 
             metadata_command = [
                 'ffmpeg',
