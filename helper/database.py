@@ -42,7 +42,8 @@ class Database:
             audio='By @N4_Bots',
             subtitle='By @N4_Bots',
             video='Encoded By @N4_Bots',
-            media_type=None
+            media_type=None,
+            metadata_profile=1  # Default to profile 1
         )
 
     async def add_user(self, b, m):
@@ -289,8 +290,6 @@ class Database:
         except Exception as e:
             logging.error(f"Error checking global thumb status for user {id}: {e}")
             return False
-# Add these methods to the Database class in database.py
-# Add them anywhere after the existing methods, before the codeflixbots initialization
 
     async def get_verify_status(self, id):
         try:
@@ -436,8 +435,136 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting banned users: {e}")
             return []
+
+    # Profile Support Methods
+    async def get_current_profile(self, user_id):
+        """Get user's current metadata profile (1 or 2)"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get("metadata_profile", 1)  # Default to profile 1
+        except Exception as e:
+            logging.error(f"Error getting metadata profile for user {user_id}: {e}")
+            return 1
+
+    async def set_current_profile(self, user_id, profile_num):
+        """Set user's current metadata profile"""
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {"metadata_profile": profile_num}},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting metadata profile for user {user_id}: {e}")
+            return False
+
+    async def get_metadata_field_with_profile(self, user_id, field, profile_num=None):
+        """Get metadata field with profile support"""
+        if profile_num is None:
+            profile_num = await self.get_current_profile(user_id)
         
+        # Field names with profile suffix
+        profile_fields = {
+            "title": f"title_profile_{profile_num}",
+            "author": f"author_profile_{profile_num}",
+            "artist": f"artist_profile_{profile_num}",
+            "audio": f"audio_profile_{profile_num}",
+            "subtitle": f"subtitle_profile_{profile_num}",
+            "video": f"video_profile_{profile_num}"
+        }
+        
+        field_key = profile_fields.get(field)
+        if not field_key:
+            return None
+        
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            if user and field_key in user:
+                return user.get(field_key)
+            else:
+                # Fallback to default field if profile field doesn't exist
+                method_name = f"get_{field}"
+                method = getattr(self, method_name, None)
+                if method:
+                    return await method(user_id)
+            return None
+        except Exception as e:
+            logging.error(f"Error getting {field} for profile {profile_num} for user {user_id}: {e}")
+            return None
+
+    async def set_metadata_field_with_profile(self, user_id, field, value, profile_num=None):
+        """Set metadata field with profile support"""
+        if profile_num is None:
+            profile_num = await self.get_current_profile(user_id)
+        
+        # Field names with profile suffix
+        profile_fields = {
+            "title": f"title_profile_{profile_num}",
+            "author": f"author_profile_{profile_num}",
+            "artist": f"artist_profile_{profile_num}",
+            "audio": f"audio_profile_{profile_num}",
+            "subtitle": f"subtitle_profile_{profile_num}",
+            "video": f"video_profile_{profile_num}"
+        }
+        
+        field_key = profile_fields.get(field)
+        if not field_key:
+            return False
+        
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {field_key: value}},
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error setting {field} for profile {profile_num} for user {user_id}: {e}")
+            return False
+
+    async def copy_profile_to_profile(self, user_id, from_profile, to_profile):
+        """Copy all metadata fields from one profile to another"""
+        try:
+            fields = ["title", "author", "artist", "audio", "subtitle", "video"]
+            
+            for field in fields:
+                # Get value from source profile
+                from_field = f"{field}_profile_{from_profile}"
+                user = await self.col.find_one({"_id": int(user_id)})
+                value = user.get(from_field) if user else None
+                
+                if value is None:
+                    # If source profile field doesn't exist, get default
+                    method_name = f"get_{field}"
+                    method = getattr(self, method_name, None)
+                    if method:
+                        value = await method(user_id)
+                
+                # Set to target profile
+                to_field = f"{field}_profile_{to_profile}"
+                await self.col.update_one(
+                    {"_id": int(user_id)},
+                    {"$set": {to_field: value}},
+                    upsert=True
+                )
+            return True
+        except Exception as e:
+            logging.error(f"Error copying profile {from_profile} to {to_profile} for user {user_id}: {e}")
+            return False
+
+    async def get_all_profiles_summary(self, user_id):
+        """Get summary of both profiles"""
+        summary = {}
+        
+        for profile_num in [1, 2]:
+            profile_data = {}
+            for field in ["title", "author", "artist", "audio", "subtitle", "video"]:
+                value = await self.get_metadata_field_with_profile(user_id, field, profile_num)
+                profile_data[field] = value
+            summary[f"profile_{profile_num}"] = profile_data
+        
+        return summary
+
 # Initialize database connection
 n4bots = Database(Config.DB_URL, Config.DB_NAME)
-
-
