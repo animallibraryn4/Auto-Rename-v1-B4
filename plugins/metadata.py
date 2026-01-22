@@ -146,38 +146,25 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
-@Client.on_callback_query(filters.regex(r'.*'))
+# Change the callback handler decorator to be more specific:
+METADATA_CALLBACK_PATTERNS = [
+    'on_metadata', 'off_metadata', 'set_metadata_menu',
+    'edit_title', 'edit_author', 'edit_artist', 'edit_audio',
+    'edit_subtitle', 'edit_video', 'view_all', 'meta_info',
+    'cancel_edit_', 'clear_', 'metadata_home', 'close_meta',
+    'toggle_profile', 'toggle_profile_from_view'
+]
+
+# Create a regex pattern that matches metadata callbacks only
+pattern = '|'.join(METADATA_CALLBACK_PATTERNS)
+@Client.on_callback_query(filters.regex(f'^({pattern})$'))
 async def metadata_callback_handler(client, query: CallbackQuery):
+    # This will only handle metadata-specific callbacks
     user_id = query.from_user.id
     data = query.data
-    
-    # Define metadata-specific callbacks
-    metadata_callbacks = [
-        'on_metadata', 'off_metadata', 'set_metadata_menu',
-        'edit_title', 'edit_author', 'edit_artist', 'edit_audio',
-        'edit_subtitle', 'edit_video', 'view_all', 'meta_info',
-        'cancel_edit_', 'clear_', 'metadata_home', 'close_meta',
-        'toggle_profile', 'toggle_profile_from_view'
-    ]
-    
-    # Check if this is a metadata callback
-    is_metadata_callback = False
-    for cb in metadata_callbacks:
-        if data.startswith(cb):
-            is_metadata_callback = True
-            break
-    
-    # If not a metadata callback, let other handlers process it
-    if not is_metadata_callback:
-        # Clear any metadata editing state if user is navigating away
-        await clear_metadata_state(user_id)
-        return
-    
-    # Continue with metadata processing
     current = await db.get_metadata(user_id)
     current_profile = await db.get_current_profile(user_id)
     
-    # ... rest of the existing handler code ...
     # Handle toggle profile from View All page
     if data == "toggle_profile_from_view":
         # Toggle between profile 1 and 2
