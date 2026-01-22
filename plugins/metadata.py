@@ -146,10 +146,28 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
+# At the beginning of the callback handler in metadata.py, add this:
+EXCLUDED_CALLBACK_PATTERNS = [
+    'quality_', 'set_', 'view_', 'delete_', 'toggle_', 'global',
+    'fileseq_', 'mode_', 'send_sequence', 'cancel_sequence',
+    'ls_', 'check_subscription', 'close_data', 'close_mode',
+    'setmedia_', 'set_mode_', 'premium_page', 'back_to_welcome',
+    'close_message'
+]
+
 @Client.on_callback_query(filters.regex(r'.*'))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
+    
+    # Check if this is a metadata callback or should be ignored
+    # Skip processing if it's from other modules
+    for pattern in EXCLUDED_CALLBACK_PATTERNS:
+        if data.startswith(pattern):
+            # Let other modules handle their own callbacks
+            return
+    
+    # Rest of the existing metadata callback handler...
     current = await db.get_metadata(user_id)
     current_profile = await db.get_current_profile(user_id)
     
