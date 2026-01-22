@@ -146,31 +146,38 @@ async def metadata_main(client, message):
         disable_web_page_preview=True
     )
 
-# At the beginning of the callback handler in metadata.py, add this:
-EXCLUDED_CALLBACK_PATTERNS = [
-    'quality_', 'set_', 'view_', 'delete_', 'toggle_', 'global',
-    'fileseq_', 'mode_', 'send_sequence', 'cancel_sequence',
-    'ls_', 'check_subscription', 'close_data', 'close_mode',
-    'setmedia_', 'set_mode_', 'premium_page', 'back_to_welcome',
-    'close_message'
-]
-
 @Client.on_callback_query(filters.regex(r'.*'))
 async def metadata_callback_handler(client, query: CallbackQuery):
     user_id = query.from_user.id
     data = query.data
     
-    # Check if this is a metadata callback or should be ignored
-    # Skip processing if it's from other modules
-    for pattern in EXCLUDED_CALLBACK_PATTERNS:
-        if data.startswith(pattern):
-            # Let other modules handle their own callbacks
-            return
+    # Define metadata-specific callbacks
+    metadata_callbacks = [
+        'on_metadata', 'off_metadata', 'set_metadata_menu',
+        'edit_title', 'edit_author', 'edit_artist', 'edit_audio',
+        'edit_subtitle', 'edit_video', 'view_all', 'meta_info',
+        'cancel_edit_', 'clear_', 'metadata_home', 'close_meta',
+        'toggle_profile', 'toggle_profile_from_view'
+    ]
     
-    # Rest of the existing metadata callback handler...
+    # Check if this is a metadata callback
+    is_metadata_callback = False
+    for cb in metadata_callbacks:
+        if data.startswith(cb):
+            is_metadata_callback = True
+            break
+    
+    # If not a metadata callback, let other handlers process it
+    if not is_metadata_callback:
+        # Clear any metadata editing state if user is navigating away
+        await clear_metadata_state(user_id)
+        return
+    
+    # Continue with metadata processing
     current = await db.get_metadata(user_id)
     current_profile = await db.get_current_profile(user_id)
     
+    # ... rest of the existing handler code ...
     # Handle toggle profile from View All page
     if data == "toggle_profile_from_view":
         # Toggle between profile 1 and 2
