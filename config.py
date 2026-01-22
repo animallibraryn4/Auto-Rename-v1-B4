@@ -32,8 +32,8 @@ class Config(object):
     DUMP_CHANNEL = int(os.environ.get("DUMP_CHANNEL", "-1001896877147"))
     WEBHOOK = bool(os.environ.get("WEBHOOK", "True")) 
     # Force Subscribe Channels (up to 5) - Use Channel IDs
-    FORCE_SUB_CHANNELS1 = "-1001896877147"  # Channel ID 1 (required) 
-    FORCE_SUB_CHANNELS2 = "-1002263636517"  # Set to channel ID string or None
+    FORCE_SUB_CHANNELS1 = None  # Channel ID 1 (required) 
+    FORCE_SUB_CHANNELS2 = None  # Set to channel ID string or None
     FORCE_SUB_CHANNELS3 = None  # Set to channel ID string or None
     FORCE_SUB_CHANNELS4 = None  # Set to channel ID string or None
     FORCE_SUB_CHANNELS5 = None  # Set to channel ID string or None
