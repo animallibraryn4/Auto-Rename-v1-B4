@@ -17,7 +17,7 @@ async def generate_main_menu_buttons(user_id):
     ])
     return buttons
 
-@Client.on_message(filters.private & filters.command('smart_thumb'))
+@Client.on_message(filters.private & filters.command("smart_thumb"))
 async def quality_menu(client, message):
     # Check if user is banned
     from plugins.admin_panel import check_ban_status
