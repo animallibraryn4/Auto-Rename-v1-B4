@@ -1,70 +1,163 @@
-from pymongo import MongoClient
-from config import MONGO_URI
+from pymongo import MongoClient, ASCENDING
+from config import MONGO_URI, DB_NAME
+import time
 
-# Database connection
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["N4_Bots"]
-users_collection = db["users_sequence"]
+client = MongoClient(MONGO_URI)
+db = client[DB_NAME]
 
-# Data storage (global variables)
-user_sequences = {}
-user_notification_msg = {}
-update_tasks = {}
-user_settings = {} 
-processing_users = set()  # 🔥 ADDED: To prevent multiple "Processing" messages
-user_ls_state = {}  # NEW: Store LS command state
-user_mode = {}  # NEW: Store user mode (file or caption)
+users = db["users"]              # user profiles
+likes = db["likes"]              # like records
+matches = db["matches"]          # mutual matches
+reports = db["reports"]          # reports
+views = db["views"]              # already-seen profiles per user
 
-def get_user_stats(user_id):
-    """Get user statistics from database"""
-    return users_collection.find_one({"user_id": user_id})
+# Indexes
+users.create_index([("user_id", ASCENDING)], unique=True)
+likes.create_index([("from_id", ASCENDING), ("to_id", ASCENDING)], unique=True)
+views.create_index([("user_id", ASCENDING), ("seen_id", ASCENDING)], unique=True)
 
-def update_user_stats(user_id, files_count, username):
-    """Update user statistics in database"""
-    users_collection.update_one(
-        {"user_id": user_id}, 
-        {"$inc": {"files_sequenced": files_count}, "$set": {"username": username}}, 
-        upsert=True
+
+# ------------- USERS -------------
+
+def get_user(user_id: int):
+    return users.find_one({"user_id": user_id})
+
+
+def create_or_update_user(user_id: int, **fields):
+    users.update_one(
+        {"user_id": user_id},
+        {"$set": {**fields, "updated_at": time.time()},
+         "$setOnInsert": {"created_at": time.time()}},
+        upsert=True,
     )
+    return get_user(user_id)
 
-def get_top_users(limit=5):
-    """Get top users by files sequenced"""
-    return users_collection.find().sort("files_sequenced", -1).limit(limit)
 
-def get_total_users():
-    """Get total number of users"""
-    return users_collection.count_documents({})
+def delete_user(user_id: int):
+    users.delete_one({"user_id": user_id})
+    likes.delete_many({"$or": [{"from_id": user_id}, {"to_id": user_id}]})
+    matches.delete_many({"$or": [{"user1": user_id}, {"user2": user_id}]})
+    views.delete_many({"user_id": user_id})
 
-def get_all_users():
-    """Get all users for broadcasting"""
-    return list(users_collection.find({}))
 
-def save_broadcast_stats(total, success, failed, blocked):
-    """Save broadcast statistics"""
-    from datetime import datetime
-    db.broadcast_stats.update_one(
-        {"_id": "latest"},
-        {
-            "$set": {
-                "total": total,
-                "success": success,
-                "failed": failed,
-                "blocked": blocked,
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-        },
-        upsert=True
-    )
+def update_field(user_id: int, key: str, value):
+    users.update_one({"user_id": user_id}, {"$set": {key: value}})
 
-# NEW: Get user mode
-def get_user_mode(user_id):
-    """Get user mode (default is 'file' if not set)"""
-    return user_mode.get(user_id, "file")
 
-# NEW: Set user mode
-def set_user_mode(user_id, mode):
-    """Set user mode ('file' or 'caption')"""
-    if mode in ["file", "caption"]:
-        user_mode[user_id] = mode
+# ------------- DISCOVERY -------------
+
+def get_candidates(user_id: int, gender_pref: str, city: str = None, country: str = None,
+                   limit: int = 20):
+    """
+    Find profiles matching the user's preference.
+    Priority: same city → same country → others.
+    """
+    seen = {v["seen_id"] for v in views.find({"user_id": user_id})}
+    seen.add(user_id)
+
+    gender_filter = {}
+    if gender_pref in ("male", "female"):
+        gender_filter["gender"] = gender_pref
+
+    # same city first
+    query_city = {"user_id": {"$nin": list(seen)},
+                  "profile_complete": True, **gender_filter,
+                  "city": {"$regex": f"^{city}$", "$options": "i"}} if city else None
+
+    results = []
+    if query_city:
+        results.extend(list(users.find(query_city).limit(limit)))
+
+    if len(results) < limit and country:
+        query_country = {"user_id": {"$nin": list(seen) + [r["user_id"] for r in results]},
+                         "profile_complete": True, **gender_filter,
+                         "country": {"$regex": f"^{country}$", "$options": "i"}}
+        results.extend(list(users.find(query_country).limit(limit - len(results))))
+
+    if len(results) < limit:
+        query_any = {"user_id": {"$nin": list(seen) + [r["user_id"] for r in results]},
+                     "profile_complete": True, **gender_filter}
+        results.extend(list(users.find(query_any).limit(limit - len(results))))
+
+    return results
+
+
+def mark_seen(user_id: int, seen_id: int):
+    try:
+        views.update_one(
+            {"user_id": user_id, "seen_id": seen_id},
+            {"$setOnInsert": {"ts": time.time()}},
+            upsert=True,
+        )
+    except Exception:
+        pass
+
+
+# ------------- LIKES -------------
+
+def add_like(from_id: int, to_id: int):
+    try:
+        likes.update_one(
+            {"from_id": from_id, "to_id": to_id},
+            {"$setOnInsert": {"ts": time.time()}},
+            upsert=True,
+        )
         return True
-    return False
+    except Exception:
+        return False
+
+
+def has_liked(from_id: int, to_id: int) -> bool:
+    return likes.find_one({"from_id": from_id, "to_id": to_id}) is not None
+
+
+def is_mutual(a: int, b: int) -> bool:
+    return has_liked(a, b) and has_liked(b, a)
+
+
+def get_pending_likes_for(user_id: int):
+    """People who liked me but I haven't responded to yet."""
+    # We track "response" by checking matches table
+    liked_me = likes.find({"to_id": user_id})
+    pending = []
+    for l in liked_me:
+        other = l["from_id"]
+        m = matches.find_one({"$or": [
+            {"user1": user_id, "user2": other},
+            {"user1": other, "user2": user_id},
+        ]})
+        if not m:
+            pending.append(other)
+    return pending
+
+
+# ------------- MATCHES -------------
+
+def create_match(a: int, b: int):
+    u1, u2 = sorted([a, b])
+    matches.update_one(
+        {"user1": u1, "user2": u2},
+        {"$setOnInsert": {"ts": time.time()}},
+        upsert=True,
+    )
+
+
+def get_matches(user_id: int):
+    return list(matches.find({"$or": [{"user1": user_id}, {"user2": user_id}]}))
+
+
+# ------------- REPORTS -------------
+
+def add_report(from_id: int, to_id: int, reason: str = ""):
+    reports.insert_one({
+        "from_id": from_id,
+        "to_id": to_id,
+        "reason": reason,
+        "ts": time.time(),
+    })
+
+
+# ------------- STATS -------------
+
+def total_users():
+    return users.count_documents({"profile_complete": True})
